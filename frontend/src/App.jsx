@@ -1,13 +1,12 @@
+import AppLayout from './components/layout/AppLayout'
+import './App.css'
+
 function App() {
   return (
-    <div>
-      <h1>SwiftletCare</h1>
-
-      <p>
-        Automated Environmental Control and Multi-Modal Health Monitoring System
-        for Swiftlet Farming
-      </p>
-    </div>
+    <AppLayout>
+      <h2>Dashboard</h2>
+      <p>Welcome to SwiftletCare.</p>
+    </AppLayout>
   )
 }
 
