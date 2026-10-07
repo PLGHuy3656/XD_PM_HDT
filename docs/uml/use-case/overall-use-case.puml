@@ -1,0 +1,162 @@
+@startuml
+title SwiftletCare - Overall Use Case Diagram
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+actor "Farm Owner" as Owner
+actor "Technician" as Tech
+actor "Administrator" as Admin
+
+rectangle "SwiftletCare System" {
+
+    package "Authentication" {
+        usecase "Login" as UC_Login
+        usecase "Logout" as UC_Logout
+    }
+
+    package "Farm & House Management" {
+        usecase "Manage Swiftlet Houses" as UC_House
+        usecase "Manage Zones" as UC_Zone
+    }
+
+    package "Environmental Monitoring" {
+        usecase "Monitor Environment" as UC_MonitorEnv
+        usecase "View Environmental History" as UC_EnvHistory
+    }
+
+    package "Environmental Control" {
+        usecase "Configure Environmental\nThresholds" as UC_Threshold
+        usecase "Switch AUTO / MANUAL\nMode" as UC_Mode
+        usecase "Manual Device Control" as UC_ManualControl
+    }
+
+    package "Device Management" {
+        usecase "View Device Status" as UC_DeviceStatus
+        usecase "Manage / Assign Devices" as UC_ManageDevice
+        usecase "Diagnose Devices" as UC_Diagnose
+    }
+
+    package "Swiftlet Monitoring" {
+        usecase "Monitor Entry / Exit\nCounts" as UC_Count
+        usecase "View Bird Movement\nStatistics" as UC_BirdStats
+        usecase "View Live Camera" as UC_LiveCamera
+    }
+
+    package "Threat & Anomaly Monitoring" {
+        usecase "View Predator Events" as UC_Predator
+        usecase "View AI Event Details" as UC_AIEvent
+        usecase "Monitor Audio /\nAnomaly Status" as UC_Audio
+    }
+
+    package "Alert Management" {
+        usecase "View Alerts" as UC_Alerts
+        usecase "Handle Alerts" as UC_HandleAlert
+    }
+
+    package "Analytics" {
+        usecase "View Trends & Statistics" as UC_Analytics
+    }
+
+    package "System Administration" {
+        usecase "Manage Users & Roles" as UC_Users
+        usecase "Manage System\nConfiguration" as UC_Config
+        usecase "Monitor System Status" as UC_SystemStatus
+    }
+}
+
+' ==============================
+' Common authentication
+' ==============================
+
+Owner --> UC_Login
+Owner --> UC_Logout
+
+Tech --> UC_Login
+Tech --> UC_Logout
+
+Admin --> UC_Login
+Admin --> UC_Logout
+
+
+' ==============================
+' Farm Owner
+' ==============================
+
+Owner --> UC_House
+Owner --> UC_Zone
+
+Owner --> UC_MonitorEnv
+Owner --> UC_EnvHistory
+
+Owner --> UC_Threshold
+Owner --> UC_Mode
+Owner --> UC_ManualControl
+
+Owner --> UC_DeviceStatus
+
+Owner --> UC_Count
+Owner --> UC_BirdStats
+Owner --> UC_LiveCamera
+
+Owner --> UC_Predator
+Owner --> UC_AIEvent
+Owner --> UC_Audio
+
+Owner --> UC_Alerts
+Owner --> UC_HandleAlert
+
+Owner --> UC_Analytics
+
+
+' ==============================
+' Technician
+' ==============================
+
+Tech --> UC_MonitorEnv
+
+Tech --> UC_DeviceStatus
+Tech --> UC_ManageDevice
+Tech --> UC_Diagnose
+
+Tech --> UC_Mode
+Tech --> UC_ManualControl
+
+Tech --> UC_Predator
+Tech --> UC_AIEvent
+Tech --> UC_Audio
+
+Tech --> UC_Alerts
+Tech --> UC_HandleAlert
+
+
+' ==============================
+' Administrator
+' ==============================
+
+Admin --> UC_ManageDevice
+Admin --> UC_Users
+Admin --> UC_Config
+Admin --> UC_SystemStatus
+
+
+' ==============================
+' Use Case Relationships
+' ==============================
+
+UC_ManualControl ..> UC_DeviceStatus : <<include>>
+UC_Predator ..> UC_AIEvent : <<include>>
+UC_HandleAlert ..> UC_Alerts : <<include>>
+
+note right of UC_Mode
+Technician access is limited
+by RBAC permissions.
+end note
+
+note right of UC_ManualControl
+Technician can only control
+authorized devices.
+end note
+
+@enduml
