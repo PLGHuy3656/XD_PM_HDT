@@ -1,0 +1,655 @@
+/* =========================================================
+   NESTMATE - REGISTER PAGE
+   Centered floating form + full background
+   Rounded visual language + transition animations
+   ========================================================= */
+
+.register-page {
+  position: relative;
+
+  min-height: 100vh;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  overflow: hidden;
+
+  background: #061b44;
+}
+
+/* =========================================================
+   BACKGROUND
+   ========================================================= */
+
+.register-background {
+  position: absolute;
+  inset: -20px;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(3, 17, 42, 0.25),
+      rgba(3, 17, 42, 0.04),
+      rgba(3, 17, 42, 0.25)
+    ),
+    url('/auth-background.jpg') center / cover no-repeat;
+
+  transform: scale(1.04);
+
+  animation: registerBackgroundEnter 1.2s ease-out both;
+}
+
+/* Dark vignette giúp form nổi hơn */
+
+.register-page::before {
+  content: '';
+
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(4, 20, 50, 0.18),
+      transparent 35%,
+      transparent 65%,
+      rgba(4, 20, 50, 0.18)
+    );
+
+  pointer-events: none;
+}
+
+/* =========================================================
+   LARGE ROUNDED SHAPES
+   ========================================================= */
+
+.register-side {
+  position: absolute;
+  z-index: 1;
+
+  pointer-events: none;
+
+  border: 1px solid rgba(239, 184, 63, 0.24);
+
+  border-radius: 50%;
+}
+
+.register-side-left {
+  width: 720px;
+  height: 720px;
+
+  left: -470px;
+  bottom: -260px;
+
+  animation: registerCircleLeft 1.1s ease-out both;
+}
+
+.register-side-right {
+  width: 650px;
+  height: 650px;
+
+  right: -430px;
+  top: -260px;
+
+  animation: registerCircleRight 1.1s ease-out both;
+}
+
+/* vòng tròn thứ hai */
+
+.register-side-left::before,
+.register-side-right::before {
+  content: '';
+
+  position: absolute;
+  inset: 42px;
+
+  border: 1px solid rgba(239, 184, 63, 0.12);
+  border-radius: 50%;
+}
+
+/* Gold curve */
+
+.register-side-left::after,
+.register-side-right::after {
+  content: '';
+
+  position: absolute;
+
+  width: 75%;
+  height: 75%;
+
+  border: 1px solid transparent;
+  border-top-color: rgba(246, 207, 119, 0.48);
+
+  border-radius: 50%;
+}
+
+.register-side-left::after {
+  top: 5%;
+  right: -5%;
+
+  transform: rotate(35deg);
+}
+
+.register-side-right::after {
+  bottom: 4%;
+  left: -5%;
+
+  transform: rotate(215deg);
+}
+
+/* =========================================================
+   CENTER PANEL
+   ========================================================= */
+
+.register-panel {
+  position: relative;
+  z-index: 5;
+
+  width: min(570px, calc(100% - 48px));
+
+  padding: 42px 50px 38px;
+
+  /*
+   * Quan trọng:
+   * không dùng border-radius nhỏ kiểu card vuông.
+   */
+
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 42px;
+
+  background: rgba(251, 248, 241, 0.96);
+
+  box-shadow:
+    0 30px 80px rgba(0, 12, 35, 0.28),
+    0 5px 18px rgba(0, 12, 35, 0.08);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  animation: registerPanelEnter 0.75s
+    cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/*
+ * Glow vàng rất nhẹ phía sau form
+ */
+
+.register-panel::before {
+  content: '';
+
+  position: absolute;
+  z-index: -1;
+
+  inset: -2px;
+
+  border-radius: 44px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(239, 184, 63, 0.18),
+      transparent 35%,
+      transparent 65%,
+      rgba(20, 95, 168, 0.12)
+    );
+
+  filter: blur(12px);
+
+  opacity: 0.75;
+}
+
+/* =========================================================
+   CONTENT
+   ========================================================= */
+
+.register-container {
+  width: 100%;
+
+  animation: registerContentEnter 0.8s 0.12s
+    cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.register-logo {
+  display: block;
+
+  width: 142px;
+  height: auto;
+
+  margin: 0 auto 17px;
+
+  animation: registerLogoEnter 0.9s 0.15s
+    cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* =========================================================
+   HEADING
+   ========================================================= */
+
+.register-heading {
+  margin-bottom: 22px;
+
+  text-align: center;
+}
+
+.register-heading h1 {
+  margin: 0;
+
+  color: #061b44;
+
+  font-size: 31px;
+  font-weight: 750;
+
+  letter-spacing: -0.035em;
+}
+
+/* =========================================================
+   FORM
+   ========================================================= */
+
+.register-form {
+  display: flex;
+  flex-direction: column;
+
+  gap: 13px;
+}
+
+.register-field {
+  display: flex;
+  flex-direction: column;
+
+  gap: 6px;
+}
+
+.register-field label {
+  padding-left: 4px;
+
+  color: #172033;
+
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.register-field input {
+  width: 100%;
+  height: 46px;
+
+  padding: 0 17px;
+
+  border: 1px solid #dfe3e8;
+
+  /*
+   * Đồng bộ ngôn ngữ bo tròn
+   */
+  border-radius: 16px;
+
+  background: rgba(255, 255, 255, 0.82);
+
+  color: #172033;
+
+  font: inherit;
+  font-size: 13px;
+
+  outline: none;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.register-field input::placeholder {
+  color: #a3a9b2;
+}
+
+.register-field input:hover {
+  border-color: #cbd3dc;
+
+  background: #ffffff;
+}
+
+.register-field input:focus {
+  border-color: #145fa8;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 0 0 4px rgba(20, 95, 168, 0.09);
+
+  transform: translateY(-1px);
+}
+
+/* =========================================================
+   PASSWORD
+   ========================================================= */
+
+.register-password-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+
+  gap: 12px;
+}
+
+/* =========================================================
+   REGISTER BUTTON
+   ========================================================= */
+
+.register-submit {
+  position: relative;
+
+  width: 100%;
+  height: 48px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 9px;
+
+  margin-top: 5px;
+
+  overflow: hidden;
+
+  border: none;
+
+  /*
+   * Pill shape thay vì button vuông
+   */
+  border-radius: 999px;
+
+  background: #efb83f;
+  color: #061b44;
+
+  font: inherit;
+  font-size: 14px;
+  font-weight: 750;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 8px 20px rgba(239, 184, 63, 0.2);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+/* ánh sáng chạy ngang button */
+
+.register-submit::before {
+  content: '';
+
+  position: absolute;
+
+  top: 0;
+  left: -120%;
+
+  width: 70%;
+  height: 100%;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.32),
+      transparent
+    );
+
+  transform: skewX(-20deg);
+
+  transition: left 0.55s ease;
+}
+
+.register-submit:hover {
+  background: #f3c45f;
+
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 12px 28px rgba(239, 184, 63, 0.3);
+}
+
+.register-submit:hover::before {
+  left: 150%;
+}
+
+.register-submit:active {
+  transform: translateY(0);
+}
+
+.register-submit span {
+  transition: transform 0.2s ease;
+}
+
+.register-submit:hover span {
+  transform: translateX(4px);
+}
+
+/* =========================================================
+   LOGIN LINK
+   ========================================================= */
+
+.register-switch {
+  display: flex;
+  justify-content: center;
+
+  gap: 5px;
+
+  margin: 19px 0 0;
+
+  color: #7b8492;
+
+  font-size: 12px;
+}
+
+.register-switch a {
+  position: relative;
+
+  color: #c88d17;
+
+  font-weight: 700;
+
+  text-decoration: none;
+}
+
+.register-switch a::after {
+  content: '';
+
+  position: absolute;
+
+  left: 0;
+  bottom: -2px;
+
+  width: 0;
+  height: 1px;
+
+  background: #c88d17;
+
+  transition: width 0.2s ease;
+}
+
+.register-switch a:hover::after {
+  width: 100%;
+}
+
+/* =========================================================
+   ANIMATIONS
+   ========================================================= */
+
+@keyframes registerPanelEnter {
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(26px)
+      scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0)
+      scale(1);
+  }
+}
+
+@keyframes registerContentEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes registerLogoEnter {
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(-10px)
+      scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0)
+      scale(1);
+  }
+}
+
+@keyframes registerBackgroundEnter {
+  from {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes registerCircleLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-100px) rotate(-15deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0) rotate(0);
+  }
+}
+
+@keyframes registerCircleRight {
+  from {
+    opacity: 0;
+    transform: translateX(100px) rotate(15deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0) rotate(0);
+  }
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 700px) {
+  .register-page {
+    padding: 20px;
+  }
+
+  .register-panel {
+    width: 100%;
+
+    padding: 34px 24px 30px;
+
+    border-radius: 32px;
+  }
+
+  .register-panel::before {
+    border-radius: 34px;
+  }
+
+  .register-password-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .register-side-left {
+    left: -600px;
+  }
+
+  .register-side-right {
+    right: -570px;
+  }
+}
+
+/* màn hình thấp */
+
+@media (max-height: 750px) and (min-width: 701px) {
+  .register-panel {
+    padding: 27px 44px 25px;
+
+    border-radius: 36px;
+  }
+
+  .register-logo {
+    width: 115px;
+
+    margin-bottom: 8px;
+  }
+
+  .register-heading {
+    margin-bottom: 13px;
+  }
+
+  .register-heading h1 {
+    font-size: 27px;
+  }
+
+  .register-form {
+    gap: 9px;
+  }
+
+  .register-field input {
+    height: 40px;
+  }
+
+  .register-switch {
+    margin-top: 13px;
+  }
+}
+
+/* Tôn trọng accessibility */
+
+@media (prefers-reduced-motion: reduce) {
+  .register-background,
+  .register-side,
+  .register-panel,
+  .register-container,
+  .register-logo {
+    animation: none;
+  }
+
+  .register-field input,
+  .register-submit,
+  .register-submit::before,
+  .register-submit span,
+  .register-switch a::after {
+    transition: none;
+  }
+}

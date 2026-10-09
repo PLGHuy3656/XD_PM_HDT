@@ -1,0 +1,32 @@
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-layout > aside {
+  width: 240px;
+  padding: 24px;
+  border-right: 1px solid #ddd;
+}
+
+.app-content {
+  flex: 1;
+}
+
+.app-content > header {
+  padding: 20px 32px;
+  border-bottom: 1px solid #ddd;
+}
+
+.main-content {
+  padding: 32px;
+}
+
+.app-layout ul {
+  padding: 0;
+  list-style: none;
+}
+
+.app-layout li {
+  padding: 10px 0;
+}
