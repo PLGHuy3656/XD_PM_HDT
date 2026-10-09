@@ -30,25 +30,25 @@
 
 ## A1. Frontend Foundation
 
-- [ ] Hoàn thiện cấu trúc React project
-- [ ] Cấu hình React Router
-- [ ] Xây dựng authentication flow phía client
-- [ ] Xây dựng role-based routing
-- [ ] Xây dựng shared application layout
+- [x] Hoàn thiện cấu trúc React project
+- [x] Cấu hình React Router
+- [x] Xây dựng authentication flow phía client
+- [x] Xây dựng role-based routing
+- [x] Xây dựng shared application layout
 - [ ] Xây dựng reusable UI components
-- [ ] Chuẩn hóa theme NestMate
-- [ ] Responsive Web UI
+- [x] Chuẩn hóa theme NestMate
+- [x] Responsive Web UI
 
 ## A2. Authentication UI
 
-- [ ] Login Page
+- [x] Login Page
 - [ ] Logout flow
 - [ ] Unauthorized / Forbidden Page
-- [ ] Điều hướng theo role:
+- [x] Điều hướng theo role:
       FARM_OWNER
       TECHNICIAN
       ADMINISTRATOR
-- [ ] Mock authentication cho prototype
+- [x] Mock authentication cho prototype
 - [ ] Tích hợp Backend Authentication API khi API sẵn sàng
 
 ## A3. Farm Owner UI
