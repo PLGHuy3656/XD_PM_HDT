@@ -311,11 +311,11 @@
 
 ## D1. Dataset
 
-- [ ] Thu thập Swiftlet dataset
-- [ ] Thu thập predator dataset
+- [x] Thu thập Swiftlet dataset
+- [x] Thu thập predator dataset
 - [ ] Xác định supported predator classes
-- [ ] Annotate dataset
-- [ ] Train / Validation / Test split
+- [x] Annotate dataset
+- [x] Train / Validation / Test split
 - [ ] Data augmentation
 
 ## D2. Swiftlet Detection
