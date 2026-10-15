@@ -35,7 +35,20 @@ const MOCK_USERS = [
 ]
 
 function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState(() => {
+    const storedUser = localStorage.getItem('nestmate_user')
+
+    if (!storedUser) {
+      return null
+    }
+
+    try {
+      return JSON.parse(storedUser)
+    } catch {
+      localStorage.removeItem('nestmate_user')
+      return null
+    }
+  })
 
   const login = (email, password) => {
     const normalizedEmail = email
@@ -64,6 +77,10 @@ function AuthProvider({ children }) {
     }
 
     setUser(authenticatedUser)
+    localStorage.setItem(
+      'nestmate_user',
+      JSON.stringify(authenticatedUser),
+    )
 
     return {
       success: true,
@@ -73,6 +90,7 @@ function AuthProvider({ children }) {
 
   const logout = () => {
     setUser(null)
+    localStorage.removeItem('nestmate_user')
   }
 
   const value = {
