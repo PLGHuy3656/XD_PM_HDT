@@ -1,5 +1,6 @@
 import Header from './Header'
 import Sidebar from './Sidebar'
+import './AppLayout.css'
 
 function AppLayout({ children }) {
   return (

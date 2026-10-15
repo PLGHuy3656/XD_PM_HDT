@@ -1,0 +1,272 @@
+.sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+
+  width: 96px;
+  height: 100vh;
+  flex: 0 0 96px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  background: #fbfaf6;
+
+  border-right:
+    1px solid rgba(16, 36, 62, 0.06);
+}
+
+/* =========================
+   LOGO
+   ========================= */
+
+.sidebar-logo-area {
+  width: 100%;
+  height: 94px;
+  flex: 0 0 94px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: transparent;
+}
+
+.sidebar-logo {
+  display: block;
+
+  width: 58px;
+  height: 58px;
+
+  object-fit: contain;
+
+  transition:
+    transform 180ms ease,
+    filter 180ms ease;
+}
+
+.sidebar-logo:hover {
+  transform: scale(1.05);
+}
+
+/* =========================
+   NAVIGATION
+   ========================= */
+
+.sidebar-nav {
+  width: 100%;
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  gap: 16px;
+
+  padding-top: 10px;
+}
+
+.sidebar-link {
+  position: relative;
+
+  width: 52px;
+  height: 52px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 auto;
+
+  border: 0;
+  border-radius: 16px;
+
+  background: transparent;
+  color: #8798a9;
+
+  text-decoration: none;
+
+  cursor: pointer;
+
+  transition:
+    color 180ms ease,
+    background 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.sidebar-link svg {
+  width: 24px;
+  height: 24px;
+
+  flex: 0 0 auto;
+}
+
+.sidebar-link:hover {
+  color: #a96f16;
+
+  background: #f8edd8;
+
+  transform: translateY(-1px);
+}
+
+.sidebar-link.active {
+  color: #a96f16;
+
+  background: #f8ead0;
+
+  box-shadow:
+    0 8px 22px rgba(169, 111, 22, 0.08);
+}
+
+/* =========================
+   TOOLTIP
+   ========================= */
+
+.sidebar-tooltip {
+  position: absolute;
+  z-index: 200;
+
+  left: 68px;
+  top: 50%;
+
+  min-height: 40px;
+
+  display: flex;
+  align-items: center;
+
+  padding: 0 15px;
+
+  border-radius: 11px;
+
+  background: #0d2942;
+  color: #ffffff;
+
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+
+  letter-spacing: 0.01em;
+
+  white-space: nowrap;
+
+  opacity: 0;
+  visibility: hidden;
+
+  transform:
+    translate(-7px, -50%)
+    scale(0.97);
+
+  transform-origin: left center;
+
+  pointer-events: none;
+
+  box-shadow:
+    0 10px 28px rgba(13, 41, 66, 0.2);
+
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease,
+    visibility 150ms ease;
+}
+
+/* Tooltip arrow */
+
+.sidebar-tooltip::before {
+  content: '';
+
+  position: absolute;
+
+  left: -5px;
+  top: 50%;
+
+  width: 10px;
+  height: 10px;
+
+  border-radius: 2px;
+
+  background: #0d2942;
+
+  transform:
+    translateY(-50%)
+    rotate(45deg);
+}
+
+/* Show tooltip */
+
+.sidebar-link:hover .sidebar-tooltip,
+.sidebar-link:focus-visible .sidebar-tooltip {
+  opacity: 1;
+  visibility: visible;
+
+  transform:
+    translate(0, -50%)
+    scale(1);
+}
+
+/* Keyboard focus */
+
+.sidebar-link:focus-visible {
+  outline: 2px solid rgba(169, 111, 22, 0.4);
+  outline-offset: 3px;
+}
+
+/* =========================
+   TABLET
+   ========================= */
+
+@media (max-width: 900px) {
+  .sidebar {
+    width: 76px;
+    flex-basis: 76px;
+  }
+
+  .sidebar-logo-area {
+    height: 82px;
+    flex-basis: 82px;
+  }
+
+  .sidebar-logo {
+    width: 50px;
+    height: 50px;
+  }
+
+  .sidebar-nav {
+    gap: 14px;
+
+    padding-top: 8px;
+  }
+
+  .sidebar-link {
+    width: 46px;
+    height: 46px;
+
+    border-radius: 14px;
+  }
+
+  .sidebar-link svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .sidebar-tooltip {
+    left: 58px;
+
+    min-height: 38px;
+
+    padding: 0 13px;
+
+    font-size: 13px;
+  }
+}
+
+/* =========================
+   MOBILE
+   ========================= */
+
+@media (max-width: 700px) {
+  .sidebar {
+    display: none;
+  }
+}
