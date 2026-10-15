@@ -6,6 +6,8 @@ import LoginPage from './pages/auth/Login/LoginPage'
 import RegisterPage from './pages/auth/Register/RegisterPage'
 
 import FarmOwnerDashboardPage from './pages/farm-owner/Dashboard/DashboardPage'
+import FarmOwnerEnvironmentPage from './pages/farm-owner/Environment/EnvironmentPage'
+
 import TechnicianDashboardPage from './pages/technician/Dashboard/DashboardPage'
 import AdminDashboardPage from './pages/admin/Dashboard/DashboardPage'
 
@@ -32,6 +34,15 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={['FARM_OWNER']}>
             <FarmOwnerDashboardPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/owner/environment"
+        element={
+          <ProtectedRoute allowedRoles={['FARM_OWNER']}>
+            <FarmOwnerEnvironmentPage />
           </ProtectedRoute>
         }
       />
