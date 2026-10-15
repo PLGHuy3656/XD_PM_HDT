@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+outputs/snapshots/*
+!outputs/snapshots/.gitkeep
+outputs/*.jsonl
+outputs/*.json
+data/samples/*
+!data/samples/.gitkeep
+# train / dataset (no push dataset&train result)
+runs/
+models/best_prev.pt
+outputs/predict/
+outputs/dataset_report.json
+*.mp4
+!docs/**/*.mp4
+Dataset_SC_NOPUSH/
+runs_NOPUSH/
+last.pt
+data.local.yaml

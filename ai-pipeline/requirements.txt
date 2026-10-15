@@ -1,0 +1,8 @@
+# SwiftletCare - AI pipeline
+ultralytics>=8.4.0      # YOLO26 (best.pt) + ByteTrack
+opencv-python>=4.9
+numpy>=1.24
+PyYAML>=6.0
+requests>=2.31          # HttpPublisher
+paho-mqtt>=2.0          # MqttPublisher (optional)
+pytest>=8.0             # tests

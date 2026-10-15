@@ -1,0 +1,60 @@
+# SwiftletCare AI pipeline - cấu hình chung (AI-FR-002, AI-NFR-005)
+model:
+  path: models/best.pt        # YOLO26, classes: 0 swiftlet, 1 rat, 2 snake
+  imgsz: 640                  # train ở 640x640; frame không vuông (vd 1280x720) được letterbox tự động, bbox trả về theo toạ độ frame gốc
+  device: auto                # auto | cpu | cuda:0
+  half: false
+  min_conf: 0.15              # ngưỡng thấp nhất đưa vào tracker (ByteTrack dùng low/high conf)
+  iou: 0.5
+
+tracker:
+  type: bytetrack             # bytetrack | centroid (fallback, không cần ultralytics)
+  frame_rate: 30
+  track_high_thresh: 0.35
+  track_low_thresh: 0.10
+  new_track_thresh: 0.35
+  track_buffer: 15            # chim bay nhanh -> giữ ngắn
+  match_thresh: 0.8
+  centroid_max_distance: 0.15 # (fallback) tỉ lệ theo đường chéo khung hình
+  centroid_max_missed: 5
+
+counting:
+  method: virtual_line        # đề xuất ở Open Question 7.3
+  inside_side: positive       # phía "trong nhà" của đường đếm: positive | negative
+  report_interval_s: 5        # chu kỳ đẩy số liệu đếm lên Backend
+  min_track_hits: 2           # track phải tồn tại >= N frame mới được tính
+
+predator:
+  classes: [rat, snake]       # Open Question 7.5: có thể giảm class
+  conf_threshold:
+    rat: 0.50
+    snake: 0.50
+  min_consecutive_frames: 3   # giảm báo giả
+  cooldown_s: 30              # không spam cảnh báo cùng class
+  anomaly_drop_ratio: null    # (tuỳ chọn) cảnh báo khi net change giảm bất thường
+
+snapshot:
+  dir: outputs/snapshots
+  public_base_url: ""         # vd http://minio:9000/swiftlet/snapshots ; rỗng -> đường dẫn local
+  jpeg_quality: 85
+
+publisher:
+  type: jsonl                 # jsonl | http | mqtt | multi
+  jsonl_path: outputs/ai_events.jsonl
+  publish_detections: false   # tiết kiệm băng thông (AI-NFR-006)
+  detections_interval_s: 1.0
+  http:
+    base_url: http://localhost:3000
+    paths: {detections: /api/ai/detections, counts: /api/ai/counts, events: /api/ai/events}
+    timeout_s: 3
+  mqtt:
+    host: localhost
+    port: 1883
+    username: ""
+    password: ""
+    topic_prefix: swiftletcare/ai   # -> {prefix}/{cameraId}/{counts|events|detections}
+
+runtime:
+  frame_skip: 0               # bỏ qua N frame giữa 2 lần infer
+  max_fps: 0                  # 0 = không giới hạn
+  draw_overlay: true
