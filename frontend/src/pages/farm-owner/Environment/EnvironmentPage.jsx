@@ -3,6 +3,12 @@ import { useMemo, useState } from 'react'
 import AppLayout from '../../../components/layout/AppLayout'
 import './EnvironmentPage.css'
 
+import EnvironmentTabs from './EnvironmentTabs'
+import './EnvironmentControlPage.css'
+
+import EnvironmentSelect from './EnvironmentSelect'
+import './EnvironmentSelect.css'
+
 const MAX_COMPARE_ZONES = 4
 
 const farms = [
@@ -385,14 +391,6 @@ function MetricIcon({ type }) {
   )
 }
 
-function ChevronIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="m8 10 4 4 4-4" />
-    </svg>
-  )
-}
-
 function RefreshIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -771,26 +769,6 @@ function EnvironmentPage() {
         !comparisonZoneIds.includes(zone.id)
     )
 
-  const handleFarmChange = (event) => {
-    const nextFarmId = event.target.value
-
-    const nextFarm =
-      farms.find(
-        (farm) => farm.id === nextFarmId
-      ) ?? farms[0]
-
-    setFarmId(nextFarmId)
-    setZoneId(nextFarm.zones[0].id)
-
-    setComparisonZoneIds(
-      nextFarm.zones
-        .slice(0, 2)
-        .map((zone) => zone.id)
-    )
-
-    setShowZonePicker(false)
-  }
-
   const addComparisonZone = (zoneIdToAdd) => {
     if (
       comparisonZoneIds.length >=
@@ -846,67 +824,48 @@ function EnvironmentPage() {
           </div>
         </section>
 
+        <EnvironmentTabs />
+
         <section className="environment-context-bar">
           <div className="context-select-group">
-            <label>
-              <span>Nhà yến</span>
+            <EnvironmentSelect
+                label="Nhà yến"
+                value={farmId}
+                options={farms.map((farm) => ({
+                value: farm.id,
+                label: farm.name,
+                }))}
+                onChange={(nextFarmId) => {
+                const nextFarm =
+                    farms.find(
+                    (farm) => farm.id === nextFarmId
+                    ) ?? farms[0]
 
-              <div className="environment-select">
-                <select
-                  value={farmId}
-                  onChange={handleFarmChange}
-                >
-                  {farms.map((farm) => (
-                    <option
-                      key={farm.id}
-                      value={farm.id}
-                    >
-                      {farm.name}
-                    </option>
-                  ))}
-                </select>
+                setFarmId(nextFarmId)
+                setZoneId(nextFarm.zones[0].id)
 
-                <ChevronIcon />
-              </div>
-            </label>
+                setComparisonZoneIds(
+                    nextFarm.zones
+                    .slice(0, 2)
+                    .map((zone) => zone.id)
+                )
 
-            <label>
-              <span>Khu vực</span>
+                setShowZonePicker(false)
+                }}
+            />
 
-              <div className="environment-select">
-                <select
-                  value={zoneId}
-                  onChange={(event) =>
-                    setZoneId(
-                      event.target.value
-                    )
-                  }
-                >
-                  {selectedFarm.zones.map(
-                    (zone) => (
-                      <option
-                        key={zone.id}
-                        value={zone.id}
-                      >
-                        {zone.name}
-                      </option>
-                    )
-                  )}
-                </select>
-
-                <ChevronIcon />
-              </div>
-            </label>
-          </div>
-
-          <div className="context-node">
-            <span>Sensor Node</span>
-
-            <strong>
-              <i />
-              {selectedZone.node}
-            </strong>
-          </div>
+            <EnvironmentSelect
+                label="Khu vực"
+                value={zoneId}
+                options={selectedFarm.zones.map((zone) => ({
+                value: zone.id,
+                label: zone.name,
+                }))}
+                onChange={(nextZoneId) => {
+                setZoneId(nextZoneId)
+                }}
+            />
+            </div>
         </section>
 
         <section className="environment-section">
@@ -1430,6 +1389,7 @@ function EnvironmentPage() {
         </footer>
       </div>
     </AppLayout>
+    
   )
 }
 
