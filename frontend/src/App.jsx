@@ -10,7 +10,12 @@ import FarmOwnerEnvironmentPage from './pages/farm-owner/Environment/Environment
 
 import EnvironmentControlPage from './pages/farm-owner/Environment/EnvironmentControlPage'
 
+import FarmOwnerDevicesPage from './pages/farm-owner/Devices/DevicesPage'
+
 import TechnicianDashboardPage from './pages/technician/Dashboard/DashboardPage'
+
+import TechnicianDevicesPage from './pages/technician/Devices/DevicesPage'
+
 import AdminDashboardPage from './pages/admin/Dashboard/DashboardPage'
 
 function App() {
@@ -59,10 +64,28 @@ function App() {
       />
 
       <Route
+        path="/owner/devices"
+        element={
+          <ProtectedRoute allowedRoles={['FARM_OWNER']}>
+            <FarmOwnerDevicesPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/technician/dashboard"
         element={
           <ProtectedRoute allowedRoles={['TECHNICIAN']}>
             <TechnicianDashboardPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/technician/devices"
+        element={
+          <ProtectedRoute allowedRoles={['TECHNICIAN']}>
+            <TechnicianDevicesPage />
           </ProtectedRoute>
         }
       />
