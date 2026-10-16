@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import './Select.css'
 
 function ChevronIcon() {
   return (
