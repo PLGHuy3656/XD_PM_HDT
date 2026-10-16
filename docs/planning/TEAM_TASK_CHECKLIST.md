@@ -53,7 +53,7 @@
 
 ## A3. Farm Owner UI
 
-- [ ] Farm Owner Dashboard
+- [x] Farm Owner Dashboard
 - [ ] House / Zone Management UI
 - [ ] Environment Monitoring Page
 - [ ] Current sensor cards
@@ -76,7 +76,7 @@
 
 ## A4. Technician UI
 
-- [ ] Technician Dashboard
+- [x] Technician Dashboard
 - [ ] Device List
 - [ ] Device Detail
 - [ ] Device Online / Offline Status
