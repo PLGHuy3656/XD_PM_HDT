@@ -1,0 +1,9 @@
+# Mỗi camera/node có ID duy nhất (Assumption 6.1). Toạ độ line chuẩn hoá 0..1.
+cameras:
+  - camera_id: CAM-01
+    source: data/samples/entrance.mp4   # đường dẫn video | 0 (webcam) | rtsp://... | http://<esp32-cam>/stream
+    source_type: auto                   # auto | video | image_dir | webcam | rtsp | mjpeg
+    counting_line:
+      start: [0.10, 0.55]
+      end:   [0.90, 0.55]
+    inside_side: positive               # ghi đè counting.inside_side nếu cần
