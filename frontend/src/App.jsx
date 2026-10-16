@@ -16,6 +16,8 @@ import FarmOwnerSwiftletsPage from './pages/farm-owner/Swiftlets/SwiftletsPage'
 
 import AlertsPage from './pages/farm-owner/Alerts/AlertsPage'
 
+import AnalyticsPage from './pages/farm-owner/Analytics/AnalyticsPage'
+
 import TechnicianDashboardPage from './pages/technician/Dashboard/DashboardPage'
 
 import TechnicianDevicesPage from './pages/technician/Devices/DevicesPage'
@@ -90,6 +92,15 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={['FARM_OWNER']}>
             <AlertsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/owner/analytics"
+        element={
+          <ProtectedRoute allowedRoles={['FARM_OWNER']}>
+            <AnalyticsPage />
           </ProtectedRoute>
         }
       />
