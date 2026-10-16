@@ -970,3 +970,64 @@
     display: none;
   }
 }
+.dashboard-camera-selector {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 7px;
+}
+
+.dashboard-camera-selector > button {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid #e8e2d5;
+  border-radius: 12px;
+  background: #fff;
+  color: #102a43;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dashboard-camera-selector > button:hover {
+  border-color: #d8c99f;
+  background: #fbf8f0;
+}
+
+.camera-live-dot.offline {
+  background: #98a5af;
+  box-shadow: 0 0 0 5px rgba(152, 165, 175, 0.12);
+}
+
+.camera-online.offline {
+  background: #f3f5f6;
+}
+
+.camera-online.offline .camera-online-dot {
+  background: #98a5af;
+}
+
+.camera-online.offline strong {
+  color: #647583;
+}
+
+.camera-preview-offline {
+  background: #263e50;
+}
+
+.camera-offline-placeholder svg {
+  opacity: 0.55;
+}
+
+.camera-offline-placeholder span {
+  max-width: 300px;
+  text-align: center;
+}
+
+.mock-detection.detection-three {
+  top: 27%;
+  left: 48%;
+  width: 13%;
+  height: 19%;
+}

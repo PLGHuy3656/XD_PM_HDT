@@ -1,5 +1,11 @@
 import { useState } from 'react'
 
+import { useNavigate } from 'react-router-dom'
+
+import EnvironmentSelect from '../../../components/ui/Select'
+
+import { cameras } from '../../../components/features/farm-owner/swiftlets/swiftletsMockData'
+
 import AppLayout from '../../../components/layout/AppLayout'
 import SectionCard from '../../../components/features/farm-owner/dashboard/SectionCard'
 import StatusBadge from '../../../components/features/farm-owner/dashboard/StatusBadge'
@@ -34,76 +40,193 @@ function CameraIcon() {
 }
 
 function LiveCamera() {
+  const navigate = useNavigate()
+
+  const [selectedCameraId, setSelectedCameraId] = useState(
+    cameras[0].id,
+  )
+
+  const selectedCamera =
+    cameras.find(
+      (camera) => camera.id === selectedCameraId,
+    ) ?? cameras[0]
+
+  const currentIndex = cameras.findIndex(
+    (camera) => camera.id === selectedCamera.id,
+  )
+
+  const isOnline = selectedCamera.status === 'ONLINE'
+
+  function moveCamera(offset) {
+    const nextIndex =
+      (currentIndex + offset + cameras.length) %
+      cameras.length
+
+    setSelectedCameraId(cameras[nextIndex].id)
+  }
+
   return (
     <div className="live-camera-layout">
-      <div className="camera-preview">
+      <div
+        className={`camera-preview ${
+          !isOnline ? 'camera-preview-offline' : ''
+        }`}
+      >
         <div className="camera-toolbar">
           <div>
-            <span className="camera-live-dot" />
-            LIVE
+            <span
+              className={`camera-live-dot ${
+                !isOnline ? 'offline' : ''
+              }`}
+            />
+
+            {isOnline ? 'LIVE' : 'OFFLINE'}
           </div>
 
-          <span>CAM-01 · Lối vào chính</span>
-        </div>
-
-        <div className="camera-placeholder">
-          <CameraIcon />
-
-          <strong>Camera trực tiếp</strong>
-
           <span>
-            Luồng camera sẽ được kết nối từ Camera Node
+            {selectedCamera.id} · {selectedCamera.name}
           </span>
         </div>
 
-        <div className="mock-detection detection-one">
-          <span>Swiftlet · 96%</span>
-        </div>
+        {isOnline ? (
+          <>
+            <div className="camera-placeholder">
+              <CameraIcon />
 
-        <div className="mock-detection detection-two">
-          <span>Swiftlet · 93%</span>
-        </div>
+              <strong>Camera trực tiếp</strong>
+
+              <span>
+                Luồng camera sẽ được kết nối từ Camera Node
+              </span>
+            </div>
+
+            {selectedCamera.detections.map(
+              (detection, index) => (
+                <div
+                  key={detection.id}
+                  className={`mock-detection detection-${
+                    index === 0
+                      ? 'one'
+                      : index === 1
+                        ? 'two'
+                        : 'three'
+                  }`}
+                >
+                  <span>
+                    {detection.label} ·{' '}
+                    {detection.confidence}%
+                  </span>
+                </div>
+              ),
+            )}
+          </>
+        ) : (
+          <div className="camera-placeholder camera-offline-placeholder">
+            <CameraIcon />
+
+            <strong>Camera ngoại tuyến</strong>
+
+            <span>
+              Không nhận được tín hiệu từ{' '}
+              {selectedCamera.node}
+            </span>
+          </div>
+        )}
       </div>
 
       <aside className="camera-information">
-        <div className="camera-online">
+        <div className="dashboard-camera-selector">
+          <button
+            type="button"
+            onClick={() => moveCamera(-1)}
+            aria-label="Camera trước"
+          >
+            ‹
+          </button>
+
+          <EnvironmentSelect
+            value={selectedCamera.id}
+            onChange={setSelectedCameraId}
+            options={cameras.map((camera) => ({
+              value: camera.id,
+              label: `${camera.id} · ${camera.name}${
+                camera.status === 'OFFLINE'
+                  ? ' · Offline'
+                  : ''
+              }`,
+            }))}
+          />
+
+          <button
+            type="button"
+            onClick={() => moveCamera(1)}
+            aria-label="Camera tiếp theo"
+          >
+            ›
+          </button>
+        </div>
+
+        <div
+          className={`camera-online ${
+            !isOnline ? 'offline' : ''
+          }`}
+        >
           <span className="camera-online-dot" />
 
           <div>
-            <strong>Camera đang trực tuyến</strong>
-            <small>CAM-01 · AI đang hoạt động</small>
+            <strong>
+              {isOnline
+                ? 'Camera đang trực tuyến'
+                : 'Camera ngoại tuyến'}
+            </strong>
+
+            <small>
+              {selectedCamera.id} ·{' '}
+              {isOnline
+                ? 'AI đang hoạt động'
+                : `Mất kết nối ${selectedCamera.node}`}
+            </small>
           </div>
         </div>
 
         <div className="camera-stat-grid">
           <article>
             <span>Chim vào</span>
-            <strong>128</strong>
+            <strong>{isOnline ? '128' : '—'}</strong>
             <small>Hôm nay</small>
           </article>
 
           <article>
             <span>Chim ra</span>
-            <strong>96</strong>
+            <strong>{isOnline ? '96' : '—'}</strong>
             <small>Hôm nay</small>
           </article>
 
           <article>
             <span>Chênh lệch</span>
-            <strong>+32</strong>
+            <strong>{isOnline ? '+32' : '—'}</strong>
             <small>Ước tính hiện diện</small>
           </article>
 
           <article>
             <span>Sự kiện AI</span>
-            <strong>03</strong>
-            <small>Cần kiểm tra</small>
+            <strong>{isOnline ? '03' : '—'}</strong>
+            <small>
+              {isOnline ? 'Cần kiểm tra' : 'Không có dữ liệu'}
+            </small>
           </article>
         </div>
 
         <button
           type="button"
           className="open-camera-button"
+          onClick={() =>
+            navigate(
+              `/owner/swiftlets?camera=${encodeURIComponent(
+                selectedCamera.id,
+              )}`,
+            )
+          }
         >
           Xem camera
           <span>→</span>
