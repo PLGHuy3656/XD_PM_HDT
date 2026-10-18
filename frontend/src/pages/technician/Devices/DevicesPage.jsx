@@ -2,17 +2,17 @@ import { useMemo, useState } from 'react'
 
 import AppLayout from '../../../components/layout/AppLayout'
 import EnvironmentSelect from '../../../components/ui/Select'
+
+import DeviceAssignmentModal from '../../../components/features/technician/devices/DeviceAssignmentModal'
+import DeviceDetailPanel from '../../../components/features/technician/devices/DeviceDetailPanel'
+import DeviceTable from '../../../components/features/technician/devices/DeviceTable'
+
 import {
   farms,
   initialDevices,
-  statusMeta,
   statusOptions,
   typeOptions,
 } from '../../../components/features/technician/devices/devicesMockData'
-
-import DeviceDetailModal from '../../../components/features/technician/devices/DeviceDetailModal'
-import DeviceAssignmentModal from '../../../components/features/technician/devices/DeviceAssignmentModal'
-import TechnicianDeviceTable from '../../../components/features/technician/devices/TechnicianDeviceTable'
 
 import './DevicesPage.css'
 
@@ -123,12 +123,15 @@ function TechnicianDevicesPage() {
     .filter((device) => device.rssi !== null)
     .map((device) => device.rssi)
 
-  const averageRssi = Math.round(
-    averageRssiValues.reduce(
-      (sum, value) => sum + value,
-      0
-    ) / averageRssiValues.length
-  )
+  const averageRssi =
+    averageRssiValues.length > 0
+      ? Math.round(
+          averageRssiValues.reduce(
+            (sum, value) => sum + value,
+            0
+          ) / averageRssiValues.length
+        )
+      : null
 
   const getZoneName = (zoneId) =>
     selectedFarm.zones.find(
@@ -227,7 +230,11 @@ function TechnicianDevicesPage() {
 
           <article>
             <span>AVG. SIGNAL</span>
-            <strong>{averageRssi} dBm</strong>
+            <strong>
+              {averageRssi !== null
+                ? `${averageRssi} dBm`
+                : '--'}
+            </strong>
             <small>Connected nodes</small>
           </article>
         </section>
@@ -242,8 +249,8 @@ function TechnicianDevicesPage() {
               <h2>Node & Connectivity</h2>
 
               <p>
-                Kiểm tra nhanh trạng thái kết nối và vị trí
-                được gán của từng node.
+                Kiểm tra nhanh trạng thái kết nối, heartbeat
+                và vị trí được gán của từng node.
               </p>
             </div>
 
@@ -272,7 +279,7 @@ function TechnicianDevicesPage() {
                 onChange={(event) =>
                   setSearch(event.target.value)
                 }
-                placeholder="Search Device ID, node name..."
+                placeholder="Tìm Device ID, tên node..."
               />
             </label>
 
@@ -305,17 +312,17 @@ function TechnicianDevicesPage() {
             </div>
           )}
 
-        <TechnicianDeviceTable
-          devices={filteredDevices}
-          farmName={selectedFarm.name}
-          getZoneName={getZoneName}
-          onOpenDetail={setSelectedDeviceId}
-          onOpenAssignment={openAssignment}
-        />
+          <DeviceTable
+            devices={filteredDevices}
+            farmName={selectedFarm.name}
+            getZoneName={getZoneName}
+            onOpenDetail={setSelectedDeviceId}
+            onOpenAssignment={openAssignment}
+          />
         </section>
 
         {selectedDevice && (
-          <DeviceDetailModal
+          <DeviceDetailPanel
             device={selectedDevice}
             zoneName={getZoneName(selectedDevice.zoneId)}
             onClose={() => setSelectedDeviceId(null)}
@@ -329,7 +336,9 @@ function TechnicianDevicesPage() {
         {assignmentDevice && (
           <DeviceAssignmentModal
             device={assignmentDevice}
-            currentZoneName={getZoneName(assignmentDevice.zoneId)}
+            currentZoneName={getZoneName(
+              assignmentDevice.zoneId
+            )}
             farmName={selectedFarm.name}
             zoneId={assignmentZoneId}
             zoneOptions={assignmentZoneOptions}

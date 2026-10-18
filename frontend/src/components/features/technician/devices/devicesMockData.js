@@ -24,6 +24,10 @@ export const initialDevices = [
     rssi: -51,
     lastSeen: 'Vừa xong',
     ip: '192.168.1.21',
+    mqttStatus: 'Connected',
+    technicalHealth: 'Healthy',
+    sensorHealth: '4/4 Healthy',
+    actuatorHealth: '2/2 Healthy',
   },
   {
     id: 'ENV-01',
@@ -36,6 +40,10 @@ export const initialDevices = [
     rssi: -57,
     lastSeen: '4 giây trước',
     ip: '192.168.1.22',
+    mqttStatus: 'Connected',
+    technicalHealth: 'Healthy',
+    sensorHealth: '4/4 Healthy',
+    actuatorHealth: 'N/A',
   },
   {
     id: 'CAM-01',
@@ -48,6 +56,10 @@ export const initialDevices = [
     rssi: -62,
     lastSeen: '7 giây trước',
     ip: '192.168.1.31',
+    mqttStatus: 'Connected',
+    technicalHealth: 'Healthy',
+    sensorHealth: 'Camera Healthy',
+    actuatorHealth: 'N/A',
   },
   {
     id: 'ESP32-CTRL-02',
@@ -60,6 +72,10 @@ export const initialDevices = [
     rssi: -79,
     lastSeen: '18 giây trước',
     ip: '192.168.1.24',
+    mqttStatus: 'Unstable',
+    technicalHealth: 'Needs Attention',
+    sensorHealth: '3/4 Healthy',
+    actuatorHealth: '2/2 Healthy',
   },
   {
     id: 'ENV-02',
@@ -72,6 +88,10 @@ export const initialDevices = [
     rssi: -65,
     lastSeen: '10 giây trước',
     ip: '192.168.1.25',
+    mqttStatus: 'Connected',
+    technicalHealth: 'Healthy',
+    sensorHealth: '4/4 Healthy',
+    actuatorHealth: 'N/A',
   },
   {
     id: 'AUDIO-01',
@@ -84,6 +104,10 @@ export const initialDevices = [
     rssi: null,
     lastSeen: '12 phút trước',
     ip: '--',
+    mqttStatus: 'Disconnected',
+    technicalHealth: 'Offline',
+    sensorHealth: 'Unavailable',
+    actuatorHealth: 'N/A',
   },
   {
     id: 'CAM-02',
@@ -96,6 +120,10 @@ export const initialDevices = [
     rssi: -60,
     lastSeen: '6 giây trước',
     ip: '192.168.1.33',
+    mqttStatus: 'Connected',
+    technicalHealth: 'Healthy',
+    sensorHealth: 'Camera Healthy',
+    actuatorHealth: 'N/A',
   },
 ]
 
