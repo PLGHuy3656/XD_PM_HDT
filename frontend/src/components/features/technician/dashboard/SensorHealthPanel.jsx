@@ -11,7 +11,7 @@ function SensorHealthPanel() {
         <div>
           <span>DIAGNOSTICS</span>
           <h3>Sensor Health</h3>
-          <p>T?nh tr?ng c?m bi?n ?ang ???c gi?m s?t</p>
+          <p>Tình trạng cảm biến đang được giám sát</p>
         </div>
       </div>
 
@@ -41,11 +41,11 @@ function SensorHealthPanel() {
       </div>
 
       <div className="technician-health-footer">
-        <span>26 sensor ???c ??ng k?</span>
+        <span>26 sensor được đăng ký</span>
 
         <button type="button">
-          Ch?n ?o?n
-          <span>?</span>
+          Chẩn đoán
+          <span aria-hidden="true">›</span>
         </button>
       </div>
     </section>

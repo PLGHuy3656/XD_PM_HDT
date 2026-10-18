@@ -10,25 +10,25 @@ function DeviceStatusPanel() {
       <div className="technician-card-heading">
         <div>
           <span>DEVICE MANAGEMENT</span>
-          <h3>Tr?ng th?i thi?t b?</h3>
+          <h3>Trạng thái thiết bị</h3>
           <p>
-            Theo d?i controller v? sensor ?ang k?t n?i trong nh? y?n
+            Theo dõi controller và sensor đang kết nối trong nhà yến
           </p>
         </div>
 
         <button type="button" className="technician-link-button">
-          Xem t?t c?
-          <span>?</span>
+          Xem tất cả
+          <span aria-hidden="true">›</span>
         </button>
       </div>
 
       <div className="technician-device-list">
         <div className="technician-device-list__header">
           <span>Node</span>
-          <span>Khu v?c</span>
+          <span>Khu vực</span>
           <span>Sensor</span>
-          <span>Tr?ng th?i</span>
-          <span>C?p nh?t</span>
+          <span>Trạng thái</span>
+          <span>Cập nhật</span>
         </div>
 
         {devices.map((device) => (
@@ -36,8 +36,9 @@ function DeviceStatusPanel() {
             <div className="technician-device-row__node">
               <span
                 className={`technician-device-icon technician-device-icon--${device.status}`}
+                aria-hidden="true"
               >
-                ?
+                N
               </span>
 
               <strong>{device.id}</strong>
