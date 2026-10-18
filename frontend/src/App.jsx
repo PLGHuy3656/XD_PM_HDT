@@ -4,22 +4,18 @@ import ProtectedRoute from './components/common/ProtectedRoute'
 
 import LoginPage from './pages/auth/Login/LoginPage'
 import RegisterPage from './pages/auth/Register/RegisterPage'
+import SettingsPage from './pages/account/Settings/SettingsPage'
 
 import FarmOwnerDashboardPage from './pages/farm-owner/Dashboard/DashboardPage'
+import FarmsPage from './pages/farm-owner/Farms/FarmsPage'
 import FarmOwnerEnvironmentPage from './pages/farm-owner/Environment/EnvironmentPage'
-
 import EnvironmentControlPage from './pages/farm-owner/Environment/EnvironmentControlPage'
-
 import FarmOwnerDevicesPage from './pages/farm-owner/Devices/DevicesPage'
-
 import FarmOwnerSwiftletsPage from './pages/farm-owner/Swiftlets/SwiftletsPage'
-
 import AlertsPage from './pages/farm-owner/Alerts/AlertsPage'
-
 import AnalyticsPage from './pages/farm-owner/Analytics/AnalyticsPage'
 
 import TechnicianDashboardPage from './pages/technician/Dashboard/DashboardPage'
-
 import TechnicianDevicesPage from './pages/technician/Devices/DevicesPage'
 
 import AdminDashboardPage from './pages/admin/Dashboard/DashboardPage'
@@ -43,10 +39,34 @@ function App() {
       />
 
       <Route
+        path="/settings"
+        element={
+          <ProtectedRoute
+            allowedRoles={[
+              'FARM_OWNER',
+              'TECHNICIAN',
+              'ADMIN',
+            ]}
+          >
+            <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/owner/dashboard"
         element={
           <ProtectedRoute allowedRoles={['FARM_OWNER']}>
             <FarmOwnerDashboardPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/owner/farms"
+        element={
+          <ProtectedRoute allowedRoles={['FARM_OWNER']}>
+            <FarmsPage />
           </ProtectedRoute>
         }
       />
