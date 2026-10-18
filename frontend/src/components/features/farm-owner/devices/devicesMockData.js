@@ -1,0 +1,137 @@
+export const farms = [
+  {
+    id: 'farm-binh-chanh',
+    name: 'Nhà yến Bình Chánh',
+    zones: [
+      { id: 'zone-a', name: 'Khu vực A' },
+      { id: 'zone-b', name: 'Khu vực B' },
+      { id: 'zone-c', name: 'Khu vực C' },
+      { id: 'zone-d', name: 'Khu vực D' },
+      { id: 'zone-e', name: 'Khu vực E' },
+    ],
+  },
+]
+
+export const devices = [
+  {
+    id: 'ESP32-CTRL-01',
+    name: 'Bộ điều khiển môi trường',
+    type: 'CONTROLLER',
+    typeLabel: 'ESP32 Controller',
+    farmId: 'farm-binh-chanh',
+    zoneId: 'zone-a',
+    status: 'ONLINE',
+    firmware: 'v1.4.2',
+    signal: -51,
+    lastSeen: 'Vừa xong',
+    description: 'Điều khiển phun sương, thông gió và sưởi.',
+  },
+  {
+    id: 'ENV-01',
+    name: 'Cảm biến môi trường',
+    type: 'SENSOR',
+    typeLabel: 'Environment Sensor',
+    farmId: 'farm-binh-chanh',
+    zoneId: 'zone-a',
+    status: 'ONLINE',
+    firmware: 'v1.2.8',
+    signal: -57,
+    lastSeen: '4 giây trước',
+    description: 'Theo dõi nhiệt độ, độ ẩm, CO₂ và ánh sáng.',
+  },
+  {
+    id: 'CAM-01',
+    name: 'Camera cửa ra vào',
+    type: 'CAMERA',
+    typeLabel: 'AI Camera Node',
+    farmId: 'farm-binh-chanh',
+    zoneId: 'zone-a',
+    status: 'ONLINE',
+    firmware: 'v2.1.0',
+    signal: -62,
+    lastSeen: '7 giây trước',
+    description: 'Nguồn hình ảnh cho đếm chim và AI Detection.',
+  },
+  {
+    id: 'ESP32-CTRL-02',
+    name: 'Bộ điều khiển môi trường',
+    type: 'CONTROLLER',
+    typeLabel: 'ESP32 Controller',
+    farmId: 'farm-binh-chanh',
+    zoneId: 'zone-b',
+    status: 'WARNING',
+    firmware: 'v1.4.2',
+    signal: -79,
+    lastSeen: '18 giây trước',
+    description: 'Tín hiệu Wi-Fi yếu, thiết bị vẫn đang hoạt động.',
+  },
+  {
+    id: 'ENV-02',
+    name: 'Cảm biến môi trường',
+    type: 'SENSOR',
+    typeLabel: 'Environment Sensor',
+    farmId: 'farm-binh-chanh',
+    zoneId: 'zone-b',
+    status: 'ONLINE',
+    firmware: 'v1.2.8',
+    signal: -65,
+    lastSeen: '10 giây trước',
+    description: 'Theo dõi nhiệt độ, độ ẩm, CO₂ và ánh sáng.',
+  },
+  {
+    id: 'AUDIO-01',
+    name: 'Audio Monitoring Node',
+    type: 'AUDIO',
+    typeLabel: 'Audio Node',
+    farmId: 'farm-binh-chanh',
+    zoneId: 'zone-c',
+    status: 'OFFLINE',
+    firmware: 'v1.0.6',
+    signal: null,
+    lastSeen: '12 phút trước',
+    description: 'Thu tín hiệu âm thanh phục vụ phát hiện bất thường.',
+  },
+  {
+    id: 'CAM-02',
+    name: 'Camera giám sát',
+    type: 'CAMERA',
+    typeLabel: 'AI Camera Node',
+    farmId: 'farm-binh-chanh',
+    zoneId: 'zone-d',
+    status: 'ONLINE',
+    firmware: 'v2.1.0',
+    signal: -60,
+    lastSeen: '6 giây trước',
+    description: 'Giám sát hình ảnh và sự kiện AI trong nhà yến.',
+  },
+]
+
+export const statusMeta = {
+  ONLINE: {
+    label: 'Online',
+    className: 'online',
+  },
+  WARNING: {
+    label: 'Cần chú ý',
+    className: 'warning',
+  },
+  OFFLINE: {
+    label: 'Offline',
+    className: 'offline',
+  },
+}
+
+export const typeFilters = [
+  { value: 'ALL', label: 'Tất cả thiết bị' },
+  { value: 'CONTROLLER', label: 'Controller' },
+  { value: 'SENSOR', label: 'Sensor' },
+  { value: 'CAMERA', label: 'Camera' },
+  { value: 'AUDIO', label: 'Audio' },
+]
+
+export const statusFilters = [
+  { value: 'ALL', label: 'Tất cả trạng thái' },
+  { value: 'ONLINE', label: 'Online' },
+  { value: 'WARNING', label: 'Cần chú ý' },
+  { value: 'OFFLINE', label: 'Offline' },
+]

@@ -14,11 +14,9 @@ const icons = {
 
   environment: (
     <>
-      <path d="M5 20V10" />
-      <path d="M10 20V5" />
-      <path d="M15 20v-8" />
-      <path d="M20 20V8" />
-      <path d="M3 20h19" />
+      <path d="M7.5 14.5V6a2 2 0 0 1 4 0v8.5a4 4 0 1 1-4 0Z" />
+      <path d="M9.5 16.5V9" />
+      <path d="M17.5 5.5s-3 3.4-3 5.8a3 3 0 0 0 6 0c0-2.4-3-5.8-3-5.8Z" />
     </>
   ),
 
@@ -77,11 +75,13 @@ const icons = {
 
   farm: (
     <>
-      <path d="M3 11 12 4l9 7" />
-      <path d="M5 10v10h14V10" />
-      <path d="M9 20v-6h6v6" />
+      <path d="M3 20V9l5-4 5 4v11" />
+      <path d="M13 12l4-3 4 3v8" />
+      <path d="M6 20v-5h4v5" />
+      <path d="M16 20v-4h2v4" />
+      <path d="M2 20h20" />
     </>
-  ),
+),
 
   settings: (
     <>

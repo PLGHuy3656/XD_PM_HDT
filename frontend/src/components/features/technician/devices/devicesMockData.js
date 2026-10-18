@@ -1,0 +1,130 @@
+export const farms = [
+  {
+    id: 'farm-binh-chanh',
+    name: 'Nhà yến Bình Chánh',
+    zones: [
+      { id: 'zone-a', name: 'Khu vực A' },
+      { id: 'zone-b', name: 'Khu vực B' },
+      { id: 'zone-c', name: 'Khu vực C' },
+      { id: 'zone-d', name: 'Khu vực D' },
+      { id: 'zone-e', name: 'Khu vực E' },
+    ],
+  },
+]
+
+export const initialDevices = [
+  {
+    id: 'ESP32-CTRL-01',
+    name: 'Environmental Controller',
+    type: 'CONTROLLER',
+    typeLabel: 'ESP32 Controller',
+    zoneId: 'zone-a',
+    status: 'ONLINE',
+    firmware: 'v1.4.2',
+    rssi: -51,
+    lastSeen: 'Vừa xong',
+    ip: '192.168.1.21',
+  },
+  {
+    id: 'ENV-01',
+    name: 'Environment Sensor Node',
+    type: 'SENSOR',
+    typeLabel: 'SHT31 · CO₂ · Light',
+    zoneId: 'zone-a',
+    status: 'ONLINE',
+    firmware: 'v1.2.8',
+    rssi: -57,
+    lastSeen: '4 giây trước',
+    ip: '192.168.1.22',
+  },
+  {
+    id: 'CAM-01',
+    name: 'Entry Camera Node',
+    type: 'CAMERA',
+    typeLabel: 'AI Camera',
+    zoneId: 'zone-a',
+    status: 'ONLINE',
+    firmware: 'v2.1.0',
+    rssi: -62,
+    lastSeen: '7 giây trước',
+    ip: '192.168.1.31',
+  },
+  {
+    id: 'ESP32-CTRL-02',
+    name: 'Environmental Controller',
+    type: 'CONTROLLER',
+    typeLabel: 'ESP32 Controller',
+    zoneId: 'zone-b',
+    status: 'WARNING',
+    firmware: 'v1.4.2',
+    rssi: -79,
+    lastSeen: '18 giây trước',
+    ip: '192.168.1.24',
+  },
+  {
+    id: 'ENV-02',
+    name: 'Environment Sensor Node',
+    type: 'SENSOR',
+    typeLabel: 'SHT31 · CO₂ · Light',
+    zoneId: 'zone-b',
+    status: 'ONLINE',
+    firmware: 'v1.2.8',
+    rssi: -65,
+    lastSeen: '10 giây trước',
+    ip: '192.168.1.25',
+  },
+  {
+    id: 'AUDIO-01',
+    name: 'Audio Monitoring Node',
+    type: 'AUDIO',
+    typeLabel: 'Audio Edge Node',
+    zoneId: 'zone-c',
+    status: 'OFFLINE',
+    firmware: 'v1.0.6',
+    rssi: null,
+    lastSeen: '12 phút trước',
+    ip: '--',
+  },
+  {
+    id: 'CAM-02',
+    name: 'Monitoring Camera',
+    type: 'CAMERA',
+    typeLabel: 'AI Camera',
+    zoneId: 'zone-d',
+    status: 'ONLINE',
+    firmware: 'v2.1.0',
+    rssi: -60,
+    lastSeen: '6 giây trước',
+    ip: '192.168.1.33',
+  },
+]
+
+export const statusMeta = {
+  ONLINE: {
+    label: 'Online',
+    className: 'online',
+  },
+  WARNING: {
+    label: 'Warning',
+    className: 'warning',
+  },
+  OFFLINE: {
+    label: 'Offline',
+    className: 'offline',
+  },
+}
+
+export const statusOptions = [
+  { value: 'ALL', label: 'Tất cả trạng thái' },
+  { value: 'ONLINE', label: 'Online' },
+  { value: 'WARNING', label: 'Warning' },
+  { value: 'OFFLINE', label: 'Offline' },
+]
+
+export const typeOptions = [
+  { value: 'ALL', label: 'Tất cả thiết bị' },
+  { value: 'CONTROLLER', label: 'Controller' },
+  { value: 'SENSOR', label: 'Sensor' },
+  { value: 'CAMERA', label: 'Camera' },
+  { value: 'AUDIO', label: 'Audio' },
+]

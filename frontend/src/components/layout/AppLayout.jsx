@@ -10,7 +10,7 @@ function AppLayout({ children }) {
       <div className="app-content">
         <Header />
 
-        <main className="main-content">
+        <main className="main-content page-container">
           {children}
         </main>
       </div>

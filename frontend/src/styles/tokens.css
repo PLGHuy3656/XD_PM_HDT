@@ -1,0 +1,128 @@
+/* ========================================
+   GLOBAL DESIGN TOKENS
+   ======================================== */
+
+:root {
+  /* ========================================
+     COLORS — BRAND & SURFACES
+     ======================================== */
+
+  --color-navy-950: #0b2138;
+  --color-navy-900: #102e4a;
+  --color-navy-800: #14283d;
+  --color-navy-700: #183c5c;
+
+  --color-gold-700: #a96f16;
+  --color-gold-600: #bd7b19;
+  --color-gold-500: #d5a43a;
+  --color-gold-400: #e7bd72;
+  --color-gold-100: #f6ead1;
+  --color-gold-50: #fffaf0;
+
+  --color-app-bg: #f8f4eb;
+  --color-cream-100: #faf7ef;
+  --color-cream-50: #fbf8f1;
+  --color-surface: #ffffff;
+  --color-surface-soft: #fbfaf7;
+  --color-surface-glass: rgba(255, 255, 255, 0.72);
+
+  /* ========================================
+     COLORS — TYPOGRAPHY
+     ======================================== */
+
+  --color-text: var(--color-navy-900);
+  --color-text-secondary: #536779;
+  --color-text-muted: #758696;
+  --color-text-subtle: #8c98a4;
+
+  /* ========================================
+     COLORS — SEMANTIC STATUS
+     ======================================== */
+
+  --color-success: #359467;
+  --color-success-soft: #eaf5ee;
+
+  --color-warning: #d08c29;
+  --color-warning-soft: #fff4df;
+
+  --color-danger: #c85b52;
+  --color-danger-soft: #fdeaea;
+
+  --color-info: #547f9d;
+  --color-info-soft: #edf2f5;
+
+  --color-offline: #8c98a4;
+  --color-offline-soft: #eef2f5;
+
+  /* ========================================
+     LAYOUT GEOMETRY
+     ======================================== */
+
+  --sidebar-width: 96px;
+  --sidebar-width-compact: 76px;
+  --header-height: 76px;
+  --header-height-mobile: 68px;
+
+  --page-max-width: 1600px;
+  --page-padding-top: 18px;
+  --page-padding-bottom: 40px;
+  --page-padding-x: 36px;
+  --page-padding-y: 28px;
+
+  /* ========================================
+     SPACING SCALE
+     ======================================== */
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+
+  /* ========================================
+     RADIUS SCALE
+     ======================================== */
+
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --radius-2xl: 28px;
+  --radius-pill: 999px;
+
+  /* ========================================
+     BORDERS
+     ======================================== */
+
+  --border-soft: rgba(16, 46, 74, 0.07);
+  --border-default: rgba(16, 46, 74, 0.09);
+  --border-warm: #e8e1d5;
+  --border-cool: #dfe5e8;
+
+  /* ========================================
+     SHADOWS
+     ======================================== */
+
+  --shadow-sm:
+    0 6px 18px rgba(16, 46, 74, 0.04);
+
+  --shadow-card:
+    0 10px 30px rgba(16, 46, 74, 0.04);
+
+  --shadow-elevated:
+    0 16px 40px rgba(16, 46, 74, 0.08);
+
+  --shadow-floating:
+    0 20px 50px rgba(16, 46, 74, 0.15);
+
+  /* ========================================
+     MOTION
+     ======================================== */
+
+  --transition-fast: 150ms ease;
+  --transition-normal: 180ms ease;
+}

@@ -1,56 +1,30 @@
-.technician-dashboard {
-  --tech-navy: #102e4a;
-  --tech-navy-soft: #183c5c;
-  --tech-gold: #c88b27;
-  --tech-gold-soft: #e7bd72;
-  --tech-cream: #f8f4eb;
-  --tech-card: rgba(255, 255, 255, 0.6);
-  --tech-border: rgba(16, 46, 74, 0.09);
-  --tech-muted: #75879a;
-  --tech-green: #3c9b75;
-  --tech-warning: #d69b36;
-  --tech-danger: #c85e58;
+/* ========================================
+   PAGE
+   ======================================== */
 
-  color: var(--tech-navy);
+.technician-dashboard {
+  --actor-surface: rgba(255, 255, 255, 0.6);
+
+  width: 100%;
+
+  color: var(--color-navy-800);
   font-family: "Segoe UI", Arial, sans-serif;
 }
 
-.technician-dashboard * {
-  box-sizing: border-box;
-}
-
-.technician-status-dot {
-  display: inline-block;
-  flex: 0 0 7px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-}
-
-.technician-status-dot.healthy {
-  background: var(--tech-green);
-  box-shadow: 0 0 0 4px rgba(60, 155, 117, 0.09);
-}
-
-.technician-status-dot.warning {
-  background: var(--tech-warning);
-  box-shadow: 0 0 0 4px rgba(214, 155, 54, 0.09);
-}
-
-.technician-status-dot.danger {
-  background: var(--tech-danger);
-  box-shadow: 0 0 0 4px rgba(200, 94, 88, 0.09);
-}
-
-/* Welcome */
+/* ========================================
+   HEADER
+   ======================================== */
 
 .technician-welcome {
-  display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.72fr);
   min-height: 205px;
   overflow: hidden;
-  border: 1px solid rgba(16, 46, 74, 0.07);
+
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.72fr);
+
+  border: 1px solid var(--border-soft);
   border-radius: 28px;
+
   background:
     radial-gradient(
       circle at 10% 20%,
@@ -62,20 +36,24 @@
       rgba(255, 255, 255, 0.82),
       rgba(252, 248, 239, 0.64)
     );
+
   box-shadow: 0 18px 45px rgba(16, 46, 74, 0.055);
 }
 
 .technician-welcome__content {
+  min-width: 0;
+
   display: flex;
   flex-direction: column;
   justify-content: center;
+
   padding: 30px 38px;
 }
 
 .technician-welcome__eyebrow,
 .technician-section-title > div > span,
 .technician-card-heading > div > span {
-  color: var(--tech-gold);
+  color: var(--color-gold-500);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.15em;
@@ -83,7 +61,8 @@
 
 .technician-welcome h1 {
   margin: 7px 0 0;
-  color: var(--tech-navy);
+
+  color: var(--color-navy-800);
   font-size: clamp(29px, 3vw, 42px);
   line-height: 1.05;
   letter-spacing: -0.04em;
@@ -91,8 +70,10 @@
 
 .technician-welcome__content > p {
   max-width: 620px;
+
   margin: 10px 0 0;
-  color: var(--tech-muted);
+
+  color: var(--color-text-muted);
   font-size: 14px;
   line-height: 1.65;
 }
@@ -101,28 +82,35 @@
   display: flex;
   align-items: center;
   gap: 14px;
+
   margin-top: 22px;
 }
 
 .technician-welcome__system > span {
-  color: var(--tech-muted);
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
 .technician-welcome__system strong {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  color: var(--tech-green);
+  gap: var(--space-2);
+
+  color: var(--color-success);
   font-size: 12px;
 }
 
 .technician-welcome__farm {
+  min-width: 0;
+
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 28px 30px;
-  border-left: 1px solid rgba(16, 46, 74, 0.07);
+
+  padding: var(--space-7) 30px;
+
+  border-left: 1px solid var(--border-soft);
+
   background:
     linear-gradient(
       145deg,
@@ -132,34 +120,42 @@
 }
 
 .technician-welcome__farm > span {
-  color: var(--tech-muted);
+  color: var(--color-text-muted);
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.12em;
 }
 
 .technician-welcome__farm button {
-  display: flex;
   width: 100%;
+
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 12px;
+
+  margin-top: var(--space-3);
   padding: 15px 17px;
-  border: 1px solid rgba(16, 46, 74, 0.09);
-  border-radius: 16px;
-  color: var(--tech-navy);
+
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+
   background: rgba(255, 255, 255, 0.62);
+
+  color: var(--color-navy-800);
+
   cursor: pointer;
+
   transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+    transform var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .technician-welcome__farm button:hover {
-  transform: translateY(-1px);
   border-color: rgba(200, 139, 39, 0.25);
+
   box-shadow: 0 10px 24px rgba(16, 46, 74, 0.06);
+  transform: translateY(-1px);
 }
 
 .technician-welcome__farm button > div {
@@ -173,14 +169,29 @@
 }
 
 .technician-welcome__farm button > span {
-  color: var(--tech-gold);
+  color: var(--color-gold-500);
   font-size: 24px;
 }
 
 .technician-welcome__farm p {
   margin: 10px 2px 0;
-  color: var(--tech-muted);
+
+  color: var(--color-text-muted);
   font-size: 10px;
+}
+
+/* ========================================
+   CONTENT
+   ======================================== */
+
+.technician-status-dot {
+  width: 7px;
+  height: 7px;
+
+  display: inline-block;
+  flex: 0 0 7px;
+
+  border-radius: 50%;
 }
 
 /* Section headings + collapse */
@@ -190,33 +201,35 @@
 }
 
 .technician-section-title {
-  display: flex;
   min-height: 54px;
+
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: var(--space-5);
 
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
   padding: 0 3px;
 
   transition:
-    min-height 180ms ease,
-    padding 180ms ease,
-    margin 180ms ease,
-    border-color 180ms ease,
-    background 180ms ease,
-    box-shadow 180ms ease;
+    min-height var(--transition-base),
+    padding var(--transition-base),
+    margin var(--transition-base),
+    border-color var(--transition-base),
+    background var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .technician-section-title__content {
-  display: flex;
   min-width: 0;
+
+  display: flex;
   flex: 1;
   flex-direction: column;
 }
 
 .technician-section-title__content > span {
-  color: var(--tech-gold);
+  color: var(--color-gold-500);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.15em;
@@ -229,23 +242,561 @@
 .technician-section-title h2 {
   margin: 3px 0 0;
 
-  color: var(--tech-navy);
-
+  color: var(--color-navy-800);
   font-size: 20px;
   letter-spacing: -0.025em;
 }
 
 .technician-section-title p {
-  margin: 4px 0 0;
+  margin: var(--space-1) 0 0;
 
-  color: var(--tech-muted);
-
+  color: var(--color-text-muted);
   font-size: 10px;
 }
 
-/* =========================
-   COLLAPSED STATE
-   ========================= */
+.technician-collapse-button {
+  width: 38px;
+  height: 38px;
+
+  display: grid;
+  flex: 0 0 38px;
+  place-items: center;
+
+  border: 1px solid rgba(16, 46, 74, 0.08);
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, 0.52);
+
+  color: var(--color-navy-800);
+
+  cursor: pointer;
+
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    transform var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.technician-collapse-button:hover {
+  border-color: rgba(200, 139, 39, 0.28);
+
+  background: var(--color-surface);
+
+  color: var(--color-gold-500);
+
+  transform: translateY(-1px);
+}
+
+.technician-collapse-button svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* System health */
+
+.technician-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.technician-stat-card {
+  min-width: 0;
+
+  padding: 18px;
+
+  border: 1px solid var(--border-medium);
+  border-radius: 20px;
+
+  background: var(--actor-surface);
+
+  box-shadow: 0 10px 30px rgba(16, 46, 74, 0.04);
+
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.technician-stat-card:hover {
+  box-shadow: 0 14px 34px rgba(16, 46, 74, 0.065);
+  transform: translateY(-2px);
+}
+
+.technician-stat-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.technician-stat-card__icon {
+  width: 38px;
+  height: 38px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: var(--radius-sm);
+
+  background: rgba(200, 139, 39, 0.1);
+
+  color: var(--color-gold-500);
+  font-size: 18px;
+}
+
+.technician-stat-card__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.technician-stat-card__body {
+  margin-top: 14px;
+}
+
+.technician-stat-card__body > span {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.technician-stat-card__body strong {
+  overflow: hidden;
+
+  display: block;
+
+  margin-top: 3px;
+
+  color: var(--color-navy-800);
+  font-size: 25px;
+  letter-spacing: -0.025em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.technician-stat-card__body p {
+  overflow: hidden;
+
+  margin: 6px 0 0;
+
+  color: var(--color-text-muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Shared cards */
+
+.technician-card {
+  min-width: 0;
+  overflow: hidden;
+
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-xl);
+
+  background: var(--actor-surface);
+
+  box-shadow: 0 12px 34px rgba(16, 46, 74, 0.04);
+}
+
+.technician-card-heading {
+  min-height: 78px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+
+  padding: 17px var(--space-5);
+
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.technician-card-heading h3 {
+  margin: var(--space-1) 0 0;
+
+  color: var(--color-navy-800);
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.technician-card-heading p {
+  margin: var(--space-1) 0 0;
+
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.technician-link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+
+  padding: 0;
+
+  border: 0;
+
+  background: transparent;
+
+  color: var(--color-gold-500);
+  font-size: 10px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.technician-link-button span {
+  font-size: 18px;
+}
+
+/* Devices */
+
+.technician-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(310px, 0.72fr);
+  gap: 14px;
+}
+
+.technician-side-column {
+  min-width: 0;
+
+  display: grid;
+  gap: 14px;
+}
+
+.technician-device-list {
+  padding: 0 var(--space-5) 10px;
+}
+
+.technician-device-list__header,
+.technician-device-row {
+  display: grid;
+  grid-template-columns:
+    minmax(130px, 1.1fr)
+    minmax(120px, 1fr)
+    70px
+    100px
+    105px;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.technician-device-list__header {
+  min-height: 40px;
+
+  border-bottom: 1px solid var(--border-soft);
+
+  color: #99a5b0;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.technician-device-row {
+  min-height: 62px;
+
+  border-bottom: 1px solid var(--border-subtle);
+
+  color: #5f7283;
+  font-size: 10px;
+}
+
+.technician-device-row:last-child {
+  border-bottom: 0;
+}
+
+.technician-device-row__node {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.technician-device-row__node strong {
+  color: var(--color-navy-800);
+  font-size: 11px;
+}
+
+.technician-device-icon {
+  width: 30px;
+  height: 30px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 9px;
+
+  font-size: 12px;
+}
+
+.technician-device-row__sensor {
+  color: var(--color-navy-800);
+}
+
+.technician-device-state {
+  width: fit-content;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.technician-device-row__time {
+  color: #93a0aa;
+  font-size: 9px;
+}
+
+/* Sensor health */
+
+.technician-health-score {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+
+  padding: 22px var(--space-5);
+}
+
+.technician-health-ring {
+  width: 112px;
+  height: 112px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+
+  background:
+    conic-gradient(
+      var(--color-success) 0 92%,
+      rgba(16, 46, 74, 0.08) 92% 100%
+    );
+}
+
+.technician-health-ring > div {
+  width: 86px;
+  height: 86px;
+
+  display: grid;
+  place-content: center;
+
+  border-radius: 50%;
+
+  background: #faf7f0;
+
+  text-align: center;
+}
+
+.technician-health-ring strong {
+  color: var(--color-navy-800);
+  font-size: 24px;
+}
+
+.technician-health-ring span {
+  margin-top: 2px;
+
+  color: var(--color-success);
+  font-size: 9px;
+}
+
+.technician-health-summary__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  padding: 10px 0;
+
+  border-bottom: 1px solid rgba(16, 46, 74, 0.065);
+}
+
+.technician-health-summary__item:last-child {
+  border-bottom: 0;
+}
+
+.technician-health-summary__item span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.technician-health-summary__item strong {
+  color: var(--color-navy-800);
+  font-size: 12px;
+}
+
+.technician-health-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+
+  padding: 13px var(--space-5);
+
+  border-top: 1px solid rgba(16, 46, 74, 0.065);
+
+  background: rgba(248, 244, 235, 0.45);
+}
+
+.technician-health-footer > span {
+  color: var(--color-text-muted);
+  font-size: 9px;
+}
+
+.technician-health-footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  padding: 0;
+
+  border: 0;
+
+  background: transparent;
+
+  color: var(--color-gold-500);
+  font-size: 9px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+/* Connectivity */
+
+.technician-connectivity-list {
+  padding: 6px var(--space-5) var(--space-3);
+}
+
+.technician-connectivity-list > div {
+  min-height: 38px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.technician-connectivity-list > div:last-child {
+  border-bottom: 0;
+}
+
+.technician-connectivity-list span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.technician-connectivity-list strong {
+  color: var(--color-navy-800);
+  font-size: 10px;
+}
+
+/* Alerts */
+
+.technician-alert-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.technician-alert-item {
+  min-width: 0;
+  min-height: 104px;
+
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-content: center;
+  gap: 10px;
+
+  padding: 17px var(--space-5);
+
+  border-right: 1px solid rgba(16, 46, 74, 0.065);
+}
+
+.technician-alert-item:last-child {
+  border-right: 0;
+}
+
+.technician-alert-item__icon {
+  width: 30px;
+  height: 30px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.technician-alert-item strong {
+  overflow: hidden;
+
+  display: block;
+
+  color: var(--color-navy-800);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.technician-alert-item p {
+  overflow: hidden;
+
+  margin: var(--space-1) 0 0;
+
+  color: var(--color-text-muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.technician-alert-item time {
+  grid-column: 2;
+
+  margin-top: -2px;
+
+  color: #a0a9b1;
+  font-size: 8px;
+}
+
+/* ========================================
+   COMPONENT STATES
+   ======================================== */
+
+.technician-status-dot.healthy {
+  background: var(--color-success);
+
+  box-shadow: 0 0 0 4px rgba(60, 155, 117, 0.09);
+}
+
+.technician-status-dot.warning {
+  background: var(--color-warning);
+
+  box-shadow: 0 0 0 4px rgba(214, 155, 54, 0.09);
+}
+
+.technician-status-dot.danger {
+  background: var(--color-danger-strong);
+
+  box-shadow: 0 0 0 4px rgba(200, 94, 88, 0.09);
+}
 
 .technician-dashboard-section:has(
   .technician-section-title--collapsed
@@ -257,10 +808,10 @@
   min-height: 66px;
 
   margin-bottom: 0;
-  padding: 0 14px 0 20px;
+  padding: 0 14px 0 var(--space-5);
 
-  border: 1px solid var(--tech-border);
-  border-radius: 18px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
 
   background:
     linear-gradient(
@@ -302,12 +853,11 @@
 
   font-size: 15px;
   font-weight: 700;
-
   letter-spacing: -0.015em;
 }
 
 .technician-section-title--collapsed:hover {
-  border-color: rgba(200, 139, 39, 0.18);
+  border-color: var(--border-gold);
 
   background:
     linear-gradient(
@@ -319,522 +869,119 @@
   box-shadow: 0 10px 28px rgba(16, 46, 74, 0.05);
 }
 
-/* Collapse button */
-
-.technician-collapse-button {
-  display: grid;
-
-  flex: 0 0 38px;
-
-  width: 38px;
-  height: 38px;
-
-  place-items: center;
-
-  border: 1px solid rgba(16, 46, 74, 0.08);
-  border-radius: 50%;
-
-  color: var(--tech-navy);
-
-  background: rgba(255, 255, 255, 0.52);
-
-  cursor: pointer;
-
-  transition:
-    color 160ms ease,
-    border-color 160ms ease,
-    transform 160ms ease,
-    background 160ms ease;
-}
-
-.technician-collapse-button:hover {
-  transform: translateY(-1px);
-
-  border-color: rgba(200, 139, 39, 0.28);
-
-  color: var(--tech-gold);
-
-  background: #ffffff;
-}
-
-.technician-collapse-button svg {
-  width: 17px;
-  height: 17px;
-}
-
 .technician-section-title--collapsed
   .technician-collapse-button {
-  flex-basis: 34px;
-
   width: 34px;
   height: 34px;
+
+  flex-basis: 34px;
 
   background: rgba(248, 244, 235, 0.7);
 }
 
-/* System health */
-
-.technician-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.technician-stat-card {
-  min-width: 0;
-  padding: 18px;
-  border: 1px solid var(--tech-border);
-  border-radius: 20px;
-  background: var(--tech-card);
-  box-shadow: 0 10px 30px rgba(16, 46, 74, 0.04);
-  transition:
-    transform 160ms ease,
-    box-shadow 160ms ease;
-}
-
-.technician-stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 34px rgba(16, 46, 74, 0.065);
-}
-
-.technician-stat-card__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.technician-stat-card__icon {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border-radius: 12px;
-  color: var(--tech-gold);
-  background: rgba(200, 139, 39, 0.1);
-  font-size: 18px;
-}
-
-.technician-stat-card__status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 9px;
-  font-weight: 700;
-}
-
 .technician-stat-card__status--healthy {
-  color: var(--tech-green);
+  color: var(--color-success);
 }
 
 .technician-stat-card__status--warning {
-  color: var(--tech-warning);
-}
-
-.technician-stat-card__body {
-  margin-top: 14px;
-}
-
-.technician-stat-card__body > span {
-  color: var(--tech-muted);
-  font-size: 11px;
-}
-
-.technician-stat-card__body strong {
-  display: block;
-  margin-top: 3px;
-  overflow: hidden;
-  color: var(--tech-navy);
-  font-size: 25px;
-  letter-spacing: -0.025em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.technician-stat-card__body p {
-  margin: 6px 0 0;
-  overflow: hidden;
-  color: var(--tech-muted);
-  font-size: 9px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Shared cards */
-
-.technician-card{
-  overflow: hidden;
-  border: 1px solid var(--tech-border);
-  border-radius: 22px;
-  background: var(--tech-card);
-  box-shadow: 0 12px 34px rgba(16, 46, 74, 0.04);
-}
-
-.technician-card-heading {
-  display: flex;
-  min-height: 78px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 17px 20px;
-  border-bottom: 1px solid rgba(16, 46, 74, 0.07);
-}
-
-.technician-card-heading h3{
-  margin: 4px 0 0;
-  color: var(--tech-navy);
-  font-size: 17px;
-  letter-spacing: -0.02em;
-}
-
-.technician-card-heading p {
-  margin: 4px 0 0;
-  color: var(--tech-muted);
-  font-size: 10px;
-}
-
-.technician-link-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0;
-  border: 0;
-  color: var(--tech-gold);
-  background: transparent;
-  font-size: 10px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.technician-link-button span {
-  font-size: 18px;
-}
-
-/* Devices */
-
-.technician-main-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(310px, 0.72fr);
-  gap: 14px;
-}
-
-.technician-side-column {
-  display: grid;
-  gap: 14px;
-}
-
-.technician-device-list {
-  padding: 0 20px 10px;
-}
-
-.technician-device-list__header,
-.technician-device-row {
-  display: grid;
-  grid-template-columns:
-    minmax(130px, 1.1fr)
-    minmax(120px, 1fr)
-    70px
-    100px
-    105px;
-  align-items: center;
-  gap: 12px;
-}
-
-.technician-device-list__header {
-  min-height: 40px;
-  border-bottom: 1px solid rgba(16, 46, 74, 0.07);
-  color: #99a5b0;
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.technician-device-row {
-  min-height: 62px;
-  border-bottom: 1px solid rgba(16, 46, 74, 0.055);
-  color: #5f7283;
-  font-size: 10px;
-}
-
-.technician-device-row:last-child {
-  border-bottom: 0;
-}
-
-.technician-device-row__node {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.technician-device-row__node strong {
-  color: var(--tech-navy);
-  font-size: 11px;
-}
-
-.technician-device-icon {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border-radius: 9px;
-  font-size: 12px;
+  color: var(--color-warning);
 }
 
 .technician-device-icon--online {
-  color: var(--tech-green);
   background: rgba(60, 155, 117, 0.09);
+
+  color: var(--color-success);
 }
 
 .technician-device-icon--warning {
-  color: var(--tech-warning);
   background: rgba(214, 155, 54, 0.1);
+
+  color: var(--color-warning);
 }
 
 .technician-device-icon--offline {
-  color: var(--tech-danger);
   background: rgba(200, 94, 88, 0.09);
-}
 
-.technician-device-row__sensor {
-  color: var(--tech-navy);
-}
-
-.technician-device-state {
-  display: inline-flex;
-  width: fit-content;
-  align-items: center;
-  gap: 7px;
-  font-size: 9px;
-  font-weight: 700;
+  color: var(--color-danger-strong);
 }
 
 .technician-device-state--online {
-  color: var(--tech-green);
+  color: var(--color-success);
 }
 
 .technician-device-state--warning {
-  color: var(--tech-warning);
+  color: var(--color-warning);
 }
 
 .technician-device-state--offline {
-  color: var(--tech-danger);
-}
-
-.technician-device-row__time {
-  color: #93a0aa;
-  font-size: 9px;
-}
-
-/* Sensor health */
-
-.technician-health-score {
-  display: grid;
-  grid-template-columns: 130px minmax(0, 1fr);
-  align-items: center;
-  gap: 14px;
-  padding: 22px 20px;
-}
-
-.technician-health-ring {
-  display: grid;
-  width: 112px;
-  height: 112px;
-  place-items: center;
-  border-radius: 50%;
-  background:
-    conic-gradient(
-      var(--tech-green) 0 92%,
-      rgba(16, 46, 74, 0.08) 92% 100%
-    );
-}
-
-.technician-health-ring > div {
-  display: grid;
-  width: 86px;
-  height: 86px;
-  place-content: center;
-  border-radius: 50%;
-  background: #faf7f0;
-  text-align: center;
-}
-
-.technician-health-ring strong {
-  color: var(--tech-navy);
-  font-size: 24px;
-}
-
-.technician-health-ring span {
-  margin-top: 2px;
-  color: var(--tech-green);
-  font-size: 9px;
-}
-
-.technician-health-summary__item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(16, 46, 74, 0.065);
-}
-
-.technician-health-summary__item:last-child {
-  border-bottom: 0;
-}
-
-.technician-health-summary__item span {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--tech-muted);
-  font-size: 10px;
-}
-
-.technician-health-summary__item strong {
-  color: var(--tech-navy);
-  font-size: 12px;
-}
-
-.technician-health-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 13px 20px;
-  border-top: 1px solid rgba(16, 46, 74, 0.065);
-  background: rgba(248, 244, 235, 0.45);
-}
-
-.technician-health-footer > span {
-  color: var(--tech-muted);
-  font-size: 9px;
-}
-
-.technician-health-footer button {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0;
-  border: 0;
-  color: var(--tech-gold);
-  background: transparent;
-  font-size: 9px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-/* Connectivity */
-
-.technician-connectivity-list {
-  padding: 6px 20px 12px;
-}
-
-.technician-connectivity-list > div {
-  display: flex;
-  min-height: 38px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border-bottom: 1px solid rgba(16, 46, 74, 0.06);
-}
-
-.technician-connectivity-list > div:last-child {
-  border-bottom: 0;
-}
-
-.technician-connectivity-list span {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--tech-muted);
-  font-size: 10px;
-}
-
-.technician-connectivity-list strong {
-  color: var(--tech-navy);
-  font-size: 10px;
-}
-
-/* Alerts */
-
-.technician-alert-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.technician-alert-item {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  min-height: 104px;
-  align-content: center;
-  gap: 10px;
-  padding: 17px 20px;
-  border-right: 1px solid rgba(16, 46, 74, 0.065);
-}
-
-.technician-alert-item:last-child {
-  border-right: 0;
-}
-
-.technician-alert-item__icon {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border-radius: 50%;
-  font-size: 10px;
-  font-weight: 800;
+  color: var(--color-danger-strong);
 }
 
 .technician-alert-item__icon--critical {
-  color: var(--tech-danger);
   background: rgba(200, 94, 88, 0.1);
+
+  color: var(--color-danger-strong);
 }
 
 .technician-alert-item__icon--warning {
-  color: var(--tech-warning);
   background: rgba(214, 155, 54, 0.11);
+
+  color: var(--color-warning);
 }
 
 .technician-alert-item__icon--info {
-  color: var(--tech-navy);
   background: rgba(16, 46, 74, 0.07);
+
+  color: var(--color-navy-800);
 }
 
-.technician-alert-item strong {
-  display: block;
-  overflow: hidden;
-  color: var(--tech-navy);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* ========================================
+   RESPONSIVE
+   ======================================== */
 
-.technician-alert-item p {
-  margin: 4px 0 0;
-  overflow: hidden;
-  color: var(--tech-muted);
-  font-size: 9px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.technician-alert-item time {
-  grid-column: 2;
-  margin-top: -2px;
-  color: #a0a9b1;
-  font-size: 8px;
-}
-
-/* Responsive chính thức xử lý ở CP7 */
-
-@media (max-width: 1100px) {
+@media (max-width: 1000px) {
   .technician-welcome {
-    grid-template-columns: 1fr 300px;
+    grid-template-columns: 1fr;
+  }
+
+  .technician-welcome__farm {
+    border-top: 1px solid var(--border-soft);
+    border-left: 0;
   }
 
   .technician-stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .technician-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .technician-alert-list {
+    grid-template-columns: 1fr;
+  }
+
+  .technician-alert-item {
+    border-right: 0;
+    border-bottom: 1px solid rgba(16, 46, 74, 0.065);
+  }
+
+  .technician-alert-item:last-child {
+    border-bottom: 0;
+  }
+}
+
+@media (max-width: 800px) {
+  .technician-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .technician-device-list {
+    overflow-x: auto;
+  }
+
+  .technician-device-list__header,
+  .technician-device-row {
+    min-width: 580px;
   }
 }

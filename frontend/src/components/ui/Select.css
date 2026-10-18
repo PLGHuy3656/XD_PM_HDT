@@ -1,0 +1,247 @@
+/* ========================================
+   CONTENT
+   ======================================== */
+
+.environment-control-select {
+  position: relative;
+
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+
+  padding: 11px 13px;
+
+  border: 1px solid #ebe5da;
+  border-radius: 13px;
+
+  background: var(--color-cream-50);
+
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.environment-control-select:hover {
+  border-color: #ddd2bf;
+}
+
+.environment-control-select-label {
+  color: var(--color-text-subtle);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.environment-control-select-trigger {
+  width: 100%;
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  padding: 0;
+
+  border: 0;
+  outline: 0;
+
+  background: transparent;
+
+  color: var(--color-navy-800);
+  font-family: Arial, sans-serif;
+
+  cursor: pointer;
+}
+
+.environment-control-select-value {
+  overflow: hidden;
+
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.environment-control-select-chevron {
+  width: 22px;
+  height: 22px;
+
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+
+  border-radius: 7px;
+
+  color: #637483;
+
+  transition:
+    transform var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.environment-control-select:hover
+  .environment-control-select-chevron {
+  background: rgba(20, 40, 61, 0.05);
+}
+
+.environment-control-select-chevron svg {
+  width: 15px;
+  height: 15px;
+
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.environment-control-select-menu {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 8px);
+  right: 0;
+  left: 0;
+
+  overflow: hidden;
+
+  padding: 5px;
+
+  border: 1px solid #e5ddd0;
+  border-radius: 12px;
+
+  background: var(--color-surface);
+
+  box-shadow:
+    0 16px 38px rgba(20, 40, 61, 0.14),
+    0 3px 10px rgba(20, 40, 61, 0.05);
+
+  animation: environment-select-enter 140ms ease;
+}
+
+.environment-control-select-option {
+  width: 100%;
+  min-height: 36px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+
+  padding: 8px 10px;
+
+  border: 0;
+  border-radius: var(--radius-xs);
+
+  background: transparent;
+
+  color: #5f6c76;
+  font-family: Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    color 120ms ease,
+    background 120ms ease;
+}
+
+.environment-control-select-option:hover {
+  background: #f7f3eb;
+
+  color: var(--color-navy-800);
+}
+
+.environment-control-select-check {
+  width: 20px;
+  height: 20px;
+
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+
+  border-radius: 50%;
+
+  background: rgba(217, 164, 65, 0.13);
+
+  color: var(--color-gold-600);
+}
+
+.environment-control-select-check svg {
+  width: 12px;
+  height: 12px;
+
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@keyframes environment-select-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========================================
+   COMPONENT STATES
+   ======================================== */
+
+.environment-control-select.open {
+  z-index: 30;
+
+  border-color: rgba(217, 164, 65, 0.7);
+
+  background: var(--color-surface);
+
+  box-shadow:
+    0 0 0 3px rgba(217, 164, 65, 0.08),
+    0 7px 20px rgba(23, 40, 56, 0.06);
+}
+
+.environment-control-select.open
+  .environment-control-select-chevron {
+  background: rgba(217, 164, 65, 0.11);
+
+  color: var(--color-gold-600);
+
+  transform: rotate(180deg);
+}
+
+.environment-control-select-trigger:disabled {
+  opacity: 0.55;
+
+  cursor: not-allowed;
+}
+
+.environment-control-select-option.selected {
+  background: #fff7e7;
+
+  color: var(--color-gold-700);
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 800px) {
+  .environment-control-select-menu {
+    position: absolute;
+  }
+}
