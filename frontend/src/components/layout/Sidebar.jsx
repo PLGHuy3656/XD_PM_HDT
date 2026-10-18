@@ -75,11 +75,13 @@ const icons = {
 
   farm: (
     <>
-      <path d="M3 11 12 4l9 7" />
-      <path d="M5 10v10h14V10" />
-      <path d="M9 20v-6h6v6" />
+      <path d="M3 20V9l5-4 5 4v11" />
+      <path d="M13 12l4-3 4 3v8" />
+      <path d="M6 20v-5h4v5" />
+      <path d="M16 20v-4h2v4" />
+      <path d="M2 20h20" />
     </>
-  ),
+),
 
   settings: (
     <>

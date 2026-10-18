@@ -7,6 +7,12 @@ export const navigationByRole = {
       icon: 'home',
     },
     {
+      id: 'farms',
+      label: 'Nhà yến',
+      path: '/owner/farms',
+      icon: 'farm',
+    },
+    {
       id: 'environment',
       label: 'Môi trường',
       path: '/owner/environment',
