@@ -34,6 +34,873 @@ All frontend code MUST follow these principles:
 
 ---
 
+# NestMate Global CSS Architecture
+
+> Architecture Version: 2.0  
+> Status: Mandatory  
+> Applies to: All frontend actors and shared UI
+
+This section defines the global CSS architecture for NestMate.
+
+These rules are mandatory for:
+
+- Farm Owner
+- Technician
+- Administrator
+- Shared Account UI
+- Shared Layout
+- Common UI
+
+The objective is not to make all actors visually identical.
+
+The objective is to ensure that every actor uses the same:
+
+- design primitives;
+- spacing system;
+- layout geometry;
+- page alignment;
+- responsive system;
+- CSS organization;
+- semantic status system;
+- component sizing principles.
+
+Actor identity may differ visually, but actor implementations MUST NOT create independent CSS architectures.
+
+---
+
+## A. CSS Architecture Layers
+
+NestMate frontend CSS follows this hierarchy:
+
+```text
+Global Design Primitives
+        ↓
+Global Semantic Tokens
+        ↓
+Global Layout Contract
+        ↓
+Optional Actor Theme
+        ↓
+Feature / Component CSS
+        ↓
+State / Responsive Rules
+```
+
+The preferred stylesheet structure is:
+
+```text
+src/
+├── styles/
+│   ├── tokens.css
+│   ├── foundation.css
+│   └── layout.css
+│
+├── components/
+│   ├── layout/
+│   ├── common/
+│   └── features/
+│
+└── pages/
+```
+
+Responsibilities:
+
+### `tokens.css`
+
+Contains global design primitives and semantic variables.
+
+Examples:
+
+- colors;
+- spacing;
+- radii;
+- shadows;
+- transitions;
+- shared layout dimensions;
+- shared status colors.
+
+### `foundation.css`
+
+Contains only intentionally global foundation rules.
+
+Examples:
+
+- box sizing;
+- root/body sizing;
+- inherited font behavior;
+- basic form inheritance where appropriate.
+
+It MUST NOT contain feature-specific styles.
+
+### `layout.css`
+
+Contains shared application geometry and reusable page-level layout contracts.
+
+Examples:
+
+- shared page container;
+- shared content viewport;
+- page spacing;
+- page width constraints.
+
+### Feature CSS
+
+Contains only styles specific to that page, component, or feature.
+
+---
+
+# B. Single Source of Truth for Design Tokens
+
+Global design primitives MUST be declared centrally.
+
+Pages MUST NOT create their own independent design systems.
+
+Example:
+
+```css
+:root {
+  /* ========================================
+     COLORS
+     ======================================== */
+
+  --color-navy-900: #102e4a;
+  --color-navy-700: #183c5c;
+
+  --color-gold-600: #bd7b19;
+  --color-gold-400: #e7bd72;
+
+  --color-cream-100: #faf7ef;
+  --color-surface: #ffffff;
+
+  --color-success: #38aa76;
+  --color-warning: #d69b36;
+  --color-danger: #c85e58;
+
+  --color-text: var(--color-navy-900);
+  --color-text-muted: #8796a3;
+
+  /* ========================================
+     LAYOUT
+     ======================================== */
+
+  --sidebar-width: 252px;
+  --header-height: 76px;
+
+  --page-max-width: 1600px;
+  --page-padding-x: 32px;
+  --page-padding-y: 28px;
+
+  /* ========================================
+     SPACING
+     ======================================== */
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* ========================================
+     RADIUS
+     ======================================== */
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* ========================================
+     BORDER
+     ======================================== */
+
+  --border-soft: rgba(16, 46, 74, 0.07);
+  --border-default: rgba(16, 46, 74, 0.09);
+
+  /* ========================================
+     SHADOW
+     ======================================== */
+
+  --shadow-card:
+    0 10px 30px rgba(16, 46, 74, 0.04);
+
+  --shadow-floating:
+    0 18px 45px rgba(16, 46, 74, 0.08);
+
+  /* ========================================
+     MOTION
+     ======================================== */
+
+  --transition-fast: 160ms ease;
+  --transition-normal: 180ms ease;
+}
+```
+
+The exact token set may be adjusted during migration after inspecting the existing UI.
+
+Do NOT create tokens merely because a value occurs once.
+
+Tokens represent repeated design decisions.
+
+---
+
+# C. Token Naming Rules
+
+Tokens MUST describe purpose or design primitive.
+
+Preferred:
+
+```css
+--color-text
+--color-text-muted
+--color-danger
+--space-4
+--radius-lg
+--shadow-card
+--page-padding-x
+```
+
+Avoid:
+
+```css
+--blue1
+--dark-color
+--padding-device
+--dashboard-gap
+--random-gray
+```
+
+Feature-specific values do not automatically belong in global tokens.
+
+---
+
+# D. Actor Theme Contract
+
+Farm Owner, Technician, and Administrator may have different visual identities.
+
+However, actors MUST NOT implement independent design systems.
+
+This is prohibited:
+
+```css
+.technician-dashboard {
+  --tech-navy: ...;
+  --tech-border: ...;
+  --tech-radius: ...;
+  --tech-spacing: ...;
+}
+```
+
+when equivalent global primitives already exist.
+
+Actor styling may define semantic aliases when necessary:
+
+```css
+.technician-shell {
+  --actor-accent: var(--color-gold-600);
+  --actor-surface: rgba(255, 255, 255, 0.6);
+}
+```
+
+An actor theme may affect:
+
+- accent presentation;
+- surface treatment;
+- decorative visual treatment;
+- actor-specific emphasis.
+
+An actor theme MUST NOT redefine:
+
+- spacing scale;
+- page geometry;
+- breakpoint system;
+- global status meanings;
+- fundamental radius scale;
+- Sidebar geometry;
+- Header geometry.
+
+Therefore:
+
+```text
+Same architecture
+Same geometry
+Same CSS conventions
+Different visual personality where approved
+```
+
+is valid.
+
+Three unrelated CSS systems are not.
+
+---
+
+# E. Application Layout Contract
+
+The application geometry MUST be controlled by shared layout infrastructure.
+
+Required hierarchy:
+
+```text
+Sidebar
+   ↓
+AppLayout
+   ↓
+Shared Content Viewport
+   ↓
+Shared Page Container
+   ↓
+Actor Page
+```
+
+Pages MUST NOT independently calculate their position relative to Sidebar or Header.
+
+Page styles MUST NOT introduce arbitrary:
+
+```css
+margin-left
+padding-left
+left
+transform
+width: calc(...)
+```
+
+to compensate for Sidebar geometry.
+
+Sidebar positioning belongs to shared layout.
+
+Header positioning belongs to shared layout.
+
+Page positioning belongs to the shared page container.
+
+---
+
+# F. Shared Page Container
+
+All normal actor pages MUST share a common page geometry.
+
+Conceptually:
+
+```css
+.page-container {
+  width: min(100%, var(--page-max-width));
+  min-width: 0;
+
+  margin: 0 auto;
+  padding:
+    var(--page-padding-y)
+    var(--page-padding-x);
+}
+```
+
+The final implementation may live in `layout.css` or shared layout components.
+
+The important invariant is:
+
+> Individual pages must not independently decide their outer horizontal alignment.
+
+---
+
+# G. Page Alignment Invariant
+
+At the same viewport width, primary page content SHOULD begin on the same horizontal origin.
+
+For example:
+
+```text
+Sidebar │ Dashboard title
+        │ Farms title
+        │ Environment title
+        │ Devices title
+        │ Swiftlets title
+        │ Alerts title
+        │ Analytics title
+```
+
+The same rule applies to Technician and Administrator pages.
+
+A page MUST NOT appear farther from or closer to Sidebar simply because its local stylesheet uses different outer padding.
+
+Feature-internal indentation is allowed.
+
+Page-level alignment inconsistency is not.
+
+---
+
+# H. Outer Spacing Ownership
+
+Outer page spacing belongs to the shared layout/page container.
+
+Feature CSS owns only internal spacing.
+
+Example:
+
+Shared:
+
+```text
+Sidebar → page edge
+Header → page content
+page maximum width
+outer horizontal padding
+outer vertical padding
+```
+
+Feature:
+
+```text
+section → section
+card → card
+title → description
+table cells
+chart internals
+camera overlay
+```
+
+This ownership rule MUST be preserved.
+
+---
+
+# I. Shared Spacing Scale
+
+Structural spacing SHOULD prefer the global spacing scale.
+
+Example:
+
+```css
+.device-grid {
+  display: grid;
+
+  gap: var(--space-4);
+}
+```
+
+Preferred scale:
+
+```text
+4
+8
+12
+16
+20
+24
+32
+```
+
+Not every numeric value must become a token.
+
+Component-specific geometry may still use exact values where necessary.
+
+Examples:
+
+```css
+top: 13px;
+grid-template-columns: 42px minmax(0, 1fr);
+```
+
+are acceptable when they represent real component geometry.
+
+The purpose of tokens is consistency, not elimination of all numeric CSS.
+
+---
+
+# J. Shared Radius Contract
+
+Repeated surface radii SHOULD use shared radius tokens.
+
+Example:
+
+```css
+.card {
+  border-radius: var(--radius-lg);
+}
+```
+
+Special shapes may remain local.
+
+Example:
+
+```css
+.camera-indicator {
+  border-radius: 50%;
+}
+```
+
+Do not create page-specific radius systems.
+
+---
+
+# K. Shared Status Colors
+
+Semantic states MUST have consistent meaning across actors.
+
+Examples:
+
+```text
+success
+warning
+danger
+offline
+information
+```
+
+A danger state must not use unrelated colors between Farm Owner and Technician without a specific UX reason.
+
+Use semantic tokens where practical.
+
+---
+
+# L. CSS File Structural Consistency
+
+Farm Owner, Technician, and Administrator CSS MUST follow the same organizational style.
+
+Recommended order:
+
+```css
+/* ========================================
+   PAGE
+   ======================================== */
+
+
+/* ========================================
+   HEADER
+   ======================================== */
+
+
+/* ========================================
+   NAVIGATION / TABS
+   ======================================== */
+
+
+/* ========================================
+   CONTENT
+   ======================================== */
+
+
+/* ========================================
+   COMPONENT STATES
+   ======================================== */
+
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+```
+
+Sections may be omitted when irrelevant.
+
+Actor identity does not justify a different CSS coding style.
+
+---
+
+# M. Property Ordering Is Global
+
+The CSS property ordering defined elsewhere in this document applies to:
+
+- Farm Owner;
+- Technician;
+- Administrator;
+- Account;
+- Shared Layout;
+- Common Components.
+
+No actor may use a different property-order convention.
+
+---
+
+# N. Responsive Contract
+
+All actors use the same standard responsive breakpoints:
+
+```text
+1280px
+1000px
+800px
+600px
+430px
+```
+
+Feature-specific exceptions are allowed only when the component genuinely requires one.
+
+A feature MUST NOT invent a different breakpoint system simply because it belongs to another actor.
+
+---
+
+# O. Layout Before Truncation
+
+When content is unexpectedly truncated:
+
+1. inspect parent Grid/Flex constraints;
+2. inspect minimum widths;
+3. inspect available page width;
+4. inspect `min-width: 0`;
+5. inspect breakpoint behavior;
+6. only then consider truncation.
+
+Do NOT hide broken layouts with:
+
+```css
+text-overflow: ellipsis;
+```
+
+as the first solution.
+
+---
+
+# P. Page CSS Restrictions
+
+Page styles SHOULD NOT define global application primitives.
+
+Avoid inside a page:
+
+```css
+.owner-dashboard {
+  --global-navy: ...;
+  --global-spacing: ...;
+  --global-radius: ...;
+}
+```
+
+Page-level custom properties are acceptable only for genuinely page-specific calculations.
+
+---
+
+# Q. Hard-Coded Values
+
+Hard-coded values are classified into two categories.
+
+## Q1. Design-system value
+
+Examples:
+
+```text
+primary navy
+gold accent
+standard card radius
+standard page padding
+standard section gap
+standard shadow
+```
+
+These SHOULD use global tokens.
+
+## Q2. Component geometry
+
+Examples:
+
+```text
+camera overlay position
+chart marker size
+specific icon dimensions
+special grid minimum width
+visualization coordinates
+```
+
+These MAY remain local.
+
+Do not mechanically tokenise Q2 values.
+
+---
+
+# R. Global CSS Restrictions
+
+Global stylesheets MUST NOT contain feature selectors such as:
+
+```css
+.owner-device-card
+.technician-health-ring
+.admin-user-table
+```
+
+Those belong to their feature stylesheets.
+
+Global styles contain primitives, foundation, and shared layout only.
+
+---
+
+# S. Shared Component Rule
+
+A shared component must use shared tokens wherever practical.
+
+For example:
+
+```text
+Header
+Sidebar
+NotificationPopover
+shared account controls
+generic buttons
+shared status badges
+```
+
+must not depend on Farm Owner-only variables.
+
+Shared components must remain safe for all actors.
+
+---
+
+# T. Migration Rule
+
+When migrating existing CSS:
+
+1. inspect the existing visual result;
+2. identify repeated design primitives;
+3. map repeated primitives to global tokens;
+4. establish shared page geometry;
+5. remove duplicated outer page spacing;
+6. preserve feature-specific geometry;
+7. preserve approved actor identity;
+8. test responsive behavior;
+9. compare visual alignment between pages.
+
+Migration MUST NOT be a blind search-and-replace operation.
+
+---
+
+# U. Migration Scope Rule
+
+A CSS architecture migration may touch multiple actors only to establish shared infrastructure.
+
+It MUST NOT use architecture migration as an excuse to implement unfinished actor features.
+
+For the current migration:
+
+```text
+Shared Infrastructure
+        ↓
+Full Farm Owner migration
+        ↓
+Existing Technician UI foundation migration
+        ↓
+Existing Administrator UI foundation migration
+```
+
+Technician/Admin functionality outside the currently existing UI remains out of scope.
+
+---
+
+# V. Visual Consistency Test
+
+Before frontend architecture work is considered complete, compare representative pages side-by-side.
+
+At minimum:
+
+```text
+Farm Owner Dashboard
+Farm Owner Devices
+Farm Owner Environment
+
+Technician Dashboard
+
+Administrator Dashboard
+
+Shared Account Settings
+```
+
+Verify:
+
+```text
+same page origin
+same outer page padding
+same Sidebar relationship
+same Header relationship
+same responsive contract
+same CSS architecture
+```
+
+Visual personality may differ.
+
+Geometry must remain intentional.
+
+---
+
+# W. CSS Architecture Completion Checklist
+
+Before merging architecture changes:
+
+```text
+[ ] Global tokens exist
+[ ] Foundation CSS is isolated
+[ ] Shared layout contract exists
+[ ] Page outer spacing has one owner
+[ ] Pages do not compensate for Sidebar individually
+[ ] Shared Header geometry is consistent
+[ ] Farm Owner pages share page origin
+[ ] Existing Technician UI uses the same foundation
+[ ] Existing Admin UI uses the same foundation
+[ ] Shared components do not depend on actor-only tokens
+[ ] Standard breakpoints are used
+[ ] CSS property ordering is consistent
+[ ] Semantic status colors are consistent
+[ ] Feature-specific values remain local where appropriate
+[ ] No unnecessary global selectors were introduced
+[ ] No unintended horizontal overflow
+[ ] Desktop visual regression checked
+[ ] Reduced desktop/tablet checked
+[ ] Mobile structure checked
+[ ] npm run build passes
+```
+
+---
+
+# X. Architecture Invariants
+
+The following invariants are mandatory.
+
+## Layout invariant
+
+```text
+Sidebar
+   ↓
+AppLayout
+   ↓
+Content Viewport
+   ↓
+Page Container
+   ↓
+Page
+```
+
+No page bypasses this hierarchy to calculate its own application-level position.
+
+## Token invariant
+
+```text
+Global Primitives
+   ↓
+Semantic Tokens
+   ↓
+Optional Actor Theme
+   ↓
+Feature CSS
+```
+
+Feature CSS must not recreate global primitives unnecessarily.
+
+## Actor invariant
+
+```text
+Farm Owner
+Technician
+Administrator
+```
+
+may have different visual identities but MUST share:
+
+```text
+CSS architecture
+layout geometry
+spacing system
+responsive system
+property ordering
+semantic status meanings
+shared component rules
+```
+
+## Refactor invariant
+
+Architecture refactoring MUST NOT silently become UI redesign or feature development.
+
 # 2. Frontend Folder Structure
 
 NestMate follows this structure:
@@ -757,7 +1624,7 @@ Colors should eventually be represented by shared design tokens such as:
 }
 ```
 
-Do NOT perform a project-wide token migration as part of an unrelated feature.
+Project-wide token migration is allowed only as an explicitly approved CSS architecture task. It must not occur as a side effect of unrelated feature development.
 
 Token migration should be performed deliberately during frontend refactoring.
 
