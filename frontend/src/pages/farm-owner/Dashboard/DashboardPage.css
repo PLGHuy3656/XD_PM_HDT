@@ -487,9 +487,9 @@
   display: grid;
 
   grid-template-columns:
-    minmax(0, 1.65fr)
-    minmax(230px, 0.68fr)
-    minmax(250px, 0.78fr);
+    minmax(0, 1.55fr)
+    minmax(290px, 0.72fr)
+    minmax(270px, 0.72fr);
 
   gap: 0;
 }
@@ -497,7 +497,7 @@
 .operations-grid > section {
   min-width: 0;
 
-  padding: 0 20px;
+  padding: 0 15px;
 }
 
 .operations-grid > section:first-child {
@@ -827,7 +827,7 @@
    RESPONSIVE - LARGE TABLET
    ======================================== */
 
-@media (max-width: 1200px) {
+@media (max-width: 1280px) {
   .operations-grid {
     grid-template-columns: 1fr 1fr;
   }
