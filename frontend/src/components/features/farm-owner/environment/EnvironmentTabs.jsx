@@ -2,15 +2,15 @@ import { NavLink } from 'react-router-dom'
 
 function EnvironmentTabs() {
   return (
-    <nav className="environment-tabs" aria-label="Điều hướng môi trường">
+    <nav className="environment-subnav" aria-label="Điều hướng môi trường">
       <NavLink
         to="/owner/environment"
         end
         className={({ isActive }) =>
-          `environment-tab ${isActive ? 'active' : ''}`
+          `environment-subnav__tab ${isActive ? 'active' : ''}`
         }
       >
-        <span className="environment-tab-icon">
+        <span className="environment-subnav__icon">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 19V10" />
             <path d="M10 19V5" />
@@ -28,10 +28,10 @@ function EnvironmentTabs() {
       <NavLink
         to="/owner/environment/control"
         className={({ isActive }) =>
-          `environment-tab ${isActive ? 'active' : ''}`
+          `environment-subnav__tab ${isActive ? 'active' : ''}`
         }
       >
-        <span className="environment-tab-icon">
+        <span className="environment-subnav__icon">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 7h10" />
             <path d="M18 7h2" />

@@ -87,14 +87,14 @@ function LiveCameraCard({
             </button>
 
             <EnvironmentSelect
-            value={selectedCamera.id}
-            onChange={onCameraChange}
-            options={cameras.map((camera) => ({
+              value={selectedCamera.id}
+              onChange={onCameraChange}
+              options={cameras.map((camera) => ({
                 value: camera.id,
                 label: `${camera.id} · ${camera.name}${
-                camera.status === 'OFFLINE' ? ' · Offline' : ''
+                  camera.status === 'OFFLINE' ? ' · Offline' : ''
                 }`,
-            }))}
+              }))}
             />
 
             <button

@@ -1,19 +1,11 @@
-.swiftlets-page {
-  --sw-navy: #102a43;
-  --sw-navy-deep: #0b2138;
-  --sw-gold: #d5a62e;
-  --sw-gold-soft: #f4e6b8;
-  --sw-cream: #fbf8f0;
-  --sw-border: #e8e2d5;
-  --sw-muted: #718096;
-  --sw-green: #34865b;
-  --sw-warning: #c98421;
-  --sw-red: #c85252;
+/* ========================================
+   PAGE
+   ======================================== */
 
+.swiftlets-page {
   width: 100%;
-  max-width: 1480px;
-  margin: 0 auto;
-  color: var(--sw-navy);
+
+  color: var(--color-navy-900);
   font-family: Arial, sans-serif;
 }
 
@@ -22,48 +14,60 @@
   font-family: Arial, sans-serif;
 }
 
+/* ========================================
+   HEADER
+   ======================================== */
+
 .swiftlets-page-heading,
 .swiftlets-context,
 .swiftlet-card-heading {
   display: flex;
   justify-content: space-between;
-  gap: 24px;
+  gap: var(--space-6);
 }
 
 .swiftlets-page-heading {
   align-items: flex-end;
+
   margin-bottom: 22px;
 }
 
 .swiftlets-eyebrow {
   display: inline-block;
-  margin-bottom: 8px;
-  color: var(--sw-gold);
+
+  margin-bottom: var(--space-2);
+
+  color: var(--color-gold-400);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: .11em;
+  letter-spacing: 0.11em;
 }
 
 .swiftlets-page-heading h1 {
   margin: 0;
-  color: var(--sw-navy-deep);
+
+  color: var(--color-navy-950);
   font-size: 36px;
-  letter-spacing: -.025em;
+  letter-spacing: -0.025em;
 }
 
 .swiftlets-page-heading p,
 .swiftlet-card-heading p {
-  margin: 8px 0 0;
-  color: var(--sw-muted);
+  margin: var(--space-2) 0 0;
+
+  color: var(--color-text-muted);
   font-size: 14px;
   line-height: 1.6;
 }
 
 .swiftlets-ai-status {
   min-width: 230px;
-  padding: 12px 15px;
+
+  padding: var(--space-3) 15px;
+
   border: 1px solid #dce8df;
-  border-radius: 16px;
+  border-radius: var(--radius-md);
+
   background: #f8fcf9;
 }
 
@@ -71,8 +75,9 @@
 .swiftlets-node strong {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: var(--sw-green);
+  gap: var(--space-2);
+
+  color: var(--color-success-strong);
   font-size: 12px;
   font-weight: 700;
 }
@@ -82,81 +87,110 @@
 .swiftlet-camera-meta i {
   width: 7px;
   height: 7px;
+
   border-radius: 50%;
-  background: var(--sw-green);
+
+  background: var(--color-success-strong);
 }
 
 .swiftlets-ai-status small {
   display: block;
+
   margin: 5px 0 0 15px;
+
   color: #87968d;
   font-size: 11px;
 }
 
+/* ========================================
+   CONTENT
+   ======================================== */
+
+/* Context bar */
 .swiftlets-context {
   align-items: flex-end;
-  margin-bottom: 24px;
-  padding: 18px 20px;
-  border: 1px solid var(--sw-border);
-  border-radius: 22px;
-  background: #fff;
-  box-shadow: 0 8px 30px rgba(31, 48, 66, .04);
+
+  margin-bottom: var(--space-6);
+  padding: 18px var(--space-5);
+
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-xl);
+
+  background: var(--color-surface);
+
+  box-shadow: var(--shadow-soft);
 }
 
 .swiftlets-context > div:first-child {
+  min-width: 0;
+
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .swiftlets-context label > span,
 .swiftlets-node > span {
   display: block;
-  margin: 0 0 7px 4px;
-  color: #7d8997;
+
+  margin: 0 0 7px var(--space-1);
+
+  color: var(--color-text-muted);
   font-size: 11px;
   font-weight: 700;
 }
 
 .swiftlets-node {
-  padding: 0 8px 4px;
+  padding: 0 var(--space-2) var(--space-1);
 }
 
+/* Stats grid */
 .swiftlet-stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+
   margin-bottom: 18px;
 }
 
 .swiftlet-stat-card,
 .swiftlet-card {
-  border: 1px solid var(--sw-border);
-  border-radius: 22px;
-  background: #fff;
-  box-shadow: 0 8px 30px rgba(31, 48, 66, .04);
+  min-width: 0;
+
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-xl);
+
+  background: var(--color-surface);
+
+  box-shadow: var(--shadow-soft);
 }
 
 .swiftlet-stat-card {
-  padding: 19px 20px;
+  padding: 19px var(--space-5);
 }
 
 .swiftlet-stat-heading,
 .swiftlet-event-name {
+  min-width: 0;
+
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .swiftlet-stat-icon,
 .event-icon {
-  display: grid;
-  place-items: center;
   width: 38px;
   height: 38px;
+
+  display: grid;
   flex: 0 0 auto;
-  border-radius: 12px;
-  background: var(--sw-gold-soft);
-  color: var(--sw-navy-deep);
+  place-items: center;
+
+  border-radius: var(--radius-sm);
+
+  background: var(--color-gold-100);
+
+  color: var(--color-navy-950);
   font-size: 19px;
   font-weight: 700;
 }
@@ -164,15 +198,18 @@
 .swiftlet-stat-heading strong,
 .swiftlet-event-name strong {
   display: block;
-  color: var(--sw-navy-deep);
+
+  color: var(--color-navy-950);
   font-size: 14px;
 }
 
 .swiftlet-stat-heading small,
 .swiftlet-event-name small {
   display: block;
+
   margin-top: 3px;
-  color: var(--sw-muted);
+
+  color: var(--color-text-muted);
   font-size: 11px;
 }
 
@@ -181,75 +218,146 @@
 }
 
 .swiftlet-stat-value strong {
-  color: var(--sw-navy-deep);
+  color: var(--color-navy-950);
   font-size: 32px;
 }
 
 .swiftlet-stat-value span {
   margin-left: 7px;
-  color: var(--sw-muted);
+
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
 .swiftlet-stat-delta {
   display: inline-block;
+
   margin-top: 9px;
-  color: var(--sw-green);
+
+  color: var(--color-success-strong);
   font-size: 11px;
   font-weight: 700;
 }
 
+/* Main grid & Cards */
 .swiftlets-main-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(360px, .8fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
   gap: 18px;
+
   margin-bottom: 18px;
 }
 
 .swiftlet-card {
-  padding: 20px;
+  padding: var(--space-5);
 }
 
 .swiftlet-card-heading {
   align-items: center;
-  margin-bottom: 16px;
+
+  margin-bottom: var(--space-4);
 }
 
 .swiftlet-card-heading h2 {
   margin: 0;
-  color: var(--sw-navy-deep);
+
+  color: var(--color-navy-950);
   font-size: 18px;
+}
+
+/* Live camera card */
+.swiftlet-camera-heading {
+  align-items: flex-start;
 }
 
 .swiftlet-live-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .swiftlet-live-title i {
   width: 7px;
   height: 7px;
+
   border-radius: 50%;
-  background: var(--sw-red);
-  box-shadow: 0 0 0 4px rgba(200, 82, 82, .1);
+
+  background: var(--color-danger-strong);
+
+  box-shadow: 0 0 0 4px rgba(200, 82, 82, 0.1);
+}
+
+.swiftlet-camera-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 9px;
+}
+
+.swiftlet-camera-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swiftlet-camera-arrow {
+  width: 36px;
+  height: 36px;
+
+  display: grid;
+  place-items: center;
+
+  padding: 0;
+
+  border: 1px solid var(--border-warm);
+  border-radius: 11px;
+
+  background: var(--color-surface);
+
+  color: var(--color-navy-950);
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.swiftlet-camera-arrow:hover {
+  border-color: #d8c99f;
+
+  background: var(--color-cream-100);
+}
+
+.swiftlet-camera-arrow svg {
+  width: 15px;
+  height: 15px;
+
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
 }
 
 .swiftlet-box-toggle {
   display: flex;
   align-items: center;
   gap: 7px;
-  color: var(--sw-muted);
+
+  color: var(--color-text-muted);
   font-size: 11px;
   font-weight: 700;
+
   cursor: pointer;
 }
 
 .swiftlet-camera-view {
   position: relative;
+
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  border-radius: 18px;
+
+  border-radius: var(--radius-lg);
+
   background:
     radial-gradient(
       circle at 50% 45%,
@@ -265,9 +373,11 @@
   z-index: 4;
   right: 16px;
   left: 16px;
+
   display: flex;
   align-items: center;
   justify-content: space-between;
+
   color: rgba(255, 255, 255, 0.88);
   font-size: 10px;
   font-weight: 700;
@@ -283,8 +393,11 @@
 
 .swiftlet-camera-bottom span {
   padding: 6px 9px;
-  border-radius: 999px;
+
+  border-radius: var(--radius-pill);
+
   background: rgba(3, 18, 30, 0.46);
+
   backdrop-filter: blur(5px);
 }
 
@@ -297,32 +410,40 @@
 .swiftlet-live-badge i {
   width: 8px;
   height: 8px;
+
   border-radius: 50%;
-  background: #ef6464;
+
+  background: var(--color-danger);
+
   box-shadow: 0 0 0 5px rgba(239, 100, 100, 0.15);
 }
 
 .swiftlet-camera-placeholder {
   position: absolute;
   inset: 0;
+
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #fff;
+
+  color: var(--color-surface);
 }
 
 .swiftlet-camera-icon {
-  display: grid;
-  place-items: center;
   width: 56px;
   height: 56px;
+
+  display: grid;
+  place-items: center;
+
   color: #e0b44b;
 }
 
 .swiftlet-camera-icon svg {
   width: 48px;
   height: 48px;
+
   fill: none;
   stroke: currentColor;
   stroke-width: 1.7;
@@ -330,11 +451,13 @@
 
 .swiftlet-camera-placeholder strong {
   margin-top: 5px;
+
   font-size: 18px;
 }
 
 .swiftlet-camera-placeholder small {
   margin-top: 7px;
+
   color: #9eb4c4;
   font-size: 11px;
 }
@@ -342,21 +465,26 @@
 .swiftlet-detection-box {
   position: absolute;
   z-index: 3;
+
   width: 14%;
   height: 20%;
-  border: 1.5px solid #d5a62e;
+
+  border: 1.5px solid var(--color-gold-400);
 }
 
 .swiftlet-detection-box span {
   position: absolute;
   top: -23px;
   left: -2px;
-  white-space: nowrap;
+
   padding: 4px 7px;
+
   background: #d59212;
-  color: #fff;
+
+  color: var(--color-surface);
   font-size: 9px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .swiftlet-detection-box.bird-one {
@@ -372,39 +500,82 @@
 .swiftlet-detection-box.bird-three {
   top: 25%;
   left: 47%;
+
   width: 10%;
   height: 15%;
 }
 
+.swiftlet-camera-offline {
+  position: absolute;
+  inset: 0;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  padding: var(--space-8);
+
+  color: var(--color-surface);
+  text-align: center;
+}
+
+.swiftlet-camera-offline strong {
+  margin-top: 7px;
+
+  font-size: 18px;
+}
+
+.swiftlet-camera-offline p {
+  max-width: 390px;
+
+  margin: var(--space-2) 0 0;
+
+  color: #b7c4ce;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.swiftlet-camera-offline small {
+  margin-top: 13px;
+
+  color: #8fa1af;
+  font-size: 10px;
+}
+
+/* Trend chart */
 .swiftlet-period-tabs {
   display: flex;
+
   padding: 3px;
-  border-radius: 12px;
+
+  border-radius: var(--radius-sm);
+
   background: #f4f1ea;
 }
 
 .swiftlet-period-tabs button {
+  padding: 7px 9px;
+
   border: 0;
   border-radius: 9px;
-  padding: 7px 9px;
+
   background: transparent;
-  color: var(--sw-muted);
+
+  color: var(--color-text-muted);
   font-size: 10px;
   font-weight: 700;
-  cursor: pointer;
-}
 
-.swiftlet-period-tabs button.active {
-  background: #fff;
-  color: var(--sw-navy-deep);
-  box-shadow: 0 2px 8px rgba(31, 48, 66, .08);
+  cursor: pointer;
 }
 
 .swiftlet-chart-legend {
   display: flex;
-  gap: 16px;
-  margin-bottom: 12px;
-  color: var(--sw-muted);
+  gap: var(--space-4);
+
+  margin-bottom: var(--space-3);
+
+  color: var(--color-text-muted);
   font-size: 10px;
 }
 
@@ -417,15 +588,16 @@
 .swiftlet-chart-legend i {
   width: 8px;
   height: 8px;
+
   border-radius: 50%;
 }
 
 .swiftlet-chart-legend .entry i {
-  background: var(--sw-green);
+  background: var(--color-success-strong);
 }
 
 .swiftlet-chart-legend .exit i {
-  background: var(--sw-gold);
+  background: var(--color-gold-400);
 }
 
 .swiftlet-chart {
@@ -452,16 +624,17 @@
 }
 
 .swiftlet-chart .entry-line {
-  stroke: var(--sw-green);
+  stroke: var(--color-success-strong);
 }
 
 .swiftlet-chart .exit-line {
-  stroke: var(--sw-gold);
+  stroke: var(--color-gold-400);
 }
 
 .swiftlet-chart-labels {
   display: flex;
   justify-content: space-between;
+
   color: #8c98a3;
   font-size: 9px;
 }
@@ -469,20 +642,25 @@
 .swiftlet-chart-placeholder {
   position: absolute;
   inset: 0;
+
   display: grid;
   place-items: center;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, .9);
-  color: var(--sw-muted);
+
+  border-radius: var(--radius-sm);
+
+  background: rgba(255, 255, 255, 0.9);
+
+  color: var(--color-text-muted);
   font-size: 11px;
 }
 
+/* AI Events table */
 .swiftlet-events-card {
   margin-bottom: 10px;
 }
 
 .swiftlet-mock-label {
-  color: var(--sw-muted);
+  color: var(--color-text-muted);
   font-size: 10px;
   font-style: italic;
 }
@@ -493,135 +671,59 @@
 
 .swiftlet-events-table {
   width: 100%;
+
   border-collapse: collapse;
+
   font-size: 12px;
 }
 
 .swiftlet-events-table th {
-  padding: 11px 12px;
-  border-bottom: 1px solid var(--sw-border);
+  padding: 11px var(--space-3);
+
+  border-bottom: 1px solid var(--border-warm);
+
   color: #84909b;
-  text-align: left;
   font-size: 10px;
+  letter-spacing: 0.04em;
+  text-align: left;
   text-transform: uppercase;
-  letter-spacing: .04em;
 }
 
 .swiftlet-events-table td {
-  padding: 14px 12px;
+  padding: 14px var(--space-3);
+
   border-bottom: 1px solid #f0ede6;
+
   color: #536779;
-}
-
-.event-icon.critical {
-  background: #fdeaea;
-  color: var(--sw-red);
-}
-
-.event-icon.warning {
-  background: #fff3dd;
-  color: var(--sw-warning);
 }
 
 .swiftlet-event-status {
   display: inline-block;
-  padding: 5px 8px;
-  border-radius: 999px;
+
+  padding: 5px var(--space-2);
+
+  border-radius: var(--radius-pill);
+
   background: #eaf5ee;
-  color: var(--sw-green);
+
+  color: var(--color-success-strong);
   font-size: 10px;
   font-weight: 700;
 }
 
-.swiftlet-event-status.warning {
-  background: #fff3dd;
-  color: var(--sw-warning);
-}
-
-.swiftlet-event-status.critical {
-  background: #fdeaea;
-  color: var(--sw-red);
-}
-
-@media (max-width: 1100px) {
-  .swiftlets-main-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .swiftlet-stats-grid {
-    grid-template-columns: 1fr 1fr 1fr;
-  }
-}
-
-@media (max-width: 760px) {
-  .swiftlets-page-heading,
-  .swiftlets-context,
-  .swiftlet-card-heading {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .swiftlets-context > div:first-child {
-    flex-direction: column;
-  }
-
-  .swiftlet-stats-grid {
-    grid-template-columns: 1fr;
-  }
-}
-.swiftlet-camera-heading {
-  align-items: flex-start;
-}
-
-.swiftlet-camera-controls {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 9px;
-}
-
-.swiftlet-camera-switcher {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.swiftlet-camera-arrow {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 1px solid var(--sw-border);
-  border-radius: 11px;
-  background: #fff;
-  color: var(--sw-navy-deep);
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
-}
-
-.swiftlet-camera-arrow:hover {
-  border-color: #d8c99f;
-  background: #fbf8f0;
-}
-
-.swiftlet-camera-arrow svg {
-  width: 15px;
-  height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-}
+/* ========================================
+   COMPONENT STATES
+   ======================================== */
 
 .swiftlet-live-title i.offline {
-  background: #9aa7b2;
+  background: var(--color-offline);
+
   box-shadow: 0 0 0 4px rgba(154, 167, 178, 0.12);
 }
 
 .swiftlet-live-badge.offline i {
-  background: #9aa7b2;
+  background: var(--color-offline);
+
   box-shadow: 0 0 0 5px rgba(154, 167, 178, 0.12);
 }
 
@@ -635,42 +737,72 @@
     );
 }
 
-.swiftlet-camera-offline {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px;
-  color: #fff;
-  text-align: center;
-}
-
-.swiftlet-camera-offline strong {
-  margin-top: 7px;
-  font-size: 18px;
-}
-
-.swiftlet-camera-offline p {
-  max-width: 390px;
-  margin: 8px 0 0;
-  color: #b7c4ce;
-  font-size: 11px;
-  line-height: 1.6;
-}
-
-.swiftlet-camera-offline small {
-  margin-top: 13px;
-  color: #8fa1af;
-  font-size: 10px;
-}
-
 .swiftlet-box-toggle input:disabled + span {
   opacity: 0.5;
 }
 
-@media (max-width: 760px) {
+.swiftlet-period-tabs button.active {
+  background: var(--color-surface);
+
+  color: var(--color-navy-950);
+
+  box-shadow: 0 2px 8px rgba(31, 48, 66, 0.08);
+}
+
+.event-icon.critical {
+  background: #fdeaea;
+
+  color: var(--color-danger-strong);
+}
+
+.event-icon.warning {
+  background: #fff3dd;
+
+  color: var(--color-warning);
+}
+
+.swiftlet-event-status.warning {
+  background: #fff3dd;
+
+  color: var(--color-warning);
+}
+
+.swiftlet-event-status.critical {
+  background: #fdeaea;
+
+  color: var(--color-danger-strong);
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 1000px) {
+  .swiftlets-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .swiftlet-stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .swiftlets-page-heading,
+  .swiftlets-context,
+  .swiftlet-card-heading {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .swiftlets-context > div:first-child {
+    flex-direction: column;
+  }
+
+  .swiftlet-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
   .swiftlet-camera-controls {
     align-items: stretch;
   }

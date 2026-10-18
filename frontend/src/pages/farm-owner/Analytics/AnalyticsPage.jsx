@@ -9,22 +9,22 @@ import AnalyticsDetail from '../../../components/features/farm-owner/analytics/A
 import AnalyticsYield from '../../../components/features/farm-owner/analytics/AnalyticsYield'
 
 import {
-    analyticsFarms,
-    birdPerformance,
-    hourlyBirdActivity,
-    zoneDensity,
-    microClimateScores,
-    alertDistribution,
-    environmentMetrics,
-    analyticsPeriods,
-    environmentComparison,
-    birdTrendAnalytics,
-    returnRateCorrelation,
-    alertTrend,
-    yieldSummary,
-    yieldTrend,
-    zoneYield,
-    harvestHistory,
+  analyticsFarms,
+  birdPerformance,
+  hourlyBirdActivity,
+  zoneDensity,
+  microClimateScores,
+  alertDistribution,
+  environmentMetrics,
+  analyticsPeriods,
+  environmentComparison,
+  birdTrendAnalytics,
+  returnRateCorrelation,
+  alertTrend,
+  yieldSummary,
+  yieldTrend,
+  zoneYield,
+  harvestHistory,
 } from '../../../components/features/farm-owner/analytics/analyticsMockData'
 
 import './AnalyticsPage.css'
@@ -98,12 +98,12 @@ function AnalyticsPage() {
         )}
 
         {activeTab === 'yield' && (
-        <AnalyticsYield
+          <AnalyticsYield
             summary={yieldSummary}
             trend={yieldTrend}
             zones={zoneYield}
             history={harvestHistory}
-        />
+          />
         )}
 
         <span className="analytics-selected-farm">

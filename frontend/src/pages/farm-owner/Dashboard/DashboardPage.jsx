@@ -507,7 +507,7 @@ function DashboardPage() {
     <AppLayout>
       <div className="owner-dashboard">
       <section className="dashboard-welcome">
-        <div className="dashboard-welcome-left">
+        <div className="dashboard-welcome-main">
           <div className="dashboard-welcome-copy">
             <span className="dashboard-eyebrow">
               NESTMATE OVERVIEW

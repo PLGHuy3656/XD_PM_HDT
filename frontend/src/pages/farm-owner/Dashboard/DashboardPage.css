@@ -1,3 +1,7 @@
+/* ========================================
+   PAGE
+   ======================================== */
+
 .owner-dashboard,
 .owner-dashboard button,
 .owner-dashboard input {
@@ -7,29 +11,31 @@
 .owner-dashboard {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  color: #102e4a;
+  gap: var(--space-4);
+
+  color: var(--color-navy-800);
 }
 
 /* ========================================
-   WELCOME / OVERVIEW
+   HEADER
    ======================================== */
 
 .dashboard-welcome {
+  min-height: 112px;
+
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 40px;
+  gap: var(--space-8);
 
-  min-height: 112px;
-  padding: 0 4px 4px;
+  padding: 0 0 var(--space-1);
 }
 
-.dashboard-welcome-left {
+.dashboard-welcome-main {
   min-width: 0;
-  flex: 1;
 
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 15px;
 }
@@ -40,10 +46,10 @@
 
 .dashboard-eyebrow {
   display: block;
+
   margin-bottom: 6px;
 
-  color: #bd7b19;
-
+  color: var(--color-gold-600);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.18em;
@@ -52,33 +58,26 @@
 .dashboard-welcome h1 {
   margin: 0;
 
-  color: #102e4a;
-
+  color: var(--color-navy-800);
   font-family: "Segoe UI", Arial, sans-serif;
   font-size: clamp(30px, 2.5vw, 40px);
   font-weight: 650;
-
   line-height: 1.1;
   letter-spacing: -0.04em;
 }
 
 .dashboard-welcome h1 strong {
-  color: #bd7b19;
+  color: var(--color-gold-600);
   font-weight: 650;
 }
 
 .dashboard-welcome-copy p {
   margin: 6px 0 0;
 
-  color: #7d8c99;
-
+  color: var(--color-text-muted);
   font-size: 12px;
   line-height: 1.55;
 }
-
-/* ========================================
-   SYSTEM STATUS
-   ======================================== */
 
 .dashboard-system-status {
   display: flex;
@@ -87,21 +86,16 @@
 }
 
 .dashboard-system-status > span {
-  color: #8796a3;
-
+  color: var(--color-text-faint);
   font-size: 9px;
   font-weight: 500;
 }
 
-/* ========================================
-   FARM SELECTOR
-   ======================================== */
-
 .dashboard-farm {
   width: min(300px, 100%);
-  flex: 0 0 300px;
 
   display: flex;
+  flex: 0 0 300px;
   flex-direction: column;
   gap: 6px;
 }
@@ -111,8 +105,7 @@
 
   margin: 0 0 1px 4px;
 
-  color: #7f909e;
-
+  color: var(--color-text-muted);
   font-size: 9px;
   font-weight: 700;
 }
@@ -127,23 +120,24 @@
 
   padding: 10px 14px;
 
-  border: 1px solid rgba(15, 43, 67, 0.07);
-  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
 
-  background: rgba(255, 255, 255, 0.76);
-  color: #102e4a;
+  background: var(--color-surface-glass);
 
+  color: var(--color-navy-800);
   text-align: left;
+
   cursor: pointer;
 
   transition:
-    border-color 180ms ease,
-    background 180ms ease,
-    box-shadow 180ms ease;
+    border-color var(--transition-base),
+    background var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .dashboard-farm-selector:hover {
-  border-color: rgba(189, 123, 25, 0.18);
+  border-color: var(--border-gold);
 
   background: rgba(255, 255, 255, 0.92);
 
@@ -158,16 +152,16 @@
 
   border-radius: 50%;
 
-  background: #38aa76;
+  background: var(--color-success);
 
   box-shadow: 0 0 0 5px rgba(56, 170, 118, 0.09);
 }
 
 .farm-selector-copy {
   min-width: 0;
-  flex: 1;
 
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 3px;
 }
@@ -175,11 +169,9 @@
 .farm-selector-copy strong {
   overflow: hidden;
 
-  color: #102e4a;
-
+  color: var(--color-navy-800);
   font-size: 11px;
   font-weight: 700;
-
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -187,10 +179,8 @@
 .farm-selector-copy small {
   overflow: hidden;
 
-  color: #8999a6;
-
+  color: var(--color-text-faint);
   font-size: 8px;
-
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -204,20 +194,20 @@
   color: #9caab5;
 
   transition:
-    color 180ms ease,
-    transform 180ms ease;
+    color var(--transition-base),
+    transform var(--transition-base);
 }
 
 .dashboard-farm-selector:hover .farm-chevron {
-  color: #b77718;
+  color: var(--color-gold-600);
+
   transform: translateY(1px);
 }
 
 .farm-last-update {
   margin: 1px 3px 0 0;
 
-  color: #91a0ac;
-
+  color: var(--color-text-faint);
   font-size: 8px;
   text-align: right;
 }
@@ -228,16 +218,79 @@
 }
 
 /* ========================================
-   LIVE CAMERA
+   NAVIGATION / TABS
    ======================================== */
+
+.environment-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.environment-tab {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+
+  padding: 9px 10px;
+
+  border: 1px solid var(--border-subtle);
+  border-radius: 11px;
+
+  background: var(--color-cream-100);
+
+  color: var(--color-text-faint);
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    border-color var(--transition-base),
+    background var(--transition-base),
+    transform var(--transition-base);
+}
+
+.environment-tab:hover {
+  border-color: var(--border-gold);
+
+  transform: translateY(-1px);
+}
+
+.environment-tab.active {
+  border-color: var(--border-gold);
+
+  background: var(--color-gold-100);
+}
+
+.environment-tab span {
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.environment-tab strong {
+  color: var(--color-navy-700);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.environment-tab.active strong {
+  color: var(--color-gold-700);
+}
+
+/* ========================================
+   CONTENT
+   ======================================== */
+
+/* LIVE CAMERA */
 
 .live-camera-layout {
   display: grid;
-
   grid-template-columns:
     minmax(0, 2fr)
     minmax(260px, 0.62fr);
-
   gap: 18px;
 }
 
@@ -253,14 +306,13 @@
     radial-gradient(
       circle at 50% 25%,
       #1c4866,
-      #0b263c 72%
+      var(--color-navy-950) 72%
     );
 }
 
 .camera-toolbar {
   position: absolute;
   z-index: 5;
-
   top: 14px;
   right: 16px;
   left: 16px;
@@ -270,7 +322,6 @@
   justify-content: space-between;
 
   color: rgba(255, 255, 255, 0.7);
-
   font-size: 9px;
 }
 
@@ -279,8 +330,7 @@
   align-items: center;
   gap: 7px;
 
-  color: #ffffff;
-
+  color: var(--color-surface);
   font-weight: 800;
 }
 
@@ -290,7 +340,7 @@
 
   border-radius: 50%;
 
-  background: #ef655c;
+  background: var(--color-danger);
 
   box-shadow: 0 0 0 4px rgba(239, 101, 92, 0.14);
 }
@@ -303,7 +353,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-2);
 
   color: rgba(255, 255, 255, 0.5);
 }
@@ -312,12 +362,11 @@
   width: 38px;
   height: 38px;
 
-  color: #dfb45f;
+  color: var(--color-gold-300);
 }
 
 .camera-placeholder strong {
   color: rgba(255, 255, 255, 0.86);
-
   font-size: 13px;
   font-weight: 650;
 }
@@ -337,15 +386,14 @@
 
 .mock-detection span {
   position: absolute;
-
   top: -19px;
   left: -1px;
 
   padding: 4px 6px;
 
-  background: #bd7b19;
-  color: #ffffff;
+  background: var(--color-gold-600);
 
+  color: var(--color-surface);
   font-size: 7px;
   font-weight: 700;
 }
@@ -360,14 +408,53 @@
   bottom: 23%;
 }
 
-/* ========================================
-   CAMERA INFORMATION
-   ======================================== */
+.mock-detection.detection-three {
+  top: 27%;
+  left: 48%;
+
+  width: 13%;
+  height: 19%;
+}
+
+/* CAMERA INFORMATION */
 
 .camera-information {
+  min-width: 0;
+
   display: flex;
   flex-direction: column;
   gap: 13px;
+}
+
+.dashboard-camera-selector {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 7px;
+}
+
+.dashboard-camera-selector > button {
+  width: 38px;
+  height: 38px;
+
+  padding: 0;
+
+  border: 1px solid #e8e2d5;
+  border-radius: var(--radius-sm);
+
+  background: var(--color-surface);
+
+  color: var(--color-navy-900);
+  font-size: 22px;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.dashboard-camera-selector > button:hover {
+  border-color: #d8c99f;
+
+  background: #fbf8f0;
 }
 
 .camera-online {
@@ -375,11 +462,11 @@
   align-items: center;
   gap: 11px;
 
-  padding: 12px;
+  padding: var(--space-3);
 
   border-radius: 13px;
 
-  background: rgba(49, 166, 112, 0.07);
+  background: var(--color-success-bg);
 }
 
 .camera-online-dot {
@@ -390,64 +477,63 @@
 
   border-radius: 50%;
 
-  background: #35a873;
+  background: var(--color-success);
 
   box-shadow: 0 0 0 4px rgba(53, 168, 115, 0.1);
 }
 
 .camera-online div {
+  min-width: 0;
+
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
 .camera-online strong {
-  color: #276e51;
-
+  color: var(--color-success-strong);
   font-size: 10px;
 }
 
 .camera-online small {
   color: #819b90;
-
   font-size: 8px;
 }
 
 .camera-stat-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .camera-stat-grid article {
+  min-width: 0;
+
   display: flex;
   flex-direction: column;
   gap: 3px;
 
-  padding: 12px;
+  padding: var(--space-3);
 
-  border: 1px solid rgba(15, 43, 67, 0.06);
+  border: 1px solid var(--border-subtle);
   border-radius: 13px;
 
-  background: #faf8f3;
+  background: var(--color-cream-100);
 }
 
 .camera-stat-grid span {
-  color: #8998a4;
-
+  color: var(--color-text-faint);
   font-size: 8px;
 }
 
 .camera-stat-grid strong {
-  color: #102e4a;
-
+  color: var(--color-navy-800);
   font-size: 20px;
   font-weight: 700;
 }
 
 .camera-stat-grid small {
   color: #a0a9b0;
-
   font-size: 7px;
 }
 
@@ -464,9 +550,9 @@
   border: 0;
   border-radius: 11px;
 
-  background: #102e4a;
-  color: #ffffff;
+  background: var(--color-navy-800);
 
+  color: var(--color-surface);
   font-size: 10px;
   font-weight: 700;
 
@@ -474,23 +560,18 @@
 }
 
 .open-camera-button span {
-  color: #e2b65f;
-
+  color: var(--color-gold-300);
   font-size: 15px;
 }
 
-/* ========================================
-   OPERATIONS
-   ======================================== */
+/* OPERATIONS */
 
 .operations-grid {
   display: grid;
-
   grid-template-columns:
     minmax(0, 1.55fr)
     minmax(290px, 0.72fr)
     minmax(270px, 0.72fr);
-
   gap: 0;
 }
 
@@ -509,7 +590,7 @@
 }
 
 .operations-grid > section:not(:last-child) {
-  border-right: 1px solid rgba(15, 43, 67, 0.07);
+  border-right: 1px solid var(--border-soft);
 }
 
 .operations-section-title {
@@ -526,8 +607,7 @@
 .operations-section-title h3 {
   margin: 0;
 
-  color: #102e4a;
-
+  color: var(--color-navy-800);
   font-size: 13px;
   font-weight: 750;
 }
@@ -535,8 +615,7 @@
 .operations-section-title p {
   margin: 4px 0 0;
 
-  color: #929faa;
-
+  color: var(--color-text-faint);
   font-size: 8px;
 }
 
@@ -546,89 +625,29 @@
   border: 0;
 
   background: transparent;
-  color: #ad7118;
 
+  color: var(--color-gold-700);
   font-size: 8px;
   font-weight: 700;
 
   cursor: pointer;
 }
 
-/* ========================================
-   ENVIRONMENT
-   ======================================== */
+/* ENVIRONMENT */
 
 .environment-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.environment-tabs {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-}
-
-.environment-tab {
   min-width: 0;
 
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
-
-  padding: 9px 10px;
-
-  border: 1px solid rgba(15, 43, 67, 0.06);
-  border-radius: 11px;
-
-  background: #faf8f3;
-  color: #8795a1;
-
-  text-align: left;
-
-  cursor: pointer;
-
-  transition:
-    border-color 180ms ease,
-    background 180ms ease,
-    transform 180ms ease;
-}
-
-.environment-tab:hover {
-  border-color: rgba(190, 128, 30, 0.16);
-
-  transform: translateY(-1px);
-}
-
-.environment-tab.active {
-  border-color: rgba(190, 128, 30, 0.24);
-
-  background: #f8edd8;
-}
-
-.environment-tab span {
-  font-size: 8px;
-  font-weight: 650;
-}
-
-.environment-tab strong {
-  color: #173750;
-
-  font-size: 11px;
-  font-weight: 750;
-}
-
-.environment-tab.active strong {
-  color: #ad7118;
+  gap: var(--space-3);
 }
 
 .environment-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .environment-summary > div {
@@ -638,36 +657,30 @@
 }
 
 .environment-summary > div > span {
-  color: #8d99a4;
-
+  color: var(--color-text-faint);
   font-size: 8px;
 }
 
 .environment-summary > div > strong {
-  color: #102e4a;
-
+  color: var(--color-navy-800);
   font-size: 18px;
   font-weight: 700;
 }
-
-/* RANGE */
 
 .range-information {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
 
   margin-bottom: 6px;
 
   color: #9aa5ad;
-
   font-size: 7px;
 }
 
 .range-information strong {
   color: #688a78;
-
   font-weight: 700;
 }
 
@@ -676,14 +689,13 @@
 
   height: 7px;
 
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 
   background: #ecebe7;
 }
 
 .range-safe-zone {
   position: absolute;
-
   top: 0;
   bottom: 0;
 
@@ -694,46 +706,41 @@
 
 .range-current-marker {
   position: absolute;
-
   top: 50%;
 
   width: 2px;
   height: 16px;
 
-  background: #bd7b19;
+  background: var(--color-gold-600);
 
   transform: translate(-50%, -50%);
 }
 
 .range-current-marker span {
   position: absolute;
-
   top: 50%;
   left: 50%;
 
   width: 7px;
   height: 7px;
 
-  border: 2px solid #ffffff;
+  border: 2px solid var(--color-surface);
   border-radius: 50%;
 
-  background: #bd7b19;
+  background: var(--color-gold-600);
 
   transform: translate(-50%, -50%);
 }
 
-/* ========================================
-   ENVIRONMENT CHART
-   ======================================== */
+/* ENVIRONMENT CHART */
 
 .compact-chart {
   position: relative;
 
   height: 108px;
-
   overflow: hidden;
 
-  border-radius: 10px;
+  border-radius: var(--radius-xs);
 
   background:
     linear-gradient(
@@ -749,16 +756,14 @@
 }
 
 .chart-grid-line {
-  stroke: rgba(15, 43, 67, 0.07);
+  stroke: var(--border-soft);
   stroke-width: 1;
 }
 
 .environment-line {
   fill: none;
-
-  stroke: #c3821d;
+  stroke: var(--color-gold-600);
   stroke-width: 2.2;
-
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -770,15 +775,13 @@
 }
 
 .current-chart-point {
-  fill: #c3821d;
-
-  stroke: #ffffff;
+  fill: var(--color-gold-600);
+  stroke: var(--color-surface);
   stroke-width: 2;
 }
 
 .chart-tooltip {
   position: absolute;
-
   top: 8px;
   left: 50%;
 
@@ -790,8 +793,9 @@
 
   border-radius: 9px;
 
-  background: #102e4a;
-  color: #ffffff;
+  background: var(--color-navy-800);
+
+  color: var(--color-surface);
 
   transform: translateX(-50%);
 
@@ -800,7 +804,6 @@
 
 .chart-tooltip span {
   color: #aebbc5;
-
   font-size: 7px;
 }
 
@@ -809,8 +812,7 @@
 }
 
 .chart-tooltip small {
-  color: #e3b55e;
-
+  color: var(--color-gold-300);
   font-size: 7px;
 }
 
@@ -819,12 +821,47 @@
   justify-content: space-between;
 
   color: #a1aab2;
-
   font-size: 7px;
 }
 
 /* ========================================
-   RESPONSIVE - LARGE TABLET
+   COMPONENT STATES
+   ======================================== */
+
+.camera-live-dot.offline {
+  background: var(--color-offline);
+
+  box-shadow: 0 0 0 5px rgba(152, 165, 175, 0.12);
+}
+
+.camera-online.offline {
+  background: #f3f5f6;
+}
+
+.camera-online.offline .camera-online-dot {
+  background: var(--color-offline);
+}
+
+.camera-online.offline strong {
+  color: #647583;
+}
+
+.camera-preview-offline {
+  background: #263e50;
+}
+
+.camera-offline-placeholder svg {
+  opacity: 0.55;
+}
+
+.camera-offline-placeholder span {
+  max-width: 300px;
+
+  text-align: center;
+}
+
+/* ========================================
+   RESPONSIVE
    ======================================== */
 
 @media (max-width: 1280px) {
@@ -835,10 +872,10 @@
   .operations-environment {
     grid-column: 1 / -1;
 
-    padding: 0 0 20px !important;
+    padding: 0 0 var(--space-5) !important;
 
     border-right: 0 !important;
-    border-bottom: 1px solid rgba(15, 43, 67, 0.07);
+    border-bottom: 1px solid var(--border-soft);
   }
 
   .operations-devices {
@@ -846,17 +883,14 @@
   }
 }
 
-/* ========================================
-   RESPONSIVE - TABLET
-   ======================================== */
-
-@media (max-width: 950px) {
+@media (max-width: 1000px) {
   .dashboard-welcome {
     gap: 28px;
   }
 
   .dashboard-farm {
     width: 270px;
+
     flex-basis: 270px;
   }
 
@@ -882,11 +916,7 @@
   }
 }
 
-/* ========================================
-   RESPONSIVE - MOBILE
-   ======================================== */
-
-@media (max-width: 700px) {
+@media (max-width: 800px) {
   .owner-dashboard {
     gap: 14px;
   }
@@ -896,18 +926,18 @@
 
     flex-direction: column;
     align-items: stretch;
-
     gap: 18px;
 
     padding: 0;
   }
 
-  .dashboard-welcome-left {
-    gap: 12px;
+  .dashboard-welcome-main {
+    gap: var(--space-3);
   }
 
   .dashboard-farm {
     width: 100%;
+
     flex-basis: auto;
   }
 
@@ -926,7 +956,7 @@
   }
 
   .operations-grid > section:not(:last-child) {
-    border-bottom: 1px solid rgba(15, 43, 67, 0.07);
+    border-bottom: 1px solid var(--border-soft);
   }
 
   .operations-environment {
@@ -938,11 +968,7 @@
   }
 }
 
-/* ========================================
-   RESPONSIVE - SMALL MOBILE
-   ======================================== */
-
-@media (max-width: 520px) {
+@media (max-width: 600px) {
   .dashboard-welcome h1 {
     font-size: 28px;
   }
@@ -952,9 +978,8 @@
   }
 
   .dashboard-system-status {
-    align-items: flex-start;
     flex-direction: column;
-
+    align-items: flex-start;
     gap: 6px;
   }
 
@@ -969,65 +994,4 @@
   .range-information strong {
     display: none;
   }
-}
-.dashboard-camera-selector {
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) 38px;
-  align-items: center;
-  gap: 7px;
-}
-
-.dashboard-camera-selector > button {
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  border: 1px solid #e8e2d5;
-  border-radius: 12px;
-  background: #fff;
-  color: #102a43;
-  font-size: 22px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.dashboard-camera-selector > button:hover {
-  border-color: #d8c99f;
-  background: #fbf8f0;
-}
-
-.camera-live-dot.offline {
-  background: #98a5af;
-  box-shadow: 0 0 0 5px rgba(152, 165, 175, 0.12);
-}
-
-.camera-online.offline {
-  background: #f3f5f6;
-}
-
-.camera-online.offline .camera-online-dot {
-  background: #98a5af;
-}
-
-.camera-online.offline strong {
-  color: #647583;
-}
-
-.camera-preview-offline {
-  background: #263e50;
-}
-
-.camera-offline-placeholder svg {
-  opacity: 0.55;
-}
-
-.camera-offline-placeholder span {
-  max-width: 300px;
-  text-align: center;
-}
-
-.mock-detection.detection-three {
-  top: 27%;
-  left: 48%;
-  width: 13%;
-  height: 19%;
 }
