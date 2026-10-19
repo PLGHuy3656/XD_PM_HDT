@@ -30,6 +30,16 @@ const icons = {
     </>
   ),
 
+  installation: (
+    <>
+      <path d="M4 20h16" />
+      <path d="M6 20V9h12v11" />
+      <path d="M9 9V5h6v4" />
+      <path d="M9 13h6" />
+      <path d="M12 10v6" />
+    </>
+  ),
+
   camera: (
     <>
       <rect x="3" y="6" width="18" height="13" rx="2" />
@@ -81,7 +91,7 @@ const icons = {
       <path d="M16 20v-4h2v4" />
       <path d="M2 20h20" />
     </>
-),
+  ),
 
   settings: (
     <>

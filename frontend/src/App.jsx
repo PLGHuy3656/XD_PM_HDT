@@ -16,9 +16,10 @@ import AlertsPage from './pages/farm-owner/Alerts/AlertsPage'
 import AnalyticsPage from './pages/farm-owner/Analytics/AnalyticsPage'
 
 import TechnicianDashboardPage from './pages/technician/Dashboard/DashboardPage'
-import TechnicianDevicesPage from './pages/technician/Devices/DevicesPage'
-import TechnicianDiagnosticsPage from './pages/technician/Diagnostics/DiagnosticsPage'
 import TechnicianEnvironmentPage from './pages/technician/Environment/EnvironmentPage'
+import TechnicianDevicesPage from './pages/technician/Devices/DevicesPage'
+import TechnicianInstallationPage from './pages/technician/Installation/InstallationPage'
+import TechnicianDiagnosticsPage from './pages/technician/Diagnostics/DiagnosticsPage'
 import TechnicianAlertsPage from './pages/technician/Alerts/AlertsPage'
 
 import AdminDashboardPage from './pages/admin/Dashboard/DashboardPage'
@@ -138,6 +139,15 @@ function App() {
       />
 
       <Route
+        path="/technician/environment"
+        element={
+          <ProtectedRoute allowedRoles={['TECHNICIAN']}>
+            <TechnicianEnvironmentPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/technician/devices"
         element={
           <ProtectedRoute allowedRoles={['TECHNICIAN']}>
@@ -147,19 +157,19 @@ function App() {
       />
 
       <Route
-        path="/technician/diagnostics"
+        path="/technician/installation"
         element={
           <ProtectedRoute allowedRoles={['TECHNICIAN']}>
-            <TechnicianDiagnosticsPage />
+            <TechnicianInstallationPage />
           </ProtectedRoute>
         }
       />
 
       <Route
-        path="/technician/environment"
+        path="/technician/diagnostics"
         element={
           <ProtectedRoute allowedRoles={['TECHNICIAN']}>
-            <TechnicianEnvironmentPage />
+            <TechnicianDiagnosticsPage />
           </ProtectedRoute>
         }
       />

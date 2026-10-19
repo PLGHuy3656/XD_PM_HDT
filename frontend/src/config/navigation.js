@@ -64,6 +64,12 @@ export const navigationByRole = {
       icon: 'device',
     },
     {
+      id: 'installation',
+      label: 'Lắp đặt',
+      path: '/technician/installation',
+      icon: 'installation',
+    },
+    {
       id: 'diagnostics',
       label: 'Chẩn đoán thiết bị',
       path: '/technician/diagnostics',
