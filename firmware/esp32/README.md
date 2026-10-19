@@ -42,3 +42,7 @@ firmware/esp32/
 ## 5. Mô phỏng ESP32 trên Wokwi cho hệ thống SwiftletCare
 
 <img width="686" height="609" alt="image" src="https://github.com/user-attachments/assets/33dde06e-337b-4e2c-8cd4-e179e3819f87" />
+
+Hình ảnh nhật ký khởi động và hoạt động của bộ điều khiển IoT SwiftletCare sử dụng ESP32
+<img width="696" height="327" alt="image" src="https://github.com/user-attachments/assets/a2ed1b3e-31a2-46c3-bba9-7d987e2a7eec" />
+
