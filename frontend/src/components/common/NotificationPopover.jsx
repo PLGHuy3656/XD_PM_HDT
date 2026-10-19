@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+
+import { useAuth } from '../../context/AuthContext'
+
 import './NotificationPopover.css'
 
-const initialNotifications = [
+const ownerNotifications = [
   {
-    id: 1,
+    id: 'owner-temperature',
     type: 'danger',
     title: 'Nhiệt độ vượt ngưỡng',
     message: 'Khu vực A đang ghi nhận 31.8°C.',
@@ -12,7 +15,7 @@ const initialNotifications = [
     unread: true,
   },
   {
-    id: 2,
+    id: 'owner-ai',
     type: 'warning',
     title: 'Phát hiện bất thường AI',
     message: 'Camera lối vào phát hiện chuyển động bất thường.',
@@ -20,7 +23,7 @@ const initialNotifications = [
     unread: true,
   },
   {
-    id: 3,
+    id: 'owner-device',
     type: 'info',
     title: 'Thiết bị đã kết nối lại',
     message: 'ESP32-Z02 đã khôi phục kết nối.',
@@ -28,6 +31,86 @@ const initialNotifications = [
     unread: false,
   },
 ]
+
+const technicianNotifications = [
+  {
+    id: 'tech-node-offline',
+    type: 'danger',
+    title: 'Node điều khiển mất kết nối',
+    message:
+      'ESP32-CTRL-04 · Nhà yến Phú An · Khu vực D.',
+    time: '5 phút trước',
+    unread: true,
+  },
+  {
+    id: 'tech-work-request',
+    type: 'warning',
+    title: 'Yêu cầu hỗ trợ mới',
+    message:
+      'Farm Owner Nhà yến Bình An yêu cầu kiểm tra độ ẩm Khu vực B.',
+    time: '12 phút trước',
+    unread: true,
+  },
+  {
+    id: 'tech-sensor-timeout',
+    type: 'danger',
+    title: 'Sensor không phản hồi',
+    message:
+      'CO2-C01 · Nhà yến Phú An · Khu vực C.',
+    time: '28 phút trước',
+    unread: true,
+  },
+  {
+    id: 'tech-admin-request',
+    type: 'info',
+    title: 'Công việc mới từ Admin',
+    message:
+      'Kiểm tra trạng thái kết nối thiết bị tại Nhà yến Phú An.',
+    time: '45 phút trước',
+    unread: false,
+  },
+]
+
+const defaultNotifications = [
+  {
+    id: 'system-notification',
+    type: 'info',
+    title: 'NestMate',
+    message: 'Chưa có thông báo hệ thống mới.',
+    time: 'Hiện tại',
+    unread: false,
+  },
+]
+
+function getNotificationsByRole(role) {
+  if (role === 'FARM_OWNER') {
+    return ownerNotifications
+  }
+
+  if (role === 'TECHNICIAN') {
+    return technicianNotifications
+  }
+
+  return defaultNotifications
+}
+
+function getViewAllConfig(role) {
+  if (role === 'FARM_OWNER') {
+    return {
+      label: 'Xem tất cả cảnh báo',
+      path: '/owner/alerts',
+    }
+  }
+
+  if (role === 'TECHNICIAN') {
+    return {
+      label: 'Xem cảnh báo & công việc',
+      path: '/technician/alerts',
+    }
+  }
+
+  return null
+}
 
 function BellIcon() {
   return (
@@ -65,11 +148,16 @@ function ArrowIcon() {
 
 function NotificationPopover() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+
   const containerRef = useRef(null)
 
   const [open, setOpen] = useState(false)
-  const [notifications, setNotifications] =
-    useState(initialNotifications)
+  const [notifications, setNotifications] = useState(() =>
+    getNotificationsByRole(user?.role),
+  )
+
+  const viewAllConfig = getViewAllConfig(user?.role)
 
   const unreadCount = useMemo(
     () =>
@@ -80,7 +168,14 @@ function NotificationPopover() {
   )
 
   useEffect(() => {
-    if (!open) return undefined
+    setNotifications(getNotificationsByRole(user?.role))
+    setOpen(false)
+  }, [user?.role])
+
+  useEffect(() => {
+    if (!open) {
+      return undefined
+    }
 
     const handleOutsideClick = (event) => {
       if (
@@ -105,7 +200,10 @@ function NotificationPopover() {
         'mousedown',
         handleOutsideClick,
       )
-      document.removeEventListener('keydown', handleEscape)
+      document.removeEventListener(
+        'keydown',
+        handleEscape,
+      )
     }
   }, [open])
 
@@ -113,7 +211,10 @@ function NotificationPopover() {
     setNotifications((current) =>
       current.map((notification) =>
         notification.id === id
-          ? { ...notification, unread: false }
+          ? {
+              ...notification,
+              unread: false,
+            }
           : notification,
       ),
     )
@@ -129,8 +230,12 @@ function NotificationPopover() {
   }
 
   const handleViewAll = () => {
+    if (!viewAllConfig) {
+      return
+    }
+
     setOpen(false)
-    navigate('/owner/alerts')
+    navigate(viewAllConfig.path)
   }
 
   return (
@@ -149,7 +254,9 @@ function NotificationPopover() {
             : 'Thông báo'
         }
         aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() =>
+          setOpen((current) => !current)
+        }
       >
         <BellIcon />
 
@@ -201,7 +308,9 @@ function NotificationPopover() {
                     : ''
                 }`}
                 onClick={() =>
-                  handleNotificationClick(notification.id)
+                  handleNotificationClick(
+                    notification.id,
+                  )
                 }
               >
                 <span
@@ -210,7 +319,9 @@ function NotificationPopover() {
 
                 <span className="notification-item__content">
                   <span className="notification-item__title-row">
-                    <strong>{notification.title}</strong>
+                    <strong>
+                      {notification.title}
+                    </strong>
 
                     {notification.unread && (
                       <span className="notification-item__unread" />
@@ -229,14 +340,16 @@ function NotificationPopover() {
             ))}
           </div>
 
-          <button
-            type="button"
-            className="notification-panel__footer"
-            onClick={handleViewAll}
-          >
-            <span>Xem tất cả cảnh báo</span>
-            <ArrowIcon />
-          </button>
+          {viewAllConfig && (
+            <button
+              type="button"
+              className="notification-panel__footer"
+              onClick={handleViewAll}
+            >
+              <span>{viewAllConfig.label}</span>
+              <ArrowIcon />
+            </button>
+          )}
         </div>
       )}
     </div>

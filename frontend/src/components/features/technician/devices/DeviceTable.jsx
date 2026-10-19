@@ -48,7 +48,7 @@ function SignalIcon() {
   )
 }
 
-function TechnicianDeviceTable({
+function DeviceTable({
   devices,
   farmName,
   getZoneName,
@@ -72,10 +72,7 @@ function TechnicianDeviceTable({
             const status = statusMeta[device.status]
 
             return (
-              <div
-                className="tech-device-row"
-                key={device.id}
-              >
+              <div className="tech-device-row" key={device.id}>
                 <button
                   type="button"
                   className="tech-device-identity"
@@ -101,9 +98,7 @@ function TechnicianDeviceTable({
                 </div>
 
                 <div>
-                  <span
-                    className={`tech-status ${status.className}`}
-                  >
+                  <span className={`tech-status ${status.className}`}>
                     <i />
                     {status.label}
                   </span>
@@ -116,13 +111,14 @@ function TechnicianDeviceTable({
                       ? `${device.rssi} dBm`
                       : 'No signal'}
                   </span>
-
-                  <small>{device.ip}</small>
+                  <small>
+                    MQTT {device.mqttStatus} · {device.ip}
+                  </small>
                 </div>
 
                 <div className="tech-firmware-cell">
                   <strong>{device.firmware}</strong>
-                  <small>{device.lastSeen}</small>
+                  <small>Heartbeat: {device.lastSeen}</small>
                 </div>
 
                 <div className="tech-device-actions">
@@ -155,4 +151,4 @@ function TechnicianDeviceTable({
   )
 }
 
-export default TechnicianDeviceTable
+export default DeviceTable
