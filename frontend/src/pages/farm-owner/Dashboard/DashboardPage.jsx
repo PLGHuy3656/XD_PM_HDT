@@ -1,126 +1,25 @@
 import { useState } from 'react'
 
-import AppLayout from '../../../components/layout/AppLayout'
-import SectionCard from '../../../components/dashboard/SectionCard'
-import StatusBadge from '../../../components/dashboard/StatusBadge'
-import DeviceQuickCard from '../../../components/dashboard/DeviceQuickCard'
-import AlertItem from '../../../components/dashboard/AlertItem'
+import { useNavigate } from 'react-router-dom'
 
-import '../../../components/dashboard/DashboardComponents.css'
+import EnvironmentSelect from '../../../components/ui/Select'
+
+import { cameras } from '../../../components/features/farm-owner/swiftlets/swiftletsMockData'
+
+import AppLayout from '../../../components/layout/AppLayout'
+import SectionCard from '../../../components/features/farm-owner/dashboard/SectionCard'
+import StatusBadge from '../../../components/features/farm-owner/dashboard/StatusBadge'
+import DeviceQuickCard from '../../../components/features/farm-owner/dashboard/DeviceQuickCard'
+import AlertItem from '../../../components/features/farm-owner/dashboard/AlertItem'
+
+import '../../../components/features/farm-owner/dashboard/DashboardComponents.css'
 import './DashboardPage.css'
 
-const environmentMetrics = {
-  temperature: {
-    label: 'Nhiệt độ',
-    value: 28.5,
-    displayValue: '28.5°C',
-    unit: '°C',
-    min: 24,
-    max: 34,
-    safeMin: 27,
-    safeMax: 31,
-    values: [
-      27.1, 27.4, 27.2, 27.8, 28.1,
-      28.4, 28.8, 29.1, 28.9, 28.6, 28.5,
-    ],
-  },
-
-  humidity: {
-    label: 'Độ ẩm',
-    value: 78,
-    displayValue: '78%',
-    unit: '%',
-    min: 60,
-    max: 100,
-    safeMin: 75,
-    safeMax: 90,
-    values: [
-      80, 79, 78, 77, 76,
-      78, 81, 82, 80, 79, 78,
-    ],
-  },
-
-  co2: {
-    label: 'CO₂',
-    value: 620,
-    displayValue: '620 ppm',
-    unit: ' ppm',
-    min: 300,
-    max: 1400,
-    safeMin: 400,
-    safeMax: 1000,
-    values: [
-      510, 530, 560, 590, 640,
-      670, 710, 690, 660, 640, 620,
-    ],
-  },
-
-  light: {
-    label: 'Ánh sáng',
-    value: 120,
-    displayValue: '120 lux',
-    unit: ' lux',
-    min: 0,
-    max: 300,
-    safeMin: 50,
-    safeMax: 180,
-    values: [
-      65, 72, 80, 95, 110,
-      130, 145, 138, 132, 125, 120,
-    ],
-  },
-}
-
-const mockDevices = [
-  {
-    id: 'misting',
-    type: 'misting',
-    name: 'Phun sương',
-    description: 'Khu vực A',
-    status: 'on',
-    mode: 'AUTO',
-  },
-  {
-    id: 'fan',
-    type: 'fan',
-    name: 'Quạt thông gió',
-    description: 'Khu vực A',
-    status: 'on',
-    mode: 'AUTO',
-  },
-  {
-    id: 'heater',
-    type: 'heater',
-    name: 'Máy sưởi',
-    description: 'Khu vực B',
-    status: 'off',
-    mode: 'AUTO',
-  },
-]
-
-const mockAlerts = [
-  {
-    id: 1,
-    title: 'Độ ẩm thấp',
-    description: 'Khu vực B · 73%',
-    time: '10 phút',
-    level: 'warning',
-  },
-  {
-    id: 2,
-    title: 'Thiết bị mất kết nối',
-    description: 'Sensor Node 04',
-    time: '32 phút',
-    level: 'danger',
-  },
-  {
-    id: 3,
-    title: 'Môi trường đã ổn định',
-    description: 'Khu vực A',
-    time: '1 giờ',
-    level: 'normal',
-  },
-]
+import {
+  environmentMetrics,
+  mockDevices,
+  mockAlerts,
+} from '../../../components/features/farm-owner/dashboard/dashboardMockData'
 
 function CameraIcon() {
   return (
@@ -141,76 +40,193 @@ function CameraIcon() {
 }
 
 function LiveCamera() {
+  const navigate = useNavigate()
+
+  const [selectedCameraId, setSelectedCameraId] = useState(
+    cameras[0].id,
+  )
+
+  const selectedCamera =
+    cameras.find(
+      (camera) => camera.id === selectedCameraId,
+    ) ?? cameras[0]
+
+  const currentIndex = cameras.findIndex(
+    (camera) => camera.id === selectedCamera.id,
+  )
+
+  const isOnline = selectedCamera.status === 'ONLINE'
+
+  function moveCamera(offset) {
+    const nextIndex =
+      (currentIndex + offset + cameras.length) %
+      cameras.length
+
+    setSelectedCameraId(cameras[nextIndex].id)
+  }
+
   return (
     <div className="live-camera-layout">
-      <div className="camera-preview">
+      <div
+        className={`camera-preview ${
+          !isOnline ? 'camera-preview-offline' : ''
+        }`}
+      >
         <div className="camera-toolbar">
           <div>
-            <span className="camera-live-dot" />
-            LIVE
+            <span
+              className={`camera-live-dot ${
+                !isOnline ? 'offline' : ''
+              }`}
+            />
+
+            {isOnline ? 'LIVE' : 'OFFLINE'}
           </div>
 
-          <span>CAM-01 · Lối vào chính</span>
-        </div>
-
-        <div className="camera-placeholder">
-          <CameraIcon />
-
-          <strong>Camera trực tiếp</strong>
-
           <span>
-            Luồng camera sẽ được kết nối từ Camera Node
+            {selectedCamera.id} · {selectedCamera.name}
           </span>
         </div>
 
-        <div className="mock-detection detection-one">
-          <span>Swiftlet · 96%</span>
-        </div>
+        {isOnline ? (
+          <>
+            <div className="camera-placeholder">
+              <CameraIcon />
 
-        <div className="mock-detection detection-two">
-          <span>Swiftlet · 93%</span>
-        </div>
+              <strong>Camera trực tiếp</strong>
+
+              <span>
+                Luồng camera sẽ được kết nối từ Camera Node
+              </span>
+            </div>
+
+            {selectedCamera.detections.map(
+              (detection, index) => (
+                <div
+                  key={detection.id}
+                  className={`mock-detection detection-${
+                    index === 0
+                      ? 'one'
+                      : index === 1
+                        ? 'two'
+                        : 'three'
+                  }`}
+                >
+                  <span>
+                    {detection.label} ·{' '}
+                    {detection.confidence}%
+                  </span>
+                </div>
+              ),
+            )}
+          </>
+        ) : (
+          <div className="camera-placeholder camera-offline-placeholder">
+            <CameraIcon />
+
+            <strong>Camera ngoại tuyến</strong>
+
+            <span>
+              Không nhận được tín hiệu từ{' '}
+              {selectedCamera.node}
+            </span>
+          </div>
+        )}
       </div>
 
       <aside className="camera-information">
-        <div className="camera-online">
+        <div className="dashboard-camera-selector">
+          <button
+            type="button"
+            onClick={() => moveCamera(-1)}
+            aria-label="Camera trước"
+          >
+            ‹
+          </button>
+
+          <EnvironmentSelect
+            value={selectedCamera.id}
+            onChange={setSelectedCameraId}
+            options={cameras.map((camera) => ({
+              value: camera.id,
+              label: `${camera.id} · ${camera.name}${
+                camera.status === 'OFFLINE'
+                  ? ' · Offline'
+                  : ''
+              }`,
+            }))}
+          />
+
+          <button
+            type="button"
+            onClick={() => moveCamera(1)}
+            aria-label="Camera tiếp theo"
+          >
+            ›
+          </button>
+        </div>
+
+        <div
+          className={`camera-online ${
+            !isOnline ? 'offline' : ''
+          }`}
+        >
           <span className="camera-online-dot" />
 
           <div>
-            <strong>Camera đang trực tuyến</strong>
-            <small>CAM-01 · AI đang hoạt động</small>
+            <strong>
+              {isOnline
+                ? 'Camera đang trực tuyến'
+                : 'Camera ngoại tuyến'}
+            </strong>
+
+            <small>
+              {selectedCamera.id} ·{' '}
+              {isOnline
+                ? 'AI đang hoạt động'
+                : `Mất kết nối ${selectedCamera.node}`}
+            </small>
           </div>
         </div>
 
         <div className="camera-stat-grid">
           <article>
             <span>Chim vào</span>
-            <strong>128</strong>
+            <strong>{isOnline ? '128' : '—'}</strong>
             <small>Hôm nay</small>
           </article>
 
           <article>
             <span>Chim ra</span>
-            <strong>96</strong>
+            <strong>{isOnline ? '96' : '—'}</strong>
             <small>Hôm nay</small>
           </article>
 
           <article>
             <span>Chênh lệch</span>
-            <strong>+32</strong>
+            <strong>{isOnline ? '+32' : '—'}</strong>
             <small>Ước tính hiện diện</small>
           </article>
 
           <article>
             <span>Sự kiện AI</span>
-            <strong>03</strong>
-            <small>Cần kiểm tra</small>
+            <strong>{isOnline ? '03' : '—'}</strong>
+            <small>
+              {isOnline ? 'Cần kiểm tra' : 'Không có dữ liệu'}
+            </small>
           </article>
         </div>
 
         <button
           type="button"
           className="open-camera-button"
+          onClick={() =>
+            navigate(
+              `/owner/swiftlets?camera=${encodeURIComponent(
+                selectedCamera.id,
+              )}`,
+            )
+          }
         >
           Xem camera
           <span>→</span>
@@ -491,7 +507,7 @@ function DashboardPage() {
     <AppLayout>
       <div className="owner-dashboard">
       <section className="dashboard-welcome">
-        <div className="dashboard-welcome-left">
+        <div className="dashboard-welcome-main">
           <div className="dashboard-welcome-copy">
             <span className="dashboard-eyebrow">
               NESTMATE OVERVIEW

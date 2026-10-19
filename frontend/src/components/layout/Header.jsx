@@ -1,3 +1,6 @@
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import NotificationPopover from '../common/NotificationPopover'
 import { useAuth } from '../../context/AuthContext'
 import './Header.css'
 
@@ -13,23 +16,6 @@ function SearchIcon() {
     >
       <circle cx="11" cy="11" r="6.5" />
       <path d="m16 16 4 4" />
-    </svg>
-  )
-}
-
-function BellIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-      <path d="M10 21h4" />
     </svg>
   )
 }
@@ -64,7 +50,13 @@ const environmentData = [
 ]
 
 function Header() {
-  const { user } = useAuth()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
+
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+
+  const profileRef = useRef(null)
 
   const displayName = user?.name || 'NestMate User'
   const roleLabel = roleLabels[user?.role] || 'Người dùng'
@@ -77,8 +69,59 @@ function Header() {
     .join('')
     .toUpperCase()
 
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (
+        profileRef.current &&
+        !profileRef.current.contains(event.target)
+      ) {
+        setProfileOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+
+    return () => {
+      document.removeEventListener(
+        'mousedown',
+        handleOutsideClick,
+      )
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 8)
+    }
+
+    handleScroll()
+
+    window.addEventListener('scroll', handleScroll, {
+      passive: true,
+    })
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [])
+
+  const handleSettings = () => {
+    setProfileOpen(false)
+    navigate('/settings')
+  }
+
+  const handleLogout = () => {
+    setProfileOpen(false)
+    logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
-    <header className="app-header">
+    <header
+      className={`app-header ${
+        scrolled ? 'app-header--scrolled' : ''
+      }`}
+    >
       <div className="header-search">
         <SearchIcon />
 
@@ -102,29 +145,65 @@ function Header() {
       </div>
 
       <div className="header-actions">
-        <button
-          type="button"
-          className="notification-button"
-          aria-label="Thông báo"
-        >
-          <BellIcon />
-          <span className="notification-dot" />
-        </button>
+        <NotificationPopover />
 
         <div className="header-divider" />
 
-        <div className="header-profile">
-          <div className="profile-copy">
-            <strong>{displayName}</strong>
-            <span>{roleLabel}</span>
-          </div>
-
-          <div
-            className="profile-avatar"
-            aria-label={displayName}
+        <div
+          className="header-profile-menu"
+          ref={profileRef}
+        >
+          <button
+            type="button"
+            className={`header-profile ${
+              profileOpen ? 'header-profile--active' : ''
+            }`}
+            onClick={() =>
+              setProfileOpen((current) => !current)
+            }
+            aria-expanded={profileOpen}
           >
-            {initials}
-          </div>
+            <div className="profile-copy">
+              <strong>{displayName}</strong>
+              <span>{roleLabel}</span>
+            </div>
+
+            <div
+              className="profile-avatar"
+              aria-label={displayName}
+            >
+              {initials}
+            </div>
+          </button>
+
+          {profileOpen && (
+            <div className="profile-dropdown">
+              <div className="profile-dropdown__identity">
+                <strong>{displayName}</strong>
+                <span>{user?.email}</span>
+              </div>
+
+              <div className="profile-dropdown__divider" />
+
+              <button
+                type="button"
+                onClick={handleSettings}
+              >
+                <span>Cài đặt tài khoản</span>
+                <small>Thông tin & thông báo</small>
+              </button>
+
+              <div className="profile-dropdown__divider" />
+
+              <button
+                type="button"
+                className="profile-dropdown__logout"
+                onClick={handleLogout}
+              >
+                Đăng xuất
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

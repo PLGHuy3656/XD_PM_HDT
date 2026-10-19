@@ -15,6 +15,7 @@ const MOCK_USERS = [
     id: 1,
     name: 'Farm Owner',
     email: 'owner@nestmate.dev',
+    phone: '0901 234 567',
     password: '123456',
     role: 'FARM_OWNER',
   },
@@ -22,6 +23,7 @@ const MOCK_USERS = [
     id: 2,
     name: 'Technician',
     email: 'tech@nestmate.dev',
+    phone: '0902 345 678',
     password: '123456',
     role: 'TECHNICIAN',
   },
@@ -29,6 +31,7 @@ const MOCK_USERS = [
     id: 3,
     name: 'Administrator',
     email: 'admin@nestmate.dev',
+    phone: '0903 456 789',
     password: '123456',
     role: 'ADMIN',
   },
@@ -68,15 +71,17 @@ function AuthProvider({ children }) {
       }
     }
 
-    // Không đưa password vào state.
+    // Không đưa password vào state/localStorage.
     const authenticatedUser = {
       id: matchedUser.id,
       name: matchedUser.name,
       email: matchedUser.email,
+      phone: matchedUser.phone,
       role: matchedUser.role,
     }
 
     setUser(authenticatedUser)
+
     localStorage.setItem(
       'nestmate_user',
       JSON.stringify(authenticatedUser),
@@ -85,6 +90,33 @@ function AuthProvider({ children }) {
     return {
       success: true,
       user: authenticatedUser,
+    }
+  }
+
+  const updateProfile = (profileData) => {
+    if (!user) {
+      return {
+        success: false,
+        message: 'Không tìm thấy phiên đăng nhập.',
+      }
+    }
+
+    const updatedUser = {
+      ...user,
+      name: profileData.name?.trim() || user.name,
+      phone: profileData.phone?.trim() || '',
+    }
+
+    setUser(updatedUser)
+
+    localStorage.setItem(
+      'nestmate_user',
+      JSON.stringify(updatedUser),
+    )
+
+    return {
+      success: true,
+      user: updatedUser,
     }
   }
 
@@ -97,6 +129,7 @@ function AuthProvider({ children }) {
     user,
     login,
     logout,
+    updateProfile,
     isAuthenticated: Boolean(user),
   }
 
