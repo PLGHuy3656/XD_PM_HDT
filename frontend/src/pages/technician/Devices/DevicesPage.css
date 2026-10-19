@@ -21,65 +21,75 @@
    ======================================== */
 
 .tech-devices-hero {
+  min-height: 150px;
+
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 30px;
+  gap: 28px;
 
-  padding: var(--space-6) 26px;
+  padding: 26px 30px;
 
-  border: 1px solid #dbe4e8;
-  border-radius: 20px;
+  border: 1px solid var(--border-soft);
+  border-radius: 28px;
 
   background:
+    radial-gradient(
+      circle at 10% 20%,
+      rgba(200, 139, 39, 0.09),
+      transparent 28%
+    ),
     linear-gradient(
-      110deg,
-      rgba(11, 38, 62, 0.98),
-      rgba(23, 63, 95, 0.95)
+      120deg,
+      rgba(255, 255, 255, 0.82),
+      rgba(252, 248, 239, 0.64)
     );
 
-  box-shadow: 0 12px 30px rgba(11, 38, 62, 0.1);
+  box-shadow: 0 18px 45px rgba(16, 46, 74, 0.055);
 }
 
 .tech-devices-kicker,
 .tech-section-code {
-  color: var(--color-gold-400);
-  font-size: 9px;
+  color: var(--color-gold-500);
+  font-size: 10px;
   font-weight: 800;
-  letter-spacing: 1.7px;
+  letter-spacing: 0.15em;
 }
 
 .tech-devices-hero h1 {
-  margin: 7px 0;
+  margin: 7px 0 0;
 
-  color: var(--color-surface);
-  font-size: 31px;
-  letter-spacing: -1px;
+  color: var(--color-navy-800);
+  font-size: clamp(29px, 3vw, 38px);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
 }
 
 .tech-devices-hero p {
   max-width: 650px;
 
-  margin: 0;
+  margin: 10px 0 0;
 
-  color: #c6d1d9;
-  font-size: 12px;
-  line-height: 1.6;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.65;
 }
 
 .tech-devices-system-chip {
-  min-width: 230px;
+  min-width: 240px;
 
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 13px;
 
-  padding: 13px 15px;
+  padding: 16px 18px;
 
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
 
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.56);
+
+  box-shadow: var(--shadow-sm);
 }
 
 .tech-system-pulse {
@@ -90,9 +100,9 @@
 
   border-radius: 50%;
 
-  background: #5ad39c;
+  background: var(--color-success);
 
-  box-shadow: 0 0 0 6px rgba(90, 211, 156, 0.1);
+  box-shadow: 0 0 0 4px rgba(53, 148, 103, 0.09);
 }
 
 .tech-devices-system-chip div {
@@ -102,13 +112,13 @@
 }
 
 .tech-devices-system-chip strong {
-  color: var(--color-surface);
-  font-size: 11px;
+  color: var(--color-navy-800);
+  font-size: 12px;
 }
 
 .tech-devices-system-chip span:last-child {
-  color: #9fb2c0;
-  font-size: 9px;
+  color: var(--color-text-muted);
+  font-size: 10px;
 }
 
 /* ========================================
@@ -271,7 +281,7 @@
 
   background: #f1faf6;
 
-  color: var(--color-success-strong);
+  color: var(--color-success);
   font-size: 10px;
   font-weight: 700;
 }
@@ -772,7 +782,7 @@
 .tech-status.offline {
   background: #faeaea;
 
-  color: var(--color-danger-strong);
+  color: var(--color-danger);
 }
 
 .tech-detail-online {
@@ -784,7 +794,7 @@
 }
 
 .tech-detail-offline {
-  color: var(--color-danger-strong) !important;
+  color: var(--color-danger) !important;
 }
 
 /* ========================================

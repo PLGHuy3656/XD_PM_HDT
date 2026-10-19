@@ -62,10 +62,18 @@ function TechnicianDevicesPage() {
     })
   )
 
+  const farmDevices = useMemo(
+    () =>
+      devices.filter(
+        (device) => device.farmId === farmId,
+      ),
+    [devices, farmId],
+  )
+
   const filteredDevices = useMemo(() => {
     const keyword = search.trim().toLowerCase()
 
-    return devices.filter((device) => {
+    return farmDevices.filter((device) => {
       const matchesZone =
         zoneFilter === 'ALL' ||
         device.zoneId === zoneFilter
@@ -92,7 +100,7 @@ function TechnicianDevicesPage() {
       )
     })
   }, [
-    devices,
+    farmDevices,
     zoneFilter,
     statusFilter,
     typeFilter,
@@ -109,17 +117,17 @@ function TechnicianDevicesPage() {
       (device) => device.id === assignmentDeviceId
     ) ?? null
 
-  const onlineCount = devices.filter(
+  const onlineCount = farmDevices.filter(
     (device) => device.status === 'ONLINE'
   ).length
 
-  const attentionCount = devices.filter(
+  const attentionCount = farmDevices.filter(
     (device) =>
       device.status === 'WARNING' ||
       device.status === 'OFFLINE'
   ).length
 
-  const averageRssiValues = devices
+  const averageRssiValues = farmDevices
     .filter((device) => device.rssi !== null)
     .map((device) => device.rssi)
 
@@ -203,7 +211,7 @@ function TechnicianDevicesPage() {
             <div>
               <strong>Device Network Active</strong>
               <span>
-                {onlineCount}/{devices.length} nodes online
+                {onlineCount}/{farmDevices.length} nodes online
               </span>
             </div>
           </div>
@@ -212,7 +220,7 @@ function TechnicianDevicesPage() {
         <section className="tech-device-metrics">
           <article>
             <span>TOTAL NODES</span>
-            <strong>{devices.length}</strong>
+            <strong>{farmDevices.length}</strong>
             <small>Registered devices</small>
           </article>
 

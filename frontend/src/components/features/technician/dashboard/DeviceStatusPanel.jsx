@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { devices } from './dashboardMockData'
 
 function StatusDot({ status }) {
@@ -5,6 +6,8 @@ function StatusDot({ status }) {
 }
 
 function DeviceStatusPanel() {
+  const navigate = useNavigate()
+
   return (
     <section className="technician-card technician-device-panel">
       <div className="technician-card-heading">
@@ -16,7 +19,11 @@ function DeviceStatusPanel() {
           </p>
         </div>
 
-        <button type="button" className="technician-link-button">
+        <button
+          type="button"
+          className="technician-link-button"
+          onClick={() => navigate('/technician/devices')}
+        >
           Xem tất cả
           <span aria-hidden="true">›</span>
         </button>

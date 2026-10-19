@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import AppLayout from '../../../components/layout/AppLayout'
+import EnvironmentSelect from '../../../components/ui/Select'
 import EnvironmentSummary from '../../../components/features/technician/environment/EnvironmentSummary'
 import EnvironmentZoneTable from '../../../components/features/technician/environment/EnvironmentZoneTable'
 import EnvironmentDetailPanel from '../../../components/features/technician/environment/EnvironmentDetailPanel'
@@ -15,12 +16,20 @@ function EnvironmentPage() {
   const [farmFilter, setFarmFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [selectedZone, setSelectedZone] = useState(null)
-  const [farmSelectOpen, setFarmSelectOpen] = useState(false)
 
-  const farms = useMemo(
-    () => [...new Set(environmentZones.map((zone) => zone.farm))],
-    [],
-  )
+  const farmOptions = useMemo(() => {
+    const uniqueFarms = [
+      ...new Set(environmentZones.map((zone) => zone.farm)),
+    ]
+
+    return [
+      { value: 'ALL', label: 'Tất cả nhà yến' },
+      ...uniqueFarms.map((farm) => ({
+        value: farm,
+        label: farm,
+      })),
+    ]
+  }, [])
 
   const filteredZones = useMemo(
     () =>
@@ -38,7 +47,7 @@ function EnvironmentPage() {
 
   return (
     <AppLayout>
-      <main className="technician-environment-page">
+      <div className="technician-environment-page">
         <section className="tech-env-hero">
           <div>
             <span>TECHNICIAN WORKSPACE</span>
@@ -62,55 +71,12 @@ function EnvironmentPage() {
 
         <section className="tech-env-toolbar">
           <div className="tech-env-farm-filter">
-            <label>Nhà yến</label>
-
-            <div className="tech-env-select">
-                <button
-                type="button"
-                className={`tech-env-select-trigger ${
-                    farmSelectOpen ? 'open' : ''
-                }`}
-                onClick={() => setFarmSelectOpen((current) => !current)}
-                aria-expanded={farmSelectOpen}
-                >
-                <span>
-                    {farmFilter === 'ALL'
-                    ? 'Tất cả nhà yến'
-                    : farmFilter}
-                </span>
-
-                <span className="tech-env-select-chevron">⌄</span>
-                </button>
-
-                {farmSelectOpen && (
-                <div className="tech-env-select-menu">
-                    <button
-                    type="button"
-                    className={farmFilter === 'ALL' ? 'active' : ''}
-                    onClick={() => {
-                        setFarmFilter('ALL')
-                        setFarmSelectOpen(false)
-                    }}
-                    >
-                    Tất cả nhà yến
-                    </button>
-
-                    {farms.map((farm) => (
-                    <button
-                        type="button"
-                        key={farm}
-                        className={farmFilter === farm ? 'active' : ''}
-                        onClick={() => {
-                        setFarmFilter(farm)
-                        setFarmSelectOpen(false)
-                        }}
-                    >
-                        {farm}
-                    </button>
-                    ))}
-                </div>
-                )}
-            </div>
+            <EnvironmentSelect
+              label="Nhà yến"
+              value={farmFilter}
+              options={farmOptions}
+              onChange={setFarmFilter}
+            />
           </div>
 
           <div className="tech-env-filter">
@@ -140,7 +106,7 @@ function EnvironmentPage() {
           zone={selectedZone}
           onClose={() => setSelectedZone(null)}
         />
-      </main>
+      </div>
     </AppLayout>
   )
 }

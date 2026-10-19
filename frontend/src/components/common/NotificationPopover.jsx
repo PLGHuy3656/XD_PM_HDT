@@ -38,7 +38,7 @@ const technicianNotifications = [
     type: 'danger',
     title: 'Node điều khiển mất kết nối',
     message:
-      'ESP32-CTRL-04 · Nhà yến Bình An · Khu vực D.',
+      'ESP32-CTRL-04 · Nhà yến Phú An · Khu vực D.',
     time: '5 phút trước',
     unread: true,
   },

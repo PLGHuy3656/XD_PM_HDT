@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import AppLayout from '../../../components/layout/AppLayout'
+import EnvironmentSelect from '../../../components/ui/Select'
 import TechnicalAlertsTab from '../../../components/features/technician/alerts/TechnicalAlertsTab'
 import WorkRequestsTab from '../../../components/features/technician/alerts/WorkRequestsTab'
 import AlertDetailPanel from '../../../components/features/technician/alerts/AlertDetailPanel'
@@ -32,24 +33,28 @@ function AlertsPage() {
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [search, setSearch] = useState('')
 
-  const [farmSelectOpen, setFarmSelectOpen] = useState(false)
-  const [statusSelectOpen, setStatusSelectOpen] = useState(false)
-
   const [selectedAlert, setSelectedAlert] = useState(null)
   const [selectedRequest, setSelectedRequest] = useState(null)
 
   const [workRequests, setWorkRequests] =
     useState(initialWorkRequests)
 
-  const farms = useMemo(
-    () => [
+  const farmOptions = useMemo(() => {
+    const uniqueFarms = [
       ...new Set([
         ...technicalAlerts.map((item) => item.farm),
         ...workRequests.map((item) => item.farm),
       ]),
-    ],
-    [workRequests],
-  )
+    ]
+
+    return [
+      { value: 'ALL', label: 'Tất cả nhà yến' },
+      ...uniqueFarms.map((farm) => ({
+        value: farm,
+        label: farm,
+      })),
+    ]
+  }, [workRequests])
 
   const filteredAlerts = useMemo(() => {
     const keyword = search.trim().toLowerCase()
@@ -124,20 +129,10 @@ function AlertsPage() {
     (item) => item.status === 'IN_PROGRESS',
   ).length
 
-  const currentFarmLabel =
-    farmFilter === 'ALL'
-      ? 'Tất cả nhà yến'
-      : farmFilter
-
   const currentStatusOptions =
     activeTab === 'technical'
       ? technicalStatusOptions
       : workStatusOptions
-
-  const currentStatusLabel =
-    currentStatusOptions.find(
-      (option) => option.value === statusFilter,
-    )?.label || 'Tất cả trạng thái'
 
   const handleTabChange = (tab) => {
     setActiveTab(tab)
@@ -145,9 +140,6 @@ function AlertsPage() {
 
     setSelectedAlert(null)
     setSelectedRequest(null)
-
-    setFarmSelectOpen(false)
-    setStatusSelectOpen(false)
   }
 
   const handleRequestStatusChange = (id, status) => {
@@ -168,7 +160,7 @@ function AlertsPage() {
 
   return (
     <AppLayout>
-      <main className="technician-alerts-page">
+      <div className="technician-alerts-page">
         <section className="tech-alerts-hero">
           <div>
             <span className="tech-alerts-eyebrow">
@@ -267,120 +259,17 @@ function AlertsPage() {
           </div>
 
           <div className="tech-alert-filter-group">
-            <div className="tech-alert-select">
-              <button
-                type="button"
-                className={`tech-alert-select-trigger ${
-                  farmSelectOpen ? 'open' : ''
-                }`}
-                aria-expanded={farmSelectOpen}
-                onClick={() => {
-                  setFarmSelectOpen(
-                    (current) => !current,
-                  )
+            <EnvironmentSelect
+              value={farmFilter}
+              options={farmOptions}
+              onChange={setFarmFilter}
+            />
 
-                  setStatusSelectOpen(false)
-                }}
-              >
-                <span>{currentFarmLabel}</span>
-
-                <span className="tech-alert-select-chevron">
-                  ⌄
-                </span>
-              </button>
-
-              {farmSelectOpen && (
-                <div className="tech-alert-select-menu">
-                  <button
-                    type="button"
-                    className={
-                      farmFilter === 'ALL'
-                        ? 'active'
-                        : ''
-                    }
-                    onClick={() => {
-                      setFarmFilter('ALL')
-                      setFarmSelectOpen(false)
-                    }}
-                  >
-                    Tất cả nhà yến
-                  </button>
-
-                  {farms.map((farm) => (
-                    <button
-                      type="button"
-                      key={farm}
-                      className={
-                        farmFilter === farm
-                          ? 'active'
-                          : ''
-                      }
-                      onClick={() => {
-                        setFarmFilter(farm)
-                        setFarmSelectOpen(false)
-                      }}
-                    >
-                      {farm}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="tech-alert-select">
-              <button
-                type="button"
-                className={`tech-alert-select-trigger ${
-                  statusSelectOpen ? 'open' : ''
-                }`}
-                aria-expanded={statusSelectOpen}
-                onClick={() => {
-                  setStatusSelectOpen(
-                    (current) => !current,
-                  )
-
-                  setFarmSelectOpen(false)
-                }}
-              >
-                <span>
-                  {currentStatusLabel}
-                </span>
-
-                <span className="tech-alert-select-chevron">
-                  ⌄
-                </span>
-              </button>
-
-              {statusSelectOpen && (
-                <div className="tech-alert-select-menu">
-                  {currentStatusOptions.map(
-                    (option) => (
-                      <button
-                        type="button"
-                        key={option.value}
-                        className={
-                          statusFilter ===
-                          option.value
-                            ? 'active'
-                            : ''
-                        }
-                        onClick={() => {
-                          setStatusFilter(
-                            option.value,
-                          )
-
-                          setStatusSelectOpen(
-                            false,
-                          )
-                        }}
-                      >
-                        {option.label}
-                      </button>
-                    ),
-                  )}
-                </div>
-              )}
-            </div>
+            <EnvironmentSelect
+              value={statusFilter}
+              options={currentStatusOptions}
+              onChange={setStatusFilter}
+            />
           </div>
         </section>
 
@@ -452,7 +341,7 @@ function AlertsPage() {
               />
             )}
         </section>
-      </main>
+      </div>
     </AppLayout>
   )
 }

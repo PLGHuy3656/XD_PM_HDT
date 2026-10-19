@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { sensorHealth } from './dashboardMockData'
 
 function StatusDot({ status }) {
@@ -5,6 +6,8 @@ function StatusDot({ status }) {
 }
 
 function SensorHealthPanel() {
+  const navigate = useNavigate()
+
   return (
     <section className="technician-card technician-health-panel">
       <div className="technician-card-heading">
@@ -43,7 +46,10 @@ function SensorHealthPanel() {
       <div className="technician-health-footer">
         <span>26 sensor được đăng ký</span>
 
-        <button type="button">
+        <button
+          type="button"
+          onClick={() => navigate('/technician/diagnostics')}
+        >
           Chẩn đoán
           <span aria-hidden="true">›</span>
         </button>

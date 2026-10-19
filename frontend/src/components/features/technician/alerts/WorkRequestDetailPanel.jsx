@@ -1,22 +1,8 @@
-function sourceLabel(source) {
-  return source === 'ADMIN' ? 'Admin' : 'Farm Owner'
-}
-
-function priorityLabel(priority) {
-  return {
-    URGENT: 'Khẩn cấp',
-    HIGH: 'Cao',
-    NORMAL: 'Bình thường',
-  }[priority]
-}
-
-function statusLabel(status) {
-  return {
-    NEW: 'Mới',
-    IN_PROGRESS: 'Đang xử lý',
-    DONE: 'Hoàn thành',
-  }[status]
-}
+import {
+  workPriorityLabel,
+  workSourceLabel,
+  workStatusLabel,
+} from './alertsMockData'
 
 export default function WorkRequestDetailPanel({
   request,
@@ -45,15 +31,15 @@ export default function WorkRequestDetailPanel({
 
       <div className="tech-alert-detail-badges">
         <span className={`tech-request-source ${request.source}`}>
-          {sourceLabel(request.source)}
+          {workSourceLabel(request.source)}
         </span>
 
         <span className={`tech-priority ${request.priority}`}>
-          {priorityLabel(request.priority)}
+          {workPriorityLabel(request.priority)}
         </span>
 
         <span className={`tech-status ${request.status}`}>
-          {statusLabel(request.status)}
+          {workStatusLabel(request.status)}
         </span>
       </div>
 

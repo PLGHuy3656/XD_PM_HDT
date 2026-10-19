@@ -1,3 +1,39 @@
+export function severityLabel(severity) {
+  return {
+    CRITICAL: 'Nghiêm trọng',
+    WARNING: 'Cảnh báo',
+    INFO: 'Thông tin',
+  }[severity]
+}
+
+export function technicalStatusLabel(status) {
+  return {
+    OPEN: 'Chưa xử lý',
+    INVESTIGATING: 'Đang kiểm tra',
+    RESOLVED: 'Đã xử lý',
+  }[status]
+}
+
+export function workSourceLabel(source) {
+  return source === 'ADMIN' ? 'Admin' : 'Farm Owner'
+}
+
+export function workPriorityLabel(priority) {
+  return {
+    URGENT: 'Khẩn cấp',
+    HIGH: 'Cao',
+    NORMAL: 'Bình thường',
+  }[priority]
+}
+
+export function workStatusLabel(status) {
+  return {
+    NEW: 'Mới',
+    IN_PROGRESS: 'Đang xử lý',
+    DONE: 'Hoàn thành',
+  }[status]
+}
+
 export const technicalAlerts = [
   {
     id: 'ALT-001',
@@ -5,7 +41,7 @@ export const technicalAlerts = [
     type: 'NODE_DISCONNECTED',
     severity: 'CRITICAL',
     status: 'OPEN',
-    farm: 'Nhà yến Bình An',
+    farm: 'Nhà yến Phú An',
     zone: 'Khu vực D',
     device: 'ESP32-CTRL-04',
     occurredAt: '08:14 hôm nay',
@@ -108,7 +144,7 @@ export const workRequests = [
     sender: 'System Administrator',
     priority: 'URGENT',
     status: 'IN_PROGRESS',
-    farm: 'Nhà yến Bình An',
+    farm: 'Nhà yến Phú An',
     zone: 'Khu vực D',
     createdAt: '07:35 hôm nay',
     content:
@@ -122,7 +158,7 @@ export const workRequests = [
     sender: 'Trần Quốc Nam',
     priority: 'NORMAL',
     status: 'NEW',
-    farm: 'Nhà yến Phú An',
+    farm: 'Nhà yến Bình An',
     zone: 'Khu vực A',
     createdAt: 'Hôm qua, 19:20',
     content:

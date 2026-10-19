@@ -1,22 +1,8 @@
-function sourceLabel(source) {
-  return source === 'ADMIN' ? 'Admin' : 'Farm Owner'
-}
-
-function priorityLabel(priority) {
-  return {
-    URGENT: 'Khẩn cấp',
-    HIGH: 'Cao',
-    NORMAL: 'Bình thường',
-  }[priority]
-}
-
-function statusLabel(status) {
-  return {
-    NEW: 'Mới',
-    IN_PROGRESS: 'Đang xử lý',
-    DONE: 'Hoàn thành',
-  }[status]
-}
+import {
+  workPriorityLabel,
+  workSourceLabel,
+  workStatusLabel,
+} from './alertsMockData'
 
 export default function WorkRequestsTab({
   requests,
@@ -35,7 +21,7 @@ export default function WorkRequestsTab({
           onClick={() => onSelect(request)}
         >
           <div className={`tech-request-source ${request.source}`}>
-            {sourceLabel(request.source)}
+            {workSourceLabel(request.source)}
           </div>
 
           <div className="tech-alert-row-main">
@@ -43,7 +29,7 @@ export default function WorkRequestsTab({
               <strong>{request.title}</strong>
 
               <span className={`tech-priority ${request.priority}`}>
-                {priorityLabel(request.priority)}
+                {workPriorityLabel(request.priority)}
               </span>
             </div>
 
@@ -56,7 +42,7 @@ export default function WorkRequestsTab({
 
           <div className="tech-alert-row-side">
             <span className={`tech-status ${request.status}`}>
-              {statusLabel(request.status)}
+              {workStatusLabel(request.status)}
             </span>
             <small>{request.createdAt}</small>
           </div>

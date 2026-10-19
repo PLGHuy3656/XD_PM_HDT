@@ -2,10 +2,10 @@ export const systemStats = [
   {
     id: 'nodes',
     label: 'Device Nodes',
-    value: '8 / 8',
-    description: 'Tất cả node đang phản hồi',
-    status: 'healthy',
-    statusLabel: 'Hoạt động tốt',
+    value: '7 / 8',
+    description: '1 node mất kết nối tại Khu vực D',
+    status: 'warning',
+    statusLabel: 'Cần chú ý',
     icon: 'N',
   },
   {
@@ -39,39 +39,39 @@ export const systemStats = [
 
 export const devices = [
   {
-    id: 'ESP32-01',
-    zone: 'Tầng 1 · Khu A',
+    id: 'ESP32-CTRL-01',
+    zone: 'Nhà yến Bình An · Khu vực A',
     status: 'online',
     sensors: '4 / 4',
-    lastSeen: '12 giây trước',
+    lastSeen: '8 giây trước',
   },
   {
-    id: 'ESP32-02',
-    zone: 'Tầng 2 · Khu A',
-    status: 'online',
-    sensors: '4 / 4',
+    id: 'ESP32-CTRL-02',
+    zone: 'Nhà yến Bình An · Khu vực B',
+    status: 'warning',
+    sensors: '3 / 4',
     lastSeen: '18 giây trước',
   },
   {
-    id: 'ESP32-03',
-    zone: 'Tầng 1 · Khu B',
-    status: 'warning',
-    sensors: '3 / 4',
-    lastSeen: '1 phút trước',
-  },
-  {
-    id: 'ESP32-04',
-    zone: 'Tầng 2 · Khu B',
+    id: 'SENSOR-ENV-03',
+    zone: 'Nhà yến Phú An · Khu vực C',
     status: 'online',
-    sensors: '4 / 4',
-    lastSeen: '22 giây trước',
+    sensors: '3 / 3',
+    lastSeen: '12 giây trước',
   },
   {
-    id: 'ESP32-05',
-    zone: 'Phòng kỹ thuật',
+    id: 'ESP32-CTRL-04',
+    zone: 'Nhà yến Phú An · Khu vực D',
     status: 'offline',
     sensors: '0 / 4',
     lastSeen: '12 phút trước',
+  },
+  {
+    id: 'ESP32-CTRL-05',
+    zone: 'Nhà yến Bình An · Khu vực E',
+    status: 'online',
+    sensors: '4 / 4',
+    lastSeen: '21 giây trước',
   },
 ]
 
@@ -83,24 +83,24 @@ export const sensorHealth = [
 
 export const alerts = [
   {
-    id: 1,
+    id: 'ALT-001',
     level: 'critical',
-    title: 'ESP32-05 mất kết nối',
-    description: 'Không nhận telemetry trong 12 phút',
+    title: 'ESP32-CTRL-04 mất kết nối',
+    description: 'Nhà yến Phú An · Khu vực D · Không nhận telemetry',
     time: '12 phút trước',
   },
   {
-    id: 2,
+    id: 'ALT-002',
     level: 'warning',
-    title: 'SHT31-03 phản hồi không ổn định',
-    description: 'ESP32-03 · Tầng 1 · Khu B',
+    title: 'SHT31-B02 độ ẩm dưới ngưỡng',
+    description: 'ESP32-CTRL-02 · Nhà yến Bình An · Khu vực B',
     time: '28 phút trước',
   },
   {
-    id: 3,
+    id: 'ALT-004',
     level: 'info',
     title: 'MQTT đã kết nối lại',
-    description: 'ESP32-02 hoạt động bình thường',
+    description: 'ESP32-CTRL-01 · Nhà yến Bình An · Khu vực A',
     time: '1 giờ trước',
   },
 ]

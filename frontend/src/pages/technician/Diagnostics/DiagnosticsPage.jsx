@@ -36,7 +36,7 @@ function DiagnosticsPage() {
 
   return (
     <AppLayout>
-      <main className="technician-diagnostics-page">
+      <div className="technician-diagnostics-page">
         <section className="diagnostics-hero">
           <div>
             <span className="diagnostic-eyebrow">
@@ -106,7 +106,7 @@ function DiagnosticsPage() {
           node={selectedNode}
           onClose={() => setSelectedNode(null)}
         />
-      </main>
+      </div>
     </AppLayout>
   )
 }

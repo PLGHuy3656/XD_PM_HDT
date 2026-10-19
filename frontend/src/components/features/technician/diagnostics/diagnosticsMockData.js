@@ -137,7 +137,7 @@ export const diagnosticNodes = [
     name: 'Camera AI cửa vào',
     type: 'AI Camera',
     farm: 'Nhà yến Bình An',
-    zone: 'Lối vào',
+    zone: 'Khu vực A',
     status: 'HEALTHY',
     lastSeen: '6 giây trước',
 
@@ -153,6 +153,95 @@ export const diagnosticNodes = [
     ],
 
     actuators: [],
+
+    issues: [],
+  },
+
+  {
+    id: 'ESP32-CTRL-05',
+    name: 'Bộ điều khiển Zone E',
+    type: 'ESP32 Controller',
+    farm: 'Nhà yến Bình An',
+    zone: 'Khu vực E',
+    status: 'HEALTHY',
+    lastSeen: '21 giây trước',
+
+    connectivity: {
+      mqtt: 'CONNECTED',
+      wifi: 'CONNECTED',
+      rssi: -55,
+      ip: '192.168.1.25',
+    },
+
+    sensors: [
+      { name: 'Nhiệt độ', status: 'HEALTHY', value: '28.8°C' },
+      { name: 'Độ ẩm', status: 'HEALTHY', value: '80%' },
+      { name: 'CO₂', status: 'HEALTHY', value: '640 ppm' },
+      { name: 'Ánh sáng', status: 'HEALTHY', value: '4.0 lux' },
+    ],
+
+    actuators: [
+      { name: 'Quạt thông gió', status: 'HEALTHY' },
+      { name: 'Máy phun sương', status: 'HEALTHY' },
+    ],
+
+    issues: [],
+  },
+
+  {
+    id: 'AUDIO-01',
+    name: 'Node âm thanh Zone C',
+    type: 'Audio Edge Node',
+    farm: 'Nhà yến Phú An',
+    zone: 'Khu vực C',
+    status: 'WARNING',
+    lastSeen: '35 giây trước',
+
+    connectivity: {
+      mqtt: 'UNSTABLE',
+      wifi: 'CONNECTED',
+      rssi: -76,
+      ip: '192.168.2.35',
+    },
+
+    sensors: [
+      { name: 'Microphone Array', status: 'WARNING', value: 'Noise floor cao' },
+    ],
+
+    actuators: [],
+
+    issues: [
+      'Tín hiệu Wi-Fi yếu tại Khu vực C (-76 dBm).',
+    ],
+  },
+
+  {
+    id: 'ESP32-CTRL-06',
+    name: 'Bộ điều khiển Zone F',
+    type: 'ESP32 Controller',
+    farm: 'Nhà yến Phú An',
+    zone: 'Khu vực F',
+    status: 'HEALTHY',
+    lastSeen: '15 giây trước',
+
+    connectivity: {
+      mqtt: 'CONNECTED',
+      wifi: 'CONNECTED',
+      rssi: -54,
+      ip: '192.168.2.26',
+    },
+
+    sensors: [
+      { name: 'Nhiệt độ', status: 'HEALTHY', value: '28.2°C' },
+      { name: 'Độ ẩm', status: 'HEALTHY', value: '83%' },
+      { name: 'CO₂', status: 'HEALTHY', value: '601 ppm' },
+      { name: 'Ánh sáng', status: 'HEALTHY', value: '3.9 lux' },
+    ],
+
+    actuators: [
+      { name: 'Quạt thông gió', status: 'HEALTHY' },
+      { name: 'Máy phun sương', status: 'HEALTHY' },
+    ],
 
     issues: [],
   },

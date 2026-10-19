@@ -1,18 +1,7 @@
-function severityLabel(severity) {
-  return {
-    CRITICAL: 'Nghiêm trọng',
-    WARNING: 'Cảnh báo',
-    INFO: 'Thông tin',
-  }[severity]
-}
-
-function statusLabel(status) {
-  return {
-    OPEN: 'Chưa xử lý',
-    INVESTIGATING: 'Đang kiểm tra',
-    RESOLVED: 'Đã xử lý',
-  }[status]
-}
+import {
+  severityLabel,
+  technicalStatusLabel,
+} from './alertsMockData'
 
 export default function TechnicalAlertsTab({
   alerts,
@@ -50,7 +39,7 @@ export default function TechnicalAlertsTab({
 
           <div className="tech-alert-row-side">
             <span className={`tech-status ${alert.status}`}>
-              {statusLabel(alert.status)}
+              {technicalStatusLabel(alert.status)}
             </span>
             <small>{alert.occurredAt}</small>
           </div>

@@ -72,9 +72,11 @@ function EnvironmentSelect({
         isOpen ? 'open' : ''
       }`}
     >
-      <span className="environment-control-select-label">
-        {label}
-      </span>
+      {label && (
+        <span className="environment-control-select-label">
+          {label}
+        </span>
+      )}
 
       <button
         type="button"
