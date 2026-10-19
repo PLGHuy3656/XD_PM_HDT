@@ -1,0 +1,979 @@
+.technician-alerts-page {
+  --actor-surface: rgba(255, 255, 255, .6);
+
+  padding: 28px 36px 40px;
+  color: var(--color-navy-800);
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+/* HERO */
+
+.tech-alerts-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+
+  padding: 25px 28px;
+
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+
+  background:
+    radial-gradient(
+      circle at 86% 15%,
+      rgba(200, 139, 39, .09),
+      transparent 32%
+    ),
+    linear-gradient(
+      120deg,
+      rgba(255, 255, 255, .82),
+      rgba(252, 248, 239, .64)
+    );
+
+  box-shadow: var(--shadow-card);
+}
+
+.tech-alerts-eyebrow,
+.tech-alert-detail-eyebrow,
+.tech-alert-list-title span {
+  display: block;
+
+  margin-bottom: 6px;
+
+  color: var(--color-gold-700);
+
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.tech-alerts-hero h1 {
+  margin: 0;
+
+  color: var(--color-navy-900);
+
+  font-size: 26px;
+}
+
+.tech-alerts-hero p {
+  max-width: 700px;
+
+  margin: 8px 0 0;
+
+  color: var(--color-text-secondary);
+
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.tech-alerts-hero-status {
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 9px 13px;
+
+  border: 1px solid rgba(53, 148, 103, .14);
+  border-radius: var(--radius-pill);
+
+  background: var(--color-success-soft);
+  color: var(--color-success);
+
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.tech-alerts-hero-status span {
+  width: 7px;
+  height: 7px;
+
+  border-radius: 50%;
+
+  background: var(--color-success);
+}
+
+/* SUMMARY */
+
+.tech-alert-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+
+  margin-top: 16px;
+}
+
+.tech-alert-summary article {
+  min-height: 118px;
+
+  padding: 18px;
+
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+
+  background: var(--actor-surface);
+
+  box-shadow: var(--shadow-sm);
+}
+
+.tech-alert-summary article > span {
+  display: block;
+
+  color: var(--color-text-muted);
+
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.tech-alert-summary strong {
+  display: block;
+
+  margin: 9px 0 4px;
+
+  color: var(--color-navy-900);
+
+  font-size: 26px;
+}
+
+.tech-alert-summary small {
+  color: var(--color-text-subtle);
+
+  font-size: 9px;
+}
+
+/* TABS */
+
+.tech-alert-tabs {
+  display: flex;
+  gap: 5px;
+
+  width: fit-content;
+
+  margin-top: 20px;
+  padding: 5px;
+
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+
+  background: rgba(255, 255, 255, .48);
+}
+
+.tech-alert-tabs button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 9px 14px;
+
+  border: 0;
+  border-radius: var(--radius-sm);
+
+  background: transparent;
+  color: var(--color-text-muted);
+
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.tech-alert-tabs button:hover {
+  color: var(--color-navy-900);
+}
+
+.tech-alert-tabs button.active {
+  background: var(--color-surface);
+  color: var(--color-navy-900);
+
+  box-shadow: var(--shadow-sm);
+}
+
+.tech-alert-tabs button > span {
+  min-width: 19px;
+
+  padding: 2px 6px;
+
+  border-radius: var(--radius-pill);
+
+  background: var(--color-gold-100);
+  color: var(--color-gold-700);
+
+  font-size: 9px;
+  text-align: center;
+}
+
+/* TOOLBAR */
+
+.tech-alert-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+
+  margin-top: 14px;
+  padding: 12px;
+
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+
+  background: rgba(255, 255, 255, .55);
+}
+
+.tech-alert-search {
+  flex: 1;
+
+  max-width: 500px;
+  height: 40px;
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 0 12px;
+
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+
+  background: rgba(255, 255, 255, .7);
+
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.tech-alert-search:focus-within {
+  border-color: rgba(213, 164, 58, .34);
+
+  box-shadow: 0 0 0 3px rgba(213, 164, 58, .06);
+}
+
+.tech-alert-search > span {
+  color: var(--color-gold-600);
+
+  font-size: 18px;
+}
+
+.tech-alert-search input {
+  flex: 1;
+
+  min-width: 0;
+
+  border: 0;
+  outline: 0;
+
+  background: transparent;
+  color: var(--color-navy-800);
+
+  font-family: inherit;
+  font-size: 10px;
+}
+
+.tech-alert-search input::placeholder {
+  color: var(--color-text-subtle);
+}
+
+.tech-alert-filter-group {
+  display: flex;
+  gap: 8px;
+}
+
+/* CUSTOM SELECT */
+
+.tech-alert-select {
+  position: relative;
+
+  width: 190px;
+}
+
+.tech-alert-select-trigger {
+  width: 100%;
+  height: 40px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 0 13px;
+
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+
+  background: rgba(255, 255, 255, .72);
+  color: var(--color-navy-800);
+
+  font-family: inherit;
+  font-size: 10px;
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.tech-alert-select-trigger:hover,
+.tech-alert-select-trigger.open {
+  border-color: rgba(213, 164, 58, .34);
+
+  background: rgba(255, 255, 255, .92);
+
+  box-shadow: 0 0 0 3px rgba(213, 164, 58, .06);
+}
+
+.tech-alert-select-trigger > span:first-child {
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tech-alert-select-chevron {
+  flex-shrink: 0;
+
+  color: var(--color-gold-600);
+
+  font-size: 16px;
+  line-height: 1;
+
+  transition: transform var(--transition-fast);
+}
+
+.tech-alert-select-trigger.open
+  .tech-alert-select-chevron {
+  transform: rotate(180deg);
+}
+
+.tech-alert-select-menu {
+  position: absolute;
+  z-index: 40;
+
+  top: calc(100% + 7px);
+  right: 0;
+
+  width: 100%;
+
+  padding: 6px;
+
+  overflow: hidden;
+
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+
+  background: rgba(251, 248, 241, .98);
+
+  box-shadow: var(--shadow-elevated);
+
+  backdrop-filter: blur(14px);
+}
+
+.tech-alert-select-menu button {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+
+  padding: 10px 11px;
+
+  border: 0;
+  border-radius: var(--radius-xs);
+
+  background: transparent;
+  color: var(--color-text-secondary);
+
+  font-family: inherit;
+  font-size: 10px;
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.tech-alert-select-menu button:hover {
+  background: rgba(213, 164, 58, .07);
+  color: var(--color-navy-800);
+}
+
+.tech-alert-select-menu button.active {
+  background: var(--color-gold-100);
+  color: var(--color-gold-700);
+
+  font-weight: 700;
+}
+
+/* CONTENT */
+
+.tech-alert-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+
+  margin-top: 14px;
+}
+
+.tech-alert-content:has(.tech-alert-detail) {
+  grid-template-columns:
+    minmax(0, 1.45fr)
+    minmax(310px, .75fr);
+}
+
+.tech-alert-list-card,
+.tech-alert-detail {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+
+  background: rgba(255, 255, 255, .62);
+
+  box-shadow: var(--shadow-card);
+}
+
+.tech-alert-list-card {
+  overflow: hidden;
+}
+
+.tech-alert-list-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 18px 20px;
+
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.tech-alert-list-title h2 {
+  margin: 0;
+
+  color: var(--color-navy-900);
+
+  font-size: 15px;
+}
+
+.tech-alert-list-title > strong {
+  min-width: 31px;
+  height: 31px;
+
+  display: grid;
+  place-items: center;
+
+  padding: 0 8px;
+
+  border-radius: var(--radius-pill);
+
+  background: var(--color-gold-100);
+  color: var(--color-gold-700);
+
+  font-size: 11px;
+}
+
+/* ROWS */
+
+.tech-alert-list {
+  padding: 7px;
+}
+
+.tech-alert-row {
+  position: relative;
+
+  width: 100%;
+
+  display: grid;
+  grid-template-columns:
+    auto
+    minmax(0, 1fr)
+    auto;
+  align-items: center;
+  gap: 13px;
+
+  padding: 13px 14px;
+
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+
+  background: transparent;
+  color: inherit;
+
+  font-family: inherit;
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.tech-alert-row + .tech-alert-row {
+  margin-top: 3px;
+}
+
+.tech-alert-row:hover {
+  background: rgba(255, 255, 255, .68);
+}
+
+.tech-alert-row.active {
+  border-color: rgba(213, 164, 58, .22);
+
+  background: rgba(246, 234, 209, .45);
+}
+
+.tech-alert-indicator {
+  width: 8px;
+  height: 36px;
+
+  border-radius: var(--radius-pill);
+}
+
+.tech-alert-indicator.CRITICAL {
+  background: var(--color-danger);
+}
+
+.tech-alert-indicator.WARNING {
+  background: var(--color-warning);
+}
+
+.tech-alert-indicator.INFO {
+  background: var(--color-info);
+}
+
+.tech-alert-row-main {
+  min-width: 0;
+}
+
+.tech-alert-row-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tech-alert-row-heading strong {
+  overflow: hidden;
+
+  color: var(--color-navy-900);
+
+  font-size: 11px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tech-alert-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+
+  margin-top: 6px;
+
+  color: var(--color-text-muted);
+
+  font-size: 9px;
+}
+
+.tech-alert-row-meta span + span::before {
+  content: "•";
+
+  margin-right: 12px;
+
+  color: var(--color-gold-500);
+}
+
+.tech-alert-row-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+}
+
+.tech-alert-row-side small {
+  color: var(--color-text-subtle);
+
+  font-size: 8px;
+}
+
+/* BADGES */
+
+.tech-severity,
+.tech-priority,
+.tech-status,
+.tech-request-source {
+  display: inline-flex;
+  align-items: center;
+
+  width: fit-content;
+
+  padding: 4px 7px;
+
+  border-radius: var(--radius-pill);
+
+  font-size: 8px;
+  font-weight: 800;
+
+  white-space: nowrap;
+}
+
+.tech-severity.CRITICAL,
+.tech-priority.URGENT {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.tech-severity.WARNING,
+.tech-priority.HIGH {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.tech-severity.INFO,
+.tech-priority.NORMAL {
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+
+.tech-status.OPEN,
+.tech-status.NEW {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.tech-status.INVESTIGATING,
+.tech-status.IN_PROGRESS {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.tech-status.RESOLVED,
+.tech-status.DONE {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.tech-request-source.ADMIN {
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+
+.tech-request-source.FARM_OWNER {
+  background: var(--color-gold-100);
+  color: var(--color-gold-700);
+}
+
+/* DETAIL PANEL */
+
+.tech-alert-detail {
+  position: sticky;
+  top: calc(var(--header-height) + 16px);
+
+  align-self: start;
+
+  padding: 20px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, .82),
+      rgba(250, 247, 239, .78)
+    );
+}
+
+.tech-alert-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.tech-alert-detail-header h2 {
+  margin: 0;
+
+  color: var(--color-navy-900);
+
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.tech-alert-close {
+  flex-shrink: 0;
+
+  width: 31px;
+  height: 31px;
+
+  border: 1px solid var(--border-default);
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, .6);
+  color: var(--color-text-muted);
+
+  font-family: inherit;
+  font-size: 18px;
+
+  cursor: pointer;
+
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.tech-alert-close:hover {
+  border-color: rgba(213, 164, 58, .28);
+
+  background: var(--color-gold-50);
+  color: var(--color-gold-700);
+}
+
+.tech-alert-detail-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  margin-top: 14px;
+}
+
+.tech-alert-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+
+  margin-top: 18px;
+}
+
+.tech-alert-detail-grid > div {
+  padding: 11px;
+
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+
+  background: rgba(255, 255, 255, .52);
+}
+
+.tech-alert-detail-grid span,
+.tech-alert-detail-section > span {
+  display: block;
+
+  margin-bottom: 5px;
+
+  color: var(--color-text-muted);
+
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.tech-alert-detail-grid strong {
+  color: var(--color-navy-800);
+
+  font-size: 10px;
+}
+
+.tech-alert-detail-section {
+  margin-top: 10px;
+  padding: 13px;
+
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+
+  background: rgba(255, 255, 255, .48);
+}
+
+.tech-alert-detail-section p {
+  margin: 0;
+
+  color: var(--color-text-secondary);
+
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+.tech-alert-detail-section.recommendation {
+  border-color: rgba(213, 164, 58, .17);
+
+  background: rgba(246, 234, 209, .35);
+}
+
+.tech-alert-permission-note {
+  margin-top: 12px;
+  padding: 11px 12px;
+
+  border-left: 3px solid var(--color-gold-500);
+  border-radius:
+    0
+    var(--radius-sm)
+    var(--radius-sm)
+    0;
+
+  background: rgba(246, 234, 209, .35);
+  color: var(--color-text-secondary);
+
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+/* WORK REQUEST ACTION */
+
+.tech-work-actions {
+  margin-top: 16px;
+}
+
+.tech-work-primary {
+  width: 100%;
+
+  padding: 11px 14px;
+
+  border: 0;
+  border-radius: var(--radius-sm);
+
+  background: var(--color-navy-900);
+  color: #fff;
+
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    background var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.tech-work-primary:hover {
+  background: var(--color-navy-800);
+}
+
+.tech-work-primary:active {
+  transform: translateY(1px);
+}
+
+.tech-work-completed {
+  padding: 11px;
+
+  border-radius: var(--radius-sm);
+
+  background: var(--color-success-soft);
+  color: var(--color-success);
+
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.tech-alert-empty {
+  padding: 36px 20px;
+
+  color: var(--color-text-muted);
+
+  font-size: 10px;
+  text-align: center;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 1100px) {
+  .tech-alert-summary {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .tech-alert-content:has(.tech-alert-detail) {
+    grid-template-columns: 1fr;
+  }
+
+  .tech-alert-detail {
+    position: static;
+  }
+}
+
+@media (max-width: 800px) {
+  .technician-alerts-page {
+    padding: 22px 20px 34px;
+  }
+
+  .tech-alerts-hero,
+  .tech-alert-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tech-alerts-hero-status {
+    width: fit-content;
+  }
+
+  .tech-alert-search {
+    max-width: none;
+  }
+
+  .tech-alert-filter-group {
+    width: 100%;
+  }
+
+  .tech-alert-select {
+    flex: 1;
+
+    width: auto;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .technician-alerts-page {
+    padding: 18px 14px 28px;
+  }
+
+  .tech-alert-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .tech-alert-tabs {
+    width: 100%;
+  }
+
+  .tech-alert-tabs button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .tech-alert-filter-group {
+    flex-direction: column;
+  }
+
+  .tech-alert-select {
+    width: 100%;
+  }
+
+  .tech-alert-select-menu {
+    right: auto;
+    left: 0;
+  }
+
+  .tech-alert-row {
+    grid-template-columns:
+      auto
+      minmax(0, 1fr);
+  }
+
+  .tech-alert-row-side {
+    grid-column: 2;
+
+    align-items: flex-start;
+    flex-direction: row;
+  }
+
+  .tech-alert-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}

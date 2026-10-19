@@ -19,6 +19,7 @@ import TechnicianDashboardPage from './pages/technician/Dashboard/DashboardPage'
 import TechnicianDevicesPage from './pages/technician/Devices/DevicesPage'
 import TechnicianDiagnosticsPage from './pages/technician/Diagnostics/DiagnosticsPage'
 import TechnicianEnvironmentPage from './pages/technician/Environment/EnvironmentPage'
+import TechnicianAlertsPage from './pages/technician/Alerts/AlertsPage'
 
 import AdminDashboardPage from './pages/admin/Dashboard/DashboardPage'
 
@@ -159,6 +160,15 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={['TECHNICIAN']}>
             <TechnicianEnvironmentPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/technician/alerts"
+        element={
+          <ProtectedRoute allowedRoles={['TECHNICIAN']}>
+            <TechnicianAlertsPage />
           </ProtectedRoute>
         }
       />
