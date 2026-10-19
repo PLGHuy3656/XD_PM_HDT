@@ -2,20 +2,45 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+venv/
+*.log
+*.cache
+Thumbs.db
+.DS_Store
+
+# secrets / local config (MQTT creds, RTSP url with password)
+.env
+*.env
+*.local.yaml
+
+# runtime outputs: only .gitkeep is tracked
+outputs/*
+!outputs/.gitkeep
+!outputs/snapshots/
 outputs/snapshots/*
 !outputs/snapshots/.gitkeep
-outputs/*.jsonl
-outputs/*.json
 data/samples/*
 !data/samples/.gitkeep
-# train / dataset (no push dataset&train result)
+
+# train / dataset (no push dataset & train result)
 runs/
-models/best_prev.pt
-outputs/predict/
-outputs/dataset_report.json
-*.mp4
-!docs/**/*.mp4
-Dataset_SC_NOPUSH/
 runs_NOPUSH/
-last.pt
-data.local.yaml
+Dataset_*/
+*.zip
+
+# weights: only models/best.pt is tracked
+*.pt
+!models/best.pt
+*.onnx
+*.engine
+*.torchscript
+*.tflite
+*_openvino_model/
+*_saved_model/
+
+# video: only docs demos are tracked
+*.mp4
+*.avi
+*.mov
+*.mkv
+!docs/**/*.mp4
