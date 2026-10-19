@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "author": "SwiftletCare - TV2 IoT",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-dht22", "id": "dht1", "top": -140, "left": -100, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "pot_sound", "top": 150, "left": -110, "attrs": { "label": "Sound Sensor (Loa ru)" } },
+    { "type": "wokwi-led", "id": "led_misting", "top": -80, "left": 160, "attrs": { "color": "blue", "label": "Misting (Phun suong)" } },
+    { "type": "wokwi-led", "id": "led_fan", "top": -20, "left": 160, "attrs": { "color": "green", "label": "Fan (Quat hut)" } },
+    { "type": "wokwi-led", "id": "led_heater", "top": 40, "left": 160, "attrs": { "color": "red", "label": "Heater (May suoi)" } },
+    { "type": "wokwi-led", "id": "led_alarm", "top": 100, "left": 160, "attrs": { "color": "orange", "label": "Alarm (Bao dong)" } },
+    { "type": "wokwi-resistor", "id": "r1", "top": -60, "left": 230, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r2", "top": 0, "left": 230, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r3", "top": 60, "left": 230, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r4", "top": 120, "left": 230, "attrs": { "value": "220" } }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "dht1:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "dht1:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "dht1:SDA", "esp:15", "green", [ "v0" ] ],
+    [ "pot_sound:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "pot_sound:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "pot_sound:SIG", "esp:34", "purple", [ "v0" ] ],
+    [ "esp:25", "led_misting:A", "blue", [ "v0" ] ],
+    [ "led_misting:C", "r1:1", "black", [ "v0" ] ],
+    [ "r1:2", "esp:GND.2", "black", [ "v0" ] ],
+    [ "esp:26", "led_fan:A", "green", [ "v0" ] ],
+    [ "led_fan:C", "r2:1", "black", [ "v0" ] ],
+    [ "r2:2", "esp:GND.2", "black", [ "v0" ] ],
+    [ "esp:27", "led_heater:A", "red", [ "v0" ] ],
+    [ "led_heater:C", "r3:1", "black", [ "v0" ] ],
+    [ "r3:2", "esp:GND.2", "black", [ "v0" ] ],
+    [ "esp:33", "led_alarm:A", "orange", [ "v0" ] ],
+    [ "led_alarm:C", "r4:1", "black", [ "v0" ] ],
+    [ "r4:2", "esp:GND.2", "black", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}
