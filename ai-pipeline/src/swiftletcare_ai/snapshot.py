@@ -1,4 +1,5 @@
 """Draw boxes and save evidence snapshots (AI-FR-007, AI-FR-014)."""
+
 from __future__ import annotations
 
 import time
@@ -42,5 +43,8 @@ class SnapshotStore:
     def save(self, image: np.ndarray, camera_id: str, event_type: str, timestamp: float) -> str:
         name = f"{camera_id}_{event_type}_{int(timestamp)}_{int((timestamp % 1) * 1000):03d}.jpg"
         path = self.dir / name
-        cv2.imwrite(str(path), image, [int(cv2.IMWRITE_JPEG_QUALITY), self.q])
+        ok, buf = cv2.imencode(".jpg", image, [int(cv2.IMWRITE_JPEG_QUALITY), self.q])
+        if not ok:
+            raise RuntimeError(f"cannot encode snapshot {name}")
+        path.write_bytes(buf.tobytes())   # unicode-safe; raises OSError on failure
         return f"{self.base}/{name}" if self.base else str(path)
