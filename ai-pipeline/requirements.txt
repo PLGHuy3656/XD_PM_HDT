@@ -1,5 +1,5 @@
 # SwiftletCare - AI pipeline
-ultralytics>=8.4.0      # YOLO26 (best.pt) + ByteTrack
+ultralytics>=8.4.174,<8.5   # version used to train best.pt
 opencv-python>=4.9
 numpy>=1.24
 PyYAML>=6.0
