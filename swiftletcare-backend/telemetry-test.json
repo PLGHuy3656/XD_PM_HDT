@@ -1,0 +1,1 @@
+{"nodeId":"device01","state":{"freeHeap":150000,"networkRssi":-60,"mode":"AUTO"},"timestamp":1792526694,"metrics":{"co2":450,"lux":120,"audioRms":0.02,"audioHealthy":true,"temperature":30,"humidity":70},"actuators":{"alarm":false,"fan":true,"heater":false,"misting":false}}
