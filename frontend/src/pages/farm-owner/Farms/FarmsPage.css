@@ -752,6 +752,166 @@
 }
 
 /* ========================================
+   ASSIGNED TECHNICIAN
+   ======================================== */
+
+.farm-technician {
+  margin-bottom: 25px;
+  padding: 17px;
+
+  border: 1px solid #eadfca;
+  border-radius: var(--radius-md);
+
+  background: #fbf8f0;
+}
+
+.farm-technician__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+
+  margin-bottom: 15px;
+}
+
+.farm-technician__eyebrow {
+  display: block;
+
+  margin-bottom: 4px;
+
+  color: #b48630;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+}
+
+.farm-technician__heading h3 {
+  margin: 0 0 4px;
+
+  color: var(--color-navy-900);
+  font-size: 16px;
+}
+
+.farm-technician__heading p {
+  margin: 0;
+
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.farm-technician__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 6px 9px;
+
+  border-radius: var(--radius-pill);
+
+  background: #e6f4ed;
+
+  color: var(--color-success-strong);
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.farm-technician__status i {
+  width: 6px;
+  height: 6px;
+
+  border-radius: 50%;
+
+  background: var(--color-success);
+}
+
+.farm-technician__profile {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 1.25fr;
+  align-items: center;
+  gap: var(--space-4);
+
+  padding: 14px;
+
+  border: 1px solid #eee8da;
+  border-radius: var(--radius-sm);
+
+  background: var(--color-surface);
+}
+
+.farm-technician__identity {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.farm-technician__avatar {
+  width: 40px;
+  height: 40px;
+
+  display: grid;
+  flex: 0 0 40px;
+  place-items: center;
+
+  border-radius: 50%;
+
+  background: var(--color-navy-900);
+
+  color: var(--color-surface);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.farm-technician__identity strong,
+.farm-technician__identity span,
+.farm-technician__contact span,
+.farm-technician__contact strong {
+  display: block;
+}
+
+.farm-technician__identity strong {
+  margin-bottom: 3px;
+
+  color: var(--color-navy-900);
+  font-size: 13px;
+}
+
+.farm-technician__identity span,
+.farm-technician__contact span {
+  color: var(--color-text-muted);
+  font-size: 9px;
+}
+
+.farm-technician__contact {
+  min-width: 0;
+}
+
+.farm-technician__contact strong {
+  margin-top: 4px;
+
+  overflow: hidden;
+
+  color: var(--color-navy-900);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.farm-technician__empty {
+  padding: 14px;
+
+  border-radius: var(--radius-sm);
+
+  background: var(--color-surface);
+
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+/* ========================================
    COMPONENT STATES
    ======================================== */
 

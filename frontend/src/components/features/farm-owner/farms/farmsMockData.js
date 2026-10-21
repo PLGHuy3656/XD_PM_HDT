@@ -11,6 +11,16 @@ export const farmsMockData = [
     birdsToday: 428,
     onlineDevices: 12,
     totalDevices: 13,
+
+    assignedTechnician: {
+      id: 'tech-01',
+      name: 'Nguyễn Minh Khang',
+      role: 'Kỹ thuật viên',
+      phone: '090 123 4567',
+      email: 'tech@swiftletcare.dev',
+      status: 'Đang phụ trách',
+    },
+
     zones: [
       {
         id: 'zone-a',
@@ -41,6 +51,7 @@ export const farmsMockData = [
       },
     ],
   },
+
   {
     id: 'farm-02',
     name: 'Nhà yến Phú An',
@@ -53,6 +64,16 @@ export const farmsMockData = [
     birdsToday: 316,
     onlineDevices: 8,
     totalDevices: 10,
+
+    assignedTechnician: {
+      id: 'tech-02',
+      name: 'Trần Quốc Huy',
+      role: 'Kỹ thuật viên',
+      phone: '091 456 7820',
+      email: 'huy.technician@swiftletcare.dev',
+      status: 'Đang phụ trách',
+    },
+
     zones: [
       {
         id: 'zone-a',
