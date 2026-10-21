@@ -23,24 +23,15 @@ import TechnicianDiagnosticsPage from './pages/technician/Diagnostics/Diagnostic
 import TechnicianAlertsPage from './pages/technician/Alerts/AlertsPage'
 
 import AdminDashboardPage from './pages/admin/Dashboard/DashboardPage'
+import AdminUsersPage from './pages/admin/Users/UsersPage'
 
 function App() {
   return (
     <Routes>
-      <Route
-        path="/"
-        element={<Navigate to="/login" replace />}
-      />
+      <Route path="/" element={<Navigate to="/login" replace />} />
 
-      <Route
-        path="/login"
-        element={<LoginPage />}
-      />
-
-      <Route
-        path="/register"
-        element={<RegisterPage />}
-      />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
 
       <Route
         path="/settings"
@@ -188,6 +179,15 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <AdminDashboardPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/users"
+        element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <AdminUsersPage />
           </ProtectedRoute>
         }
       />
