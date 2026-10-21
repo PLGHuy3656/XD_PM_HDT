@@ -1,8 +1,8 @@
-
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.routes.technician_routes import router as technician_router
 from app.telemetry import start_mqtt
 
 
@@ -24,6 +24,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(technician_router)
+
 
 @app.get("/health")
 def health():
@@ -31,6 +33,7 @@ def health():
         "status": "ok",
         "service": "swiftletcare-backend",
     }
+
 
 @app.get("/mqtt/status")
 def mqtt_status():
