@@ -1,7 +1,7 @@
 export const farms = [
   {
-    id: 'farm-01',
-    name: 'Nhà yến Bình Chánh',
+    id: 'farm-binh-an',
+    name: 'Nhà yến Bình An',
     zones: [
       { id: 'zone-a', name: 'Khu vực A · Cửa chính' },
       { id: 'zone-b', name: 'Khu vực B · Tầng 2' },

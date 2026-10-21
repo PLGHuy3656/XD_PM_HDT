@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import AppLayout from '../../../components/layout/AppLayout'
+import Select from '../../../components/ui/Select'
 
 import DeviceTable from '../../../components/features/admin/devices/DeviceTable'
 import DeviceDetailPanel from '../../../components/features/admin/devices/DeviceDetailPanel'
@@ -9,6 +10,13 @@ import {
 } from '../../../components/features/admin/devices/adminDevicesData'
 
 import './DevicesPage.css'
+
+const statusFilterOptions = [
+  { value: 'ALL', label: 'Tất cả trạng thái' },
+  { value: 'ONLINE', label: 'Online' },
+  { value: 'WARNING', label: 'Cần chú ý' },
+  { value: 'OFFLINE', label: 'Offline' },
+]
 
 function DevicesPage() {
   const devices = useMemo(
@@ -31,12 +39,20 @@ function DevicesPage() {
     (device) => device.id === selectedDeviceId,
   )
 
-  const deviceTypes = useMemo(
-    () => [...new Set(devices.map((device) => device.type))],
+  const typeFilterOptions = useMemo(
+    () => [
+      { value: 'ALL', label: 'Tất cả loại' },
+      ...[...new Set(devices.map((device) => device.type))].map(
+        (type) => ({
+          value: type,
+          label: type,
+        }),
+      ),
+    ],
     [devices],
   )
 
-  const farms = useMemo(() => {
+  const farmFilterOptions = useMemo(() => {
     const uniqueFarms = new Map()
 
     devices.forEach((device) => {
@@ -46,7 +62,13 @@ function DevicesPage() {
       )
     })
 
-    return [...uniqueFarms.values()]
+    return [
+      { value: 'ALL', label: 'Tất cả nhà yến' },
+      ...[...uniqueFarms.values()].map((farm) => ({
+        value: farm.id,
+        label: farm.name,
+      })),
+    ]
   }, [devices])
 
   const filteredDevices = useMemo(() => {
@@ -175,58 +197,23 @@ function DevicesPage() {
               placeholder="Tìm Device ID, tên, Farm, Zone..."
             />
 
-            <select
+            <Select
               value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(event.target.value)
-              }
-            >
-              <option value="ALL">
-                Tất cả trạng thái
-              </option>
-              <option value="ONLINE">Online</option>
-              <option value="WARNING">
-                Cần chú ý
-              </option>
-              <option value="OFFLINE">Offline</option>
-            </select>
+              options={statusFilterOptions}
+              onChange={setStatusFilter}
+            />
 
-            <select
+            <Select
               value={typeFilter}
-              onChange={(event) =>
-                setTypeFilter(event.target.value)
-              }
-            >
-              <option value="ALL">
-                Tất cả loại
-              </option>
+              options={typeFilterOptions}
+              onChange={setTypeFilter}
+            />
 
-              {deviceTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-
-            <select
+            <Select
               value={farmFilter}
-              onChange={(event) =>
-                setFarmFilter(event.target.value)
-              }
-            >
-              <option value="ALL">
-                Tất cả nhà yến
-              </option>
-
-              {farms.map((farm) => (
-                <option
-                  key={farm.id}
-                  value={farm.id}
-                >
-                  {farm.name}
-                </option>
-              ))}
-            </select>
+              options={farmFilterOptions}
+              onChange={setFarmFilter}
+            />
           </div>
 
           <DeviceTable

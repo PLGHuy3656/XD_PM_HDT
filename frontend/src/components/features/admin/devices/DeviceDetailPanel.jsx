@@ -3,6 +3,14 @@ import {
   provisioningLabels,
 } from './adminDevicesData'
 
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m6 6 12 12M18 6 6 18" />
+    </svg>
+  )
+}
+
 function DeviceDetailPanel({ device, onClose }) {
   if (!device) return null
 
@@ -26,10 +34,11 @@ function DeviceDetailPanel({ device, onClose }) {
 
           <button
             type="button"
+            className="admin-device-detail__close"
             onClick={onClose}
             aria-label="Đóng"
           >
-            ×
+            <CloseIcon />
           </button>
         </header>
 

@@ -1,7 +1,7 @@
 export const analyticsFarms = [
   {
-    id: 'farm-01',
-    name: 'Nhà yến Bình Chánh',
+    id: 'farm-binh-an',
+    name: 'Nhà yến Bình An',
     zones: [
       { id: 'all', name: 'Tất cả khu vực' },
       { id: 'zone-a', name: 'Khu vực A · Cửa chính' },

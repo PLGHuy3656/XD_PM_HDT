@@ -1,0 +1,142 @@
+export const systemServices = [
+  {
+    id: 'fastapi',
+    name: 'FastAPI Backend',
+    description: 'Dịch vụ REST API và xử lý telemetry (Python + FastAPI)',
+    status: 'HEALTHY',
+    latency: '14 ms',
+    tier: 'CURRENT',
+  },
+  {
+    id: 'postgresql',
+    name: 'PostgreSQL',
+    description: 'Cơ sở dữ liệu chính (psycopg v3 · Supabase-compatible)',
+    status: 'HEALTHY',
+    latency: '9 ms',
+    tier: 'CURRENT',
+  },
+  {
+    id: 'mqtt',
+    name: 'MQTT Broker',
+    description: 'Kết nối thiết bị IoT và luồng telemetry (paho-mqtt)',
+    status: 'HEALTHY',
+    latency: '28 ms',
+    tier: 'CURRENT',
+  },
+  {
+    id: 'ai-vision',
+    name: 'AI Vision Pipeline',
+    description: 'Nhận diện chim yến, thiên địch và đếm lượt ra vào (YOLO26 + ByteTrack)',
+    status: 'HEALTHY',
+    latency: '84 ms',
+    tier: 'CURRENT',
+  },
+  {
+    id: 'redis',
+    name: 'Redis Cache',
+    description: 'Cache và dữ liệu thời gian thực (Kiến trúc mục tiêu)',
+    status: 'PLANNED',
+    latency: null,
+    tier: 'PLANNED',
+  },
+  {
+    id: 'firebase',
+    name: 'Firebase Messaging',
+    description: 'Dịch vụ push notification (Kiến trúc mục tiêu)',
+    status: 'PLANNED',
+    latency: null,
+    tier: 'PLANNED',
+  },
+  {
+    id: 'api-gateway',
+    name: 'API Gateway',
+    description: 'Điểm truy cập tập trung cho Microservices (Kiến trúc mục tiêu)',
+    status: 'PLANNED',
+    latency: null,
+    tier: 'PLANNED',
+  },
+  {
+    id: 'nifi',
+    name: 'Apache NiFi',
+    description: 'Điều phối và tích hợp luồng dữ liệu IoT (Kiến trúc mục tiêu)',
+    status: 'PLANNED',
+    latency: null,
+    tier: 'PLANNED',
+  },
+]
+
+export const systemSettings = {
+  temperature: {
+    min: 27,
+    max: 31,
+    unit: '°C',
+  },
+  humidity: {
+    min: 75,
+    max: 90,
+    unit: '%',
+  },
+  alertCooldown: 5,
+  offlineThreshold: 3,
+}
+
+export const systemAuditLogs = [
+  {
+    id: 'AUD-001',
+    actor: 'Administrator',
+    role: 'ADMIN',
+    action: 'UPDATE_FARM',
+    description: 'Cập nhật thông tin Nhà yến Bình An',
+    target: 'NM-BA-01',
+    time: '21/10/2026 · 16:22',
+    category: 'FARM',
+  },
+  {
+    id: 'AUD-002',
+    actor: 'Administrator',
+    role: 'ADMIN',
+    action: 'ASSIGN_TECHNICIAN',
+    description:
+      'Phân công Nguyễn Minh Khang phụ trách Nhà yến Bình An',
+    target: 'USR-003 → NM-BA-01',
+    time: '21/10/2026 · 16:08',
+    category: 'ACCESS',
+  },
+  {
+    id: 'AUD-003',
+    actor: 'Administrator',
+    role: 'ADMIN',
+    action: 'LOCK_USER',
+    description: 'Khóa tài khoản người dùng Lê Thanh Hà',
+    target: 'USR-005',
+    time: '21/10/2026 · 15:41',
+    category: 'USER',
+  },
+  {
+    id: 'AUD-004',
+    actor: 'System',
+    role: 'SYSTEM',
+    action: 'DEVICE_OFFLINE',
+    description: 'Phát hiện Audio Monitoring Node mất kết nối',
+    target: 'AUDIO-01',
+    time: '21/10/2026 · 15:17',
+    category: 'DEVICE',
+  },
+  {
+    id: 'AUD-005',
+    actor: 'Administrator',
+    role: 'ADMIN',
+    action: 'CREATE_USER',
+    description: 'Tạo tài khoản Technician mới Trần Quốc Huy',
+    target: 'USR-004',
+    time: '21/10/2026 · 14:53',
+    category: 'USER',
+  },
+]
+
+export const systemStatusLabels = {
+  HEALTHY: 'Hoạt động tốt',
+  DEGRADED: 'Suy giảm',
+  DOWN: 'Ngừng hoạt động',
+  PLANNED: 'Chưa tích hợp',
+}

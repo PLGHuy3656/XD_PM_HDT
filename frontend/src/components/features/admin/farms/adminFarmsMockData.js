@@ -1,6 +1,6 @@
 export const adminFarms = [
   {
-    id: 'farm-01',
+    id: 'farm-binh-an',
     code: 'NM-BA-01',
     name: 'Nhà yến Bình An',
     address: 'Thủ Đức, TP. Hồ Chí Minh',
@@ -16,7 +16,7 @@ export const adminFarms = [
       id: 'USR-003',
       name: 'Nguyễn Minh Khang',
       email: 'tech@swiftletcare.dev',
-      phone: '090 123 4567',
+      phone: '090 345 6789',
       status: 'ASSIGNED',
     },
     zones: [
@@ -84,7 +84,7 @@ export const adminFarms = [
   },
 
   {
-    id: 'farm-02',
+    id: 'farm-phu-an',
     code: 'NM-PA-02',
     name: 'Nhà yến Phú An',
     address: 'Dĩ An, Bình Dương',

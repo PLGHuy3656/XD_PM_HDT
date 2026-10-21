@@ -11,6 +11,14 @@ const deviceStatusLabels = {
   OFFLINE: 'Offline',
 }
 
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m6 6 12 12M18 6 6 18" />
+    </svg>
+  )
+}
+
 function FarmDetailPanel({
   farm,
   onClose,
@@ -44,10 +52,11 @@ function FarmDetailPanel({
 
           <button
             type="button"
+            className="admin-farm-detail__close"
             onClick={onClose}
             aria-label="Đóng"
           >
-            ×
+            <CloseIcon />
           </button>
         </header>
 
@@ -161,7 +170,7 @@ function FarmDetailPanel({
 
         <section className="admin-farm-detail__section">
           <span className="admin-farm-detail__label">
-            KHU VỰC & THIẾT BỊ
+            KHU VỰC &amp; THIẾT BỊ
           </span>
 
           <div className="admin-farm-zones">

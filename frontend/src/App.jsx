@@ -26,6 +26,7 @@ import AdminDashboardPage from './pages/admin/Dashboard/DashboardPage'
 import AdminUsersPage from './pages/admin/Users/UsersPage'
 import AdminFarmsPage from './pages/admin/Farms/FarmsPage'
 import AdminDevicesPage from './pages/admin/Devices/DevicesPage'
+import AdminSystemPage from './pages/admin/System/SystemPage'
 
 function App() {
   return (
@@ -208,6 +209,15 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <AdminDevicesPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/system"
+        element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <AdminSystemPage />
           </ProtectedRoute>
         }
       />

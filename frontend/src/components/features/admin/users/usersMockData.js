@@ -23,7 +23,7 @@ export const initialAdminUsers = [
     id: 'USR-003',
     name: 'Nguyễn Minh Khang',
     email: 'tech@swiftletcare.dev',
-    phone: '090 123 4567',
+    phone: '090 345 6789',
     role: 'TECHNICIAN',
     status: 'ACTIVE',
     joinedAt: '22/08/2026',

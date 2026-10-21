@@ -1,4 +1,10 @@
 import { useEffect, useState } from 'react'
+import Select from '../../../ui/Select'
+
+const farmStatusOptions = [
+  { value: 'ACTIVE', label: 'Đang hoạt động' },
+  { value: 'INACTIVE', label: 'Ngừng hoạt động' },
+]
 
 function FarmEditModal({ farm, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -126,23 +132,20 @@ function FarmEditModal({ farm, onClose, onSave }) {
             )}
           </label>
 
-          <label>
+          <div className="admin-farm-form__field">
             <span>Trạng thái</span>
 
-            <select
-              name="status"
+            <Select
               value={form.status}
-              onChange={handleChange}
-            >
-              <option value="ACTIVE">
-                Đang hoạt động
-              </option>
-
-              <option value="INACTIVE">
-                Ngừng hoạt động
-              </option>
-            </select>
-          </label>
+              options={farmStatusOptions}
+              onChange={(nextStatus) =>
+                setForm((current) => ({
+                  ...current,
+                  status: nextStatus,
+                }))
+              }
+            />
+          </div>
         </div>
 
         <div className="admin-farm-edit-note">

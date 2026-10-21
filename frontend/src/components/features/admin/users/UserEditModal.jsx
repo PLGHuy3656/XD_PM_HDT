@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react'
+import Select from '../../../ui/Select'
 import { userRoleLabels } from './usersMockData'
+
+const roleOptions = Object.entries(userRoleLabels).map(
+  ([value, label]) => ({
+    value,
+    label,
+  }),
+)
 
 function UserEditModal({ user, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -52,10 +60,14 @@ function UserEditModal({ user, onClose, onSave }) {
   }
 
   return (
-    <div className="admin-user-modal-backdrop">
+    <div
+      className="admin-user-modal-backdrop"
+      onMouseDown={onClose}
+    >
       <form
         className="admin-user-modal"
         onSubmit={handleSubmit}
+        onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="admin-user-modal__heading">
           <div>
@@ -93,22 +105,19 @@ function UserEditModal({ user, onClose, onSave }) {
             />
           </label>
 
-          <label>
+          <div className="admin-user-form__field">
             <span>Vai trò</span>
-            <select
-              name="role"
+            <Select
               value={form.role}
-              onChange={handleChange}
-            >
-              {Object.entries(userRoleLabels).map(
-                ([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ),
-              )}
-            </select>
-          </label>
+              options={roleOptions}
+              onChange={(nextRole) =>
+                setForm((current) => ({
+                  ...current,
+                  role: nextRole,
+                }))
+              }
+            />
+          </div>
         </div>
 
         <div className="admin-user-modal__actions">

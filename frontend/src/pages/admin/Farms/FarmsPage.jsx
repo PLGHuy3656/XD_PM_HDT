@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import AppLayout from '../../../components/layout/AppLayout'
+import Select from '../../../components/ui/Select'
 import FarmTable from '../../../components/features/admin/farms/FarmTable'
 import FarmDetailPanel from '../../../components/features/admin/farms/FarmDetailPanel'
 import FarmEditModal from '../../../components/features/admin/farms/FarmEditModal'
@@ -15,6 +16,12 @@ import {
 } from '../../../components/features/admin/users/usersMockData'
 
 import './FarmsPage.css'
+
+const healthFilterOptions = [
+  { value: 'ALL', label: 'Tất cả tình trạng' },
+  { value: 'GOOD', label: 'Ổn định' },
+  { value: 'ATTENTION', label: 'Cần theo dõi' },
+]
 
 function FarmsPage() {
   const [farms, setFarms] = useState(adminFarms)
@@ -178,13 +185,14 @@ function FarmsPage() {
 
         <section className="admin-farms-content">
           <div className="admin-farms-content__heading">
-            <span>FARM DIRECTORY</span>
-            <h2>Danh sách nhà yến</h2>
-
-            <p>
-              {filteredFarms.length} /{' '}
-              {farms.length} nhà yến
-            </p>
+            <div>
+              <span>FARM DIRECTORY</span>
+              <h2>Danh sách nhà yến</h2>
+              <p>
+                {filteredFarms.length} /{' '}
+                {farms.length} nhà yến
+              </p>
+            </div>
           </div>
 
           <div className="admin-farms-toolbar">
@@ -197,26 +205,13 @@ function FarmsPage() {
               placeholder="Tìm nhà yến, Owner, Technician..."
             />
 
-            <select
-              value={healthFilter}
-              onChange={(event) =>
-                setHealthFilter(
-                  event.target.value,
-                )
-              }
-            >
-              <option value="ALL">
-                Tất cả tình trạng
-              </option>
-
-              <option value="GOOD">
-                Ổn định
-              </option>
-
-              <option value="ATTENTION">
-                Cần theo dõi
-              </option>
-            </select>
+            <div className="admin-farms-toolbar__select">
+              <Select
+                value={healthFilter}
+                options={healthFilterOptions}
+                onChange={setHealthFilter}
+              />
+            </div>
           </div>
 
           <FarmTable

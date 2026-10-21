@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Select from '../../../ui/Select'
 import { userRoleLabels } from './usersMockData'
 
 const initialForm = {
@@ -7,6 +8,13 @@ const initialForm = {
   phone: '',
   role: 'FARM_OWNER',
 }
+
+const roleOptions = Object.entries(userRoleLabels).map(
+  ([value, label]) => ({
+    value,
+    label,
+  }),
+)
 
 function UserCreateModal({ open, onClose, onCreate }) {
   const [form, setForm] = useState(initialForm)
@@ -150,23 +158,20 @@ function UserCreateModal({ open, onClose, onCreate }) {
             )}
           </label>
 
-          <label>
+          <div className="admin-user-form__field">
             <span>Vai trò *</span>
 
-            <select
-              name="role"
+            <Select
               value={form.role}
-              onChange={handleChange}
-            >
-              {Object.entries(userRoleLabels).map(
-                ([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ),
-              )}
-            </select>
-          </label>
+              options={roleOptions}
+              onChange={(nextRole) =>
+                setForm((current) => ({
+                  ...current,
+                  role: nextRole,
+                }))
+              }
+            />
+          </div>
         </div>
 
         <div className="admin-user-create-note">

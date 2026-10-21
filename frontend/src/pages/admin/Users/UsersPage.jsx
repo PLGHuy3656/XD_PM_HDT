@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import AppLayout from '../../../components/layout/AppLayout'
+import Select from '../../../components/ui/Select'
 import UserTable from '../../../components/features/admin/users/UserTable'
 import UserDetailPanel from '../../../components/features/admin/users/UserDetailPanel'
 import UserEditModal from '../../../components/features/admin/users/UserEditModal'
@@ -11,6 +12,20 @@ import {
 } from '../../../components/features/admin/users/usersMockData'
 
 import './UsersPage.css'
+
+const roleFilterOptions = [
+  { value: 'ALL', label: 'Tất cả vai trò' },
+  ...Object.entries(userRoleLabels).map(([value, label]) => ({
+    value,
+    label,
+  })),
+]
+
+const statusFilterOptions = [
+  { value: 'ALL', label: 'Tất cả trạng thái' },
+  { value: 'ACTIVE', label: 'Đang hoạt động' },
+  { value: 'LOCKED', label: 'Đã khóa' },
+]
 
 function SearchIcon() {
   return (
@@ -195,7 +210,7 @@ function UsersPage() {
         <section className="admin-users-hero">
           <div>
             <span className="admin-users-eyebrow">
-              USER & ACCESS MANAGEMENT
+              USER &amp; ACCESS MANAGEMENT
             </span>
 
             <h1>Quản lý người dùng</h1>
@@ -271,51 +286,25 @@ function UsersPage() {
             </label>
 
             <div className="admin-users-filters">
-              <label>
+              <div className="admin-users-filter-item">
                 <span>Vai trò</span>
 
-                <select
+                <Select
                   value={roleFilter}
-                  onChange={(event) =>
-                    setRoleFilter(event.target.value)
-                  }
-                >
-                  <option value="ALL">
-                    Tất cả vai trò
-                  </option>
+                  options={roleFilterOptions}
+                  onChange={setRoleFilter}
+                />
+              </div>
 
-                  {Object.entries(userRoleLabels).map(
-                    ([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ),
-                  )}
-                </select>
-              </label>
-
-              <label>
+              <div className="admin-users-filter-item">
                 <span>Trạng thái</span>
 
-                <select
+                <Select
                   value={statusFilter}
-                  onChange={(event) =>
-                    setStatusFilter(event.target.value)
-                  }
-                >
-                  <option value="ALL">
-                    Tất cả trạng thái
-                  </option>
-
-                  <option value="ACTIVE">
-                    Đang hoạt động
-                  </option>
-
-                  <option value="LOCKED">
-                    Đã khóa
-                  </option>
-                </select>
-              </label>
+                  options={statusFilterOptions}
+                  onChange={setStatusFilter}
+                />
+              </div>
             </div>
           </div>
 
