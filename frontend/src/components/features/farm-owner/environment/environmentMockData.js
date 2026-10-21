@@ -2,8 +2,8 @@ export const MAX_COMPARE_ZONES = 4
 
 export const monitoringFarms = [
   {
-    id: 'farm-binh-chanh',
-    name: 'Nhà yến Bình Chánh',
+    id: 'farm-binh-an',
+    name: 'Nhà yến Bình An',
     zones: [
       {
         id: 'zone-a',
@@ -347,8 +347,8 @@ export const comparisonColors = [
 
 export const controlFarms = [
   {
-    id: 'farm-binh-chanh',
-    name: 'Nhà yến Bình Chánh',
+    id: 'farm-binh-an',
+    name: 'Nhà yến Bình An',
     zones: [
       {
         id: 'zone-a',

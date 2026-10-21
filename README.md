@@ -67,30 +67,28 @@ AI Pipeline ──────┤
 
 ```text
 XD_PM_HDT/
-├── ai-pipeline/            # AI / Computer Vision pipeline
-│   ├── src/
-│   ├── tests/
-│   └── ...
+├── ai-pipeline/            # AI / Computer Vision pipeline (Python, YOLO26 + ByteTrack)
+│   ├── configs/
+│   ├── docs/
+│   ├── models/
+│   └── src/
 │
-├── backend/                # Backend services and APIs
-│   ├── src/
-│   └── ...
+├── swiftletcare-backend/   # Backend services and MQTT telemetry worker (Python, FastAPI, PostgreSQL)
+│   ├── app/
+│   └── requirements.txt
 │
-├── firmware/               # ESP32 / IoT firmware
-│   ├── src/
-│   └── ...
+├── firmware/               # ESP32 / IoT firmware (Arduino / FreeRTOS)
+│   └── esp32/
 │
-├── frontend/               # React Web application
+├── frontend/               # React + Vite Web application (Farm Owner, Technician, Administrator)
 │   ├── src/
 │   ├── public/
-│   └── ...
+│   └── package.json
 │
-├── docs/                   # Project documentation
+├── docs/                   # Project documentation (SRS, UML, Conventions, Context)
+│   ├── planning/
 │   ├── requirements/
-│   ├── uml/
-│   └── ...
-│
-├── mobile/                 # React Native application
+│   └── uml/
 │
 └── README.md
 ```
@@ -98,11 +96,12 @@ XD_PM_HDT/
 Các module chính của hệ thống đã được khởi tạo và đang được phát triển song song bởi các thành viên trong nhóm:
 
 - `frontend/` — Web Frontend cho Farm Owner, Technician và Administrator.
-- `backend/` — Backend services, API, business logic và các thành phần tích hợp hệ thống.
+- `swiftletcare-backend/` — Backend services (Python FastAPI), kết nối PostgreSQL và MQTT telemetry subscriber.
 - `firmware/` — Firmware cho ESP32, sensor, actuator và giao tiếp IoT.
 - `ai-pipeline/` — Computer Vision/AI processing, detection, tracking và event processing.
-- `mobile/` — Ứng dụng Mobile của hệ thống.
 - `docs/` — Requirement, SRS, Use Case, UML, architecture và tài liệu kỹ thuật.
+
+*(Ghi chú: Ứng dụng `mobile/` nằm trong định hướng mở rộng/kiến trúc mục tiêu của dự án).*
 
 Cấu trúc chi tiết bên trong từng module được quản lý theo phạm vi kỹ thuật của thành viên phụ trách và tiếp tục được hoàn thiện trong quá trình Implementation & Integration.
 
@@ -111,7 +110,8 @@ Cấu trúc chi tiết bên trong từng module được quản lý theo phạm 
 Các tài liệu chính:
 
 - [Software Requirements Specification](docs/requirements/SRS.md)
-- [Use Case Documentation](docs/uml/use-case/README.md)
+- [Project Context](docs/PROJECT_CONTEXT.md)
+- [Frontend Conventions](docs/FRONTEND_CONVENTIONS.md)
 - [Overall Use Case Diagram](docs/uml/use-case/overall-use-case.puml)
 
 Ngoài repository, project sử dụng Confluence để quản lý các tài liệu phân tích, kiến trúc và thiết kế trong quá trình phát triển.
@@ -158,20 +158,27 @@ Việc tích hợp IoT và AI vào Backend được thực hiện phối hợp g
 
 ## Technology & Architecture
 
-Các công nghệ và thành phần chính của hệ thống:
+### Current Implementation (Đã triển khai trong Repository)
 
-- **Frontend:** React, Vite, React Router.
-- **Mobile:** React Native.
-- **Backend:** Node.js / NestJS, Microservices.
-- **Database:** MongoDB.
-- **Cache:** Redis.
-- **IoT:** ESP32, MQTT/HTTP.
-- **AI/CV:** YOLO26, ByteTrack, OpenCV.
-- **API Documentation:** OpenAPI / Swagger.
-- **Notification:** Firebase Cloud Messaging.
-- **Data Synchronization:** Apache NiFi.
+- **Frontend:** React, Vite, React Router, Plain CSS (giao diện cho 3 vai trò: Farm Owner, Technician, Administrator).
+- **Backend:** Python, FastAPI (`swiftletcare-backend/`).
+- **Database:** PostgreSQL (Supabase-compatible) kết nối qua `psycopg` v3 (`psycopg[binary]`).
+- **IoT & Messaging:** ESP32 (Arduino / FreeRTOS dual-core), giao tiếp MQTT (`PubSubClient` trên ESP32 và `paho-mqtt` trên Backend/AI).
+- **AI / Computer Vision:** Python, YOLO26 (`ultralytics`), ByteTrack, OpenCV (`ai-pipeline/`).
+- **API Documentation (Cơ bản):** FastAPI built-in OpenAPI / Swagger (`/docs`) và tài liệu contract AI (`ai-pipeline/docs/ai-interface.md`).
+
+### Planned / Target Course Architecture (Kiến trúc mục tiêu của học phần)
+
+Các công nghệ và thành phần hạ tầng mục tiêu sẽ được tích hợp trong các giai đoạn tiếp theo:
+
+- **Cache:** Redis Cache.
+- **Notification:** Firebase Cloud Messaging (FCM).
+- **Data Synchronization & Flow:** Apache NiFi.
+- **Architecture Style:** Microservices.
 - **API Management:** API Gateway.
 - **Deployment:** Docker.
+- **API Documentation (Hoàn chỉnh):** OpenAPI / Swagger đầy đủ cho toàn bộ các domain service.
+- **Mobile & Audio AI:** React Native Mobile App và mô-đun phân tích âm thanh bất thường.
 
 ## Development Workflow
 
@@ -213,6 +220,4 @@ Project hiện đang trong giai đoạn:
 
 Các tài liệu Requirement, SRS, Use Case và kiến trúc cơ bản đã được xây dựng và tiếp tục được cập nhật khi có thay đổi được nhóm thống nhất.
 
-Frontend được phát triển theo từng actor và đang được tích hợp dần với Backend. Backend, IoT và AI Pipeline được phát triển song song theo phạm vi trách nhiệm của từng thành viên.
-
-Các integration contract giữa Backend, IoT và AI tiếp tục được hoàn thiện trong quá trình triển khai và kiểm thử End-to-End.
+Frontend đã hoàn thiện giao diện cho cả 3 actor (`Farm Owner`, `Technician`, `Administrator`) và đang được tích hợp dần với Backend Python FastAPI + PostgreSQL. Các integration contract giữa Backend, IoT và AI tiếp tục được đồng bộ và hoàn thiện trong quá trình triển khai và kiểm thử End-to-End.

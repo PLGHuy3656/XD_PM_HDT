@@ -1,6 +1,6 @@
 export const farmsMockData = [
   {
-    id: 'farm-01',
+    id: 'farm-binh-an',
     name: 'Nhà yến Bình An',
     code: 'NM-BA-01',
     address: 'Thủ Đức, TP. Hồ Chí Minh',
@@ -13,10 +13,10 @@ export const farmsMockData = [
     totalDevices: 13,
 
     assignedTechnician: {
-      id: 'tech-01',
+      id: 'USR-003',
       name: 'Nguyễn Minh Khang',
       role: 'Kỹ thuật viên',
-      phone: '090 123 4567',
+      phone: '090 345 6789',
       email: 'tech@swiftletcare.dev',
       status: 'Đang phụ trách',
     },
@@ -53,7 +53,7 @@ export const farmsMockData = [
   },
 
   {
-    id: 'farm-02',
+    id: 'farm-phu-an',
     name: 'Nhà yến Phú An',
     code: 'NM-PA-02',
     address: 'Dĩ An, Bình Dương',
@@ -66,7 +66,7 @@ export const farmsMockData = [
     totalDevices: 10,
 
     assignedTechnician: {
-      id: 'tech-02',
+      id: 'USR-004',
       name: 'Trần Quốc Huy',
       role: 'Kỹ thuật viên',
       phone: '091 456 7820',
@@ -85,8 +85,8 @@ export const farmsMockData = [
         status: 'Ổn định',
       },
       {
-        id: 'zone-b',
-        name: 'Khu vực B',
+        id: 'zone-d',
+        name: 'Khu vực D',
         floor: 'Tầng 2',
         temperature: 30.6,
         humidity: 74,

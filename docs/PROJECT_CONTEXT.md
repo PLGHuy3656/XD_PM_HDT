@@ -60,25 +60,39 @@ Administrator assigns Technician to farms. Technician works within assigned Farm
 
 ### Administrator
 
-Current responsibility direction:
+Current implemented navigation and responsibility scope:
 
-- User and access management
-- Farm administration
-- Device/system administration
-- Technician ↔ Farm assignment
-- Platform administration
-
-Admin frontend will be developed after Technician.
+- Dashboard (`/admin/dashboard`)
+- Người dùng (`/admin/users`) — User and access management
+- Nhà yến (`/admin/farms`) — Farm administration & Technician ↔ Farm assignment
+- Thiết bị (`/admin/devices`) — Read-only system-wide device registry & provisioning overview
+- Hệ thống (`/admin/system`) — System health overview, default thresholds, and Audit Log (kept inside System)
 
 ---
 
 ## 2. Important Domain Decisions
 
+### Canonical Farm & Device Data
+
+Canonical Farms in frontend mock data:
+
+- `farm-binh-an` — **Nhà yến Bình An** (`NM-BA-01`)
+- `farm-phu-an` — **Nhà yến Phú An** (`NM-PA-02`)
+
+Canonical device location:
+
+- `ESP32-CTRL-04` → **Nhà yến Phú An** → **Khu vực D**
+
 ### Technician ↔ Farm Assignment
 
 Assigned Farm is a shared Technician context, not a separate sidebar module.
 
-Administrator will assign Technician to one or more farms.
+Canonical relationship:
+
+- `Technician -> 0..N Farms`
+- `Farm -> 1 primary Technician when operational`
+
+Administrator assigns Technician to one or more farms. Do not convert this relationship to many-to-many.
 
 Technician should be able to:
 
@@ -87,15 +101,11 @@ Technician should be able to:
 - receive notification when an assignment changes;
 - access only authorized farms.
 
-Farm Owner should also be able to see the Technician supporting a farm.
-
-Basic Technician information available to Farm Owner should include at least:
+Farm Owner can view the Technician supporting a farm, including:
 
 - name;
 - contact information;
 - assignment/support status.
-
-This information should eventually be accessible from Farm Management.
 
 ---
 
@@ -181,31 +191,40 @@ Do not add them to navigation or implementation without approval.
 
 ## 3. Current Technical Decisions
 
-Current important technical baseline:
+### Current Implementation (Verified in Repository)
 
-- Backend: Node.js / NestJS
-- Database: MongoDB
-- Cache: Redis
-- IoT: ESP32 / ESP32-CAM
-- Embedded: Arduino / FreeRTOS
-- Communication: MQTT + HTTP
-- AI: YOLO26 + ByteTrack
-- Notifications: Firebase Cloud Messaging
-- Storage: MinIO / S3 compatible storage
+- **Frontend (`frontend/`):** React, Vite, React Router, Plain CSS (three-role UI for `FARM_OWNER`, `TECHNICIAN`, `ADMIN`).
+- **Backend (`swiftletcare-backend/`):** Python + FastAPI (`fastapi[standard]`, `pydantic-settings`, `python-dotenv`).
+- **Database:** PostgreSQL (Supabase-compatible) accessed via `psycopg` v3 (`psycopg[binary]`) with `Jsonb`.
+- **IoT / MQTT:**
+  - Embedded Firmware (`firmware/esp32/`): ESP32 with Arduino / FreeRTOS dual-core, DHT22 + sensor modules, local Hysteresis AUTO/MANUAL control, `PubSubClient`.
+  - Backend MQTT Subscriber (`swiftletcare-backend/app/telemetry.py`): Python `paho-mqtt`.
+- **AI Vision Pipeline (`ai-pipeline/`):** Python, YOLO26 (`ultralytics`) + ByteTrack + `CentroidTracker` fallback, Virtual Line entry/exit counting, predator detection, JSONL/HTTP/MQTT publishers.
 
-Mandatory course technologies:
+### Planned / Target Course Architecture (Not Yet Integrated in Repository)
 
-- OpenAPI / Swagger
-- Redis Cache
-- Firebase Messaging
-- Apache NiFi
-- Microservices
-- API Gateway
-- Docker
+The following technologies remain part of the target course architecture and must be distinguished from currently operational services:
 
-Older documentation may contain outdated decisions such as Express, Tailwind, YOLOv8, YOLOv10, or additional actors.
+- **Redis Cache** — Caching and real-time state layer
+- **Firebase Cloud Messaging (FCM)** — Push notifications
+- **Apache NiFi** — IoT data flow orchestration and synchronization
+- **Microservices** — Multi-service decomposition for domain modules
+- **API Gateway** — Centralized routing and access gateway
+- **Docker** — Containerized deployment and orchestration
+- **OpenAPI / Swagger** — Full domain REST API documentation (beyond initial FastAPI `/health` and `/mqtt/status` endpoints)
+- **Audio AI & Mobile (React Native)** — Planned multi-modal audio anomaly pipeline and mobile client
 
-Do not silently restore those decisions.
+Older documentation may contain legacy assumptions such as Node.js/NestJS, Express, MongoDB, Tailwind, YOLOv8, YOLOv10, or additional actors. Do not present unimplemented services or replaced stack items (such as MongoDB or Node.js/NestJS) as currently running in the repository.
+
+### Remaining Integration Technical Debt (Backend / Integration Phase)
+
+1. **MQTT Topic & Payload Contract Alignment:**
+   - `firmware/esp32/sketch.ino` currently publishes to `swiftlet/telemetry/swc-h01-f01-node01` (3 segments) with fields `temp`, `soundOk`, `wifiRssi`.
+   - `swiftletcare-backend/app/telemetry.py` and `schemas.py` currently subscribe to `swiftlet/telemetry/+/+` (`swiftlet/telemetry/{house_code}/{node_id}`, 4 segments) expecting `temperature`, `audioRms`, `audioHealthy`, `networkRssi`.
+2. **AI HTTP Publisher Default Port:**
+   - `ai-pipeline/configs/pipeline.yaml` defaults `publishers.http.base_url` to `http://localhost:3000` whereas FastAPI runs on port `8000` by default.
+3. **Domain CRUD APIs & Backend Authentication:**
+   - Frontend currently uses canonical mock state and `localStorage` authentication (`AuthContext.jsx`) pending Backend REST CRUD and auth endpoints.
 
 ---
 
@@ -229,3 +248,4 @@ components/features/
 ├── farm-owner/
 ├── technician/
 └── admin/
+```
