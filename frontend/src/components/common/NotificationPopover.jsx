@@ -26,7 +26,7 @@ const ownerNotifications = [
     id: 'owner-device',
     type: 'info',
     title: 'Thiết bị đã kết nối lại',
-    message: 'ESP32-Z02 đã khôi phục kết nối.',
+    message: 'ESP32-CTRL-02 đã khôi phục kết nối.',
     time: '1 giờ trước',
     unread: false,
   },

@@ -2,21 +2,20 @@ export const installationFarms = [
   {
     id: 'farm-binh-an',
     name: 'Nhà yến Bình An',
-    location: 'Củ Chi, TP. Hồ Chí Minh',
+    location: 'Thủ Đức, TP. Hồ Chí Minh',
     zones: [
       { id: 'zone-a', name: 'Khu vực A' },
       { id: 'zone-b', name: 'Khu vực B' },
-      { id: 'zone-e', name: 'Khu vực E' },
+      { id: 'zone-c', name: 'Khu vực C' },
     ],
   },
   {
     id: 'farm-phu-an',
     name: 'Nhà yến Phú An',
-    location: 'Hóc Môn, TP. Hồ Chí Minh',
+    location: 'Dĩ An, Bình Dương',
     zones: [
-      { id: 'zone-c', name: 'Khu vực C' },
+      { id: 'zone-a', name: 'Khu vực A' },
       { id: 'zone-d', name: 'Khu vực D' },
-      { id: 'zone-f', name: 'Khu vực F' },
     ],
   },
 ]
@@ -39,11 +38,11 @@ export const deviceTypes = [
 export const initialInstallation = {
   farmId: 'farm-binh-an',
   zoneId: 'zone-a',
-  deviceId: 'ESP32-CTRL-05',
+  deviceId: 'ESP32-CTRL-01',
   deviceType: 'controller',
-  serialNumber: 'NM-ESP32-2026-005',
+  serialNumber: 'NM-ESP32-2026-001',
   firmware: 'v1.4.2',
-  mqttTopic: 'nestmate/binh-an/zone-a/controller-05',
+  mqttTopic: 'nestmate/binh-an/zone-a/controller-01',
   samplingInterval: '30',
 }
 
