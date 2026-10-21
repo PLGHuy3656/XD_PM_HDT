@@ -107,7 +107,7 @@ function SwiftletsPage() {
 
   return (
     <AppLayout>
-      <main className="swiftlets-page">
+      <div className="swiftlets-page">
         <header className="swiftlets-page-heading">
           <div>
             <span className="swiftlets-eyebrow">
@@ -191,7 +191,7 @@ function SwiftletsPage() {
         </section>
 
         <AIEventsTable events={aiEvents} />
-      </main>
+      </div>
     </AppLayout>
   )
 }

@@ -218,55 +218,6 @@
   text-transform: uppercase;
 }
 
-.environment-select {
-  position: relative;
-
-  min-width: 215px;
-}
-
-.environment-select select {
-  width: 100%;
-  height: 43px;
-
-  padding: 0 42px 0 15px;
-
-  border: 1px solid #e5dfd1;
-  border-radius: 13px;
-  outline: none;
-
-  background: var(--color-cream-100);
-
-  color: var(--color-navy-950);
-  font-size: 13px;
-  font-weight: 600;
-
-  cursor: pointer;
-  appearance: none;
-}
-
-.environment-select select:focus {
-  border-color: #d5c484;
-
-  box-shadow: 0 0 0 3px rgba(213, 166, 46, 0.08);
-}
-
-.environment-select svg {
-  position: absolute;
-  top: 50%;
-  right: 14px;
-
-  width: 15px;
-  height: 15px;
-
-  fill: none;
-  stroke: #73808c;
-  stroke-width: 1.8;
-
-  transform: translateY(-50%);
-
-  pointer-events: none;
-}
-
 .context-node {
   min-width: 170px;
 }
@@ -789,7 +740,7 @@
   border-radius: 50%;
 
   color: var(--color-gold-400);
-  font-family: Georgia, serif;
+  font-family: Arial, sans-serif;
   font-size: 11px;
 }
 
@@ -1448,4 +1399,98 @@
     right: 0;
     left: auto;
   }
+}
+
+/* ========================================
+   ENVIRONMENT SUBNAV
+   ======================================== */
+
+.environment-subnav {
+  display: inline-flex;
+  gap: 5px;
+
+  margin-bottom: var(--space-6);
+  padding: 5px;
+
+  border: 1px solid var(--border-warm);
+  border-radius: 17px;
+
+  background: var(--color-cream-300);
+}
+
+.environment-subnav__tab {
+  min-width: 180px;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 10px 14px;
+
+  border-radius: var(--radius-sm);
+
+  color: #68737d;
+  text-decoration: none;
+
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.environment-subnav__tab:hover {
+  color: var(--color-navy-900);
+}
+
+.environment-subnav__tab.active {
+  background: var(--color-surface);
+
+  color: var(--color-navy-900);
+
+  box-shadow: 0 3px 12px rgba(30, 43, 55, 0.08);
+}
+
+.environment-subnav__icon {
+  width: 31px;
+  height: 31px;
+
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+
+  border-radius: 9px;
+
+  background: rgba(20, 40, 61, 0.06);
+}
+
+.environment-subnav__tab.active .environment-subnav__icon {
+  background: rgba(217, 164, 65, 0.13);
+
+  color: var(--color-gold-600);
+}
+
+.environment-subnav__icon svg {
+  width: 17px;
+  height: 17px;
+
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.environment-subnav__tab > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.environment-subnav__tab strong {
+  font-size: 13px;
+}
+
+.environment-subnav__tab small {
+  color: #92999f;
+  font-size: 10px;
 }

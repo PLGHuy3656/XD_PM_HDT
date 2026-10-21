@@ -107,7 +107,7 @@ function AlertsPage() {
 
   return (
     <AppLayout>
-      <main className="alerts-page">
+      <div className="alerts-page">
         <header className="alerts-page-heading">
           <div>
             <span className="alerts-eyebrow">
@@ -191,7 +191,7 @@ function AlertsPage() {
           onAcknowledge={handleAcknowledge}
           onResolve={handleResolve}
         />
-      </main>
+      </div>
     </AppLayout>
   )
 }

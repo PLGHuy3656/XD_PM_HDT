@@ -2,8 +2,8 @@ export const systemStats = [
   {
     id: 'nodes',
     label: 'Device Nodes',
-    value: '7 / 8',
-    description: '1 node mất kết nối tại Khu vực D',
+    value: '5 / 6',
+    description: '1 node mất kết nối tại Khu vực C',
     status: 'warning',
     statusLabel: 'Cần chú ý',
     icon: 'N',
@@ -11,7 +11,7 @@ export const systemStats = [
   {
     id: 'sensors',
     label: 'Sensors',
-    value: '24 / 26',
+    value: '22 / 24',
     description: '2 sensor cần kiểm tra',
     status: 'warning',
     statusLabel: 'Cần chú ý',
@@ -53,30 +53,30 @@ export const devices = [
     lastSeen: '18 giây trước',
   },
   {
-    id: 'SENSOR-ENV-03',
-    zone: 'Nhà yến Phú An · Khu vực C',
+    id: 'AUDIO-01',
+    zone: 'Nhà yến Bình An · Khu vực C',
+    status: 'offline',
+    sensors: '0 / 1',
+    lastSeen: '12 phút trước',
+  },
+  {
+    id: 'ESP32-CTRL-03',
+    zone: 'Nhà yến Phú An · Khu vực A',
     status: 'online',
-    sensors: '3 / 3',
-    lastSeen: '12 giây trước',
+    sensors: '4 / 4',
+    lastSeen: '5 giây trước',
   },
   {
     id: 'ESP32-CTRL-04',
     zone: 'Nhà yến Phú An · Khu vực D',
-    status: 'offline',
-    sensors: '0 / 4',
-    lastSeen: '12 phút trước',
-  },
-  {
-    id: 'ESP32-CTRL-05',
-    zone: 'Nhà yến Bình An · Khu vực E',
-    status: 'online',
-    sensors: '4 / 4',
-    lastSeen: '21 giây trước',
+    status: 'warning',
+    sensors: '3 / 4',
+    lastSeen: '16 giây trước',
   },
 ]
 
 export const sensorHealth = [
-  { label: 'Healthy', value: 24, status: 'healthy' },
+  { label: 'Healthy', value: 22, status: 'healthy' },
   { label: 'Warning', value: 2, status: 'warning' },
   { label: 'Offline', value: 0, status: 'danger' },
 ]
@@ -84,10 +84,10 @@ export const sensorHealth = [
 export const alerts = [
   {
     id: 'ALT-001',
-    level: 'critical',
-    title: 'ESP32-CTRL-04 mất kết nối',
-    description: 'Nhà yến Phú An · Khu vực D · Không nhận telemetry',
-    time: '12 phút trước',
+    level: 'warning',
+    title: 'ESP32-CTRL-04 độ ẩm dưới ngưỡng',
+    description: 'Nhà yến Phú An · Khu vực D · Tín hiệu Wi-Fi yếu',
+    time: '14 phút trước',
   },
   {
     id: 'ALT-002',

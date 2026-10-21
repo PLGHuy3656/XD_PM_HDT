@@ -37,20 +37,20 @@ export function workStatusLabel(status) {
 export const technicalAlerts = [
   {
     id: 'ALT-001',
-    title: 'Node điều khiển mất kết nối',
-    type: 'NODE_DISCONNECTED',
-    severity: 'CRITICAL',
+    title: 'Độ ẩm dưới ngưỡng vận hành',
+    type: 'ABNORMAL_READING',
+    severity: 'WARNING',
     status: 'OPEN',
     farm: 'Nhà yến Phú An',
     zone: 'Khu vực D',
     device: 'ESP32-CTRL-04',
     occurredAt: '08:14 hôm nay',
     description:
-      'Node không gửi heartbeat và telemetry trong hơn 10 phút.',
+      'Độ ẩm hiện tại 74%, thấp hơn ngưỡng môi trường được cấu hình.',
     diagnostic:
-      'Không nhận được heartbeat. MQTT client hiện ở trạng thái disconnected.',
+      'Node gửi telemetry với tín hiệu Wi-Fi yếu (-76 dBm).',
     recommendation:
-      'Kiểm tra nguồn cấp, kết nối mạng và trạng thái MQTT của node.',
+      'Kiểm tra máy phun sương Khu vực D và độ ổn định kết nối Wi-Fi.',
   },
   {
     id: 'ALT-002',
@@ -60,7 +60,7 @@ export const technicalAlerts = [
     status: 'OPEN',
     farm: 'Nhà yến Bình An',
     zone: 'Khu vực B',
-    device: 'SHT31-B02',
+    device: 'ESP32-CTRL-02',
     occurredAt: '07:48 hôm nay',
     description:
       'Độ ẩm hiện tại 74%, thấp hơn ngưỡng môi trường được cấu hình.',
@@ -75,16 +75,16 @@ export const technicalAlerts = [
     type: 'SENSOR_TIMEOUT',
     severity: 'WARNING',
     status: 'INVESTIGATING',
-    farm: 'Nhà yến Phú An',
+    farm: 'Nhà yến Bình An',
     zone: 'Khu vực C',
-    device: 'CO2-C01',
+    device: 'AUDIO-01',
     occurredAt: '07:22 hôm nay',
     description:
-      'Không nhận được dữ liệu CO₂ từ sensor trong chu kỳ telemetry gần nhất.',
+      'Không nhận được dữ liệu âm thanh từ node trong chu kỳ gần nhất.',
     diagnostic:
-      'Node gateway vẫn online nhưng sensor CO₂ không trả về dữ liệu.',
+      'Audio node hiện ở trạng thái offline.',
     recommendation:
-      'Kiểm tra dây kết nối, nguồn sensor và giao tiếp với node.',
+      'Kiểm tra nguồn cấp và kết nối mạng của node âm thanh.',
   },
   {
     id: 'ALT-004',
@@ -110,8 +110,8 @@ export const technicalAlerts = [
     severity: 'CRITICAL',
     status: 'OPEN',
     farm: 'Nhà yến Phú An',
-    zone: 'Khu vực F',
-    device: 'FAN-F01',
+    zone: 'Khu vực D',
+    device: 'ESP32-CTRL-04',
     occurredAt: 'Hôm qua, 22:36',
     description:
       'Actuator không xác nhận trạng thái sau lệnh điều khiển.',
@@ -127,7 +127,7 @@ export const workRequests = [
     id: 'REQ-001',
     title: 'Kiểm tra độ ẩm Khu vực B',
     source: 'FARM_OWNER',
-    sender: 'Nguyễn Minh Anh',
+    sender: 'Nguyễn Văn Minh',
     priority: 'HIGH',
     status: 'NEW',
     farm: 'Nhà yến Bình An',
@@ -135,27 +135,27 @@ export const workRequests = [
     createdAt: '08:05 hôm nay',
     content:
       'Độ ẩm khu vực B giảm liên tục từ sáng. Nhờ kỹ thuật viên kiểm tra sensor và hệ thống phun sương.',
-    contact: '0901 234 567',
+    contact: '090 123 4567',
   },
   {
     id: 'REQ-002',
     title: 'Kiểm tra Node ESP32-CTRL-04',
     source: 'ADMIN',
-    sender: 'System Administrator',
+    sender: 'Phạm Lê Gia Huy',
     priority: 'URGENT',
     status: 'IN_PROGRESS',
     farm: 'Nhà yến Phú An',
     zone: 'Khu vực D',
     createdAt: '07:35 hôm nay',
     content:
-      'Node mất heartbeat. Kiểm tra connectivity và xác nhận tình trạng thiết bị.',
+      'Node cảnh báo tín hiệu yếu và độ ẩm thấp tại Khu vực D. Kiểm tra connectivity và xác nhận tình trạng thiết bị.',
     contact: null,
   },
   {
     id: 'REQ-003',
     title: 'Camera cửa vào mất hình',
     source: 'FARM_OWNER',
-    sender: 'Trần Quốc Nam',
+    sender: 'Nguyễn Văn Minh',
     priority: 'NORMAL',
     status: 'NEW',
     farm: 'Nhà yến Bình An',
@@ -163,20 +163,20 @@ export const workRequests = [
     createdAt: 'Hôm qua, 19:20',
     content:
       'Camera cửa vào không hiển thị hình ảnh. Nhờ kiểm tra nguồn và kết nối thiết bị.',
-    contact: '0908 456 789',
+    contact: '090 123 4567',
   },
   {
     id: 'REQ-004',
-    title: 'Xác nhận tình trạng Sensor CO₂',
+    title: 'Xác nhận tình trạng Audio Node',
     source: 'ADMIN',
-    sender: 'System Administrator',
+    sender: 'Phạm Lê Gia Huy',
     priority: 'NORMAL',
     status: 'DONE',
-    farm: 'Nhà yến Phú An',
+    farm: 'Nhà yến Bình An',
     zone: 'Khu vực C',
     createdAt: 'Hôm qua, 14:10',
     content:
-      'Kiểm tra sensor CO₂ sau khi hệ thống ghi nhận telemetry gián đoạn.',
+      'Kiểm tra node âm thanh sau khi hệ thống ghi nhận mất kết nối.',
     contact: null,
   },
 ]

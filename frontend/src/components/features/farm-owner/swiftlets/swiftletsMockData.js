@@ -1,10 +1,19 @@
 export const farms = [
   {
     id: 'farm-binh-an',
-    name: 'Nhà yến Bình An',
+    name: 'Nh� y?n B�nh An',
     zones: [
-      { id: 'zone-a', name: 'Khu vực A · Cửa chính' },
-      { id: 'zone-b', name: 'Khu vực B · Tầng 2' },
+      { id: 'zone-a', name: 'Khu v?c A � C?a ch�nh' },
+      { id: 'zone-b', name: 'Khu v?c B � T?ng 2' },
+      { id: 'zone-c', name: 'Khu v?c C � T?ng 3' },
+    ],
+  },
+  {
+    id: 'farm-phu-an',
+    name: 'Nh� y?n Ph� An',
+    zones: [
+      { id: 'zone-a', name: 'Khu v?c A � T?ng 1' },
+      { id: 'zone-d', name: 'Khu v?c D � T?ng 2' },
     ],
   },
 ]
