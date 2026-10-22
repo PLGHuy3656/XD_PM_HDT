@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from app.controllers.technician_controller import technician_controller
-from app.technician_schema import (
+from app.schemas.technician import (
     AssignedFarmResponse,
     TechnicianFarmDetailResponse,
     TechnicianProfileResponse,

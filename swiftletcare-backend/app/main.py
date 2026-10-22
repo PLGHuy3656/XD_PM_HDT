@@ -3,9 +3,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
-from app.realtime import realtime_manager
+from app.mqtt.client import start_mqtt, stop_mqtt
+from app.realtime.manager import realtime_manager
 from app.routes.technician_routes import router as technician_router
-from app.telemetry import start_mqtt
 
 
 @asynccontextmanager
@@ -18,8 +18,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        mqtt_client.disconnect()
-        mqtt_client.loop_stop()
+        stop_mqtt(mqtt_client)
 
 
 app = FastAPI(
@@ -49,7 +48,10 @@ def mqtt_status():
             "message": "MQTT client not initialized",
         }
 
-    connected = client.is_connected()
+    try:
+        connected = client.is_connected()
+    except Exception:
+        connected = False
 
     return {
         "connected": connected,
