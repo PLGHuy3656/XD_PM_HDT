@@ -1,6 +1,8 @@
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
+
 
 import paho.mqtt.client as mqtt
 from pydantic import ValidationError
@@ -9,6 +11,7 @@ from psycopg.types.json import Jsonb
 from app.config import settings
 from app.database import get_connection
 from app.schemas import TelemetryPayload
+from app.realtime import realtime_manager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("telemetry")
@@ -145,6 +148,7 @@ def on_connect(client, userdata, flags, reason_code, properties):
         logger.error("MQTT connection failed: %s", reason_code)
 
 
+
 def on_message(client, userdata, message):
     try:
         parts = message.topic.split("/")
@@ -164,7 +168,43 @@ def on_message(client, userdata, message):
         if payload.nodeId != node_id_from_topic:
             raise ValueError("nodeId does not match MQTT topic")
 
+        # Chỉ phát realtime sau khi lưu thành công.
         save_telemetry(house_code, payload)
+
+        loop = (
+            userdata.get("event_loop")
+            if isinstance(userdata, dict)
+            else None
+        )
+
+        if loop is None or not loop.is_running():
+            logger.warning(
+                "Telemetry saved, but realtime event loop is unavailable"
+            )
+            return
+
+        realtime_data = {
+            "type": "telemetry",
+            "houseCode": house_code,
+            "nodeId": payload.nodeId,
+            "timestamp": payload.timestamp,
+            "metrics": payload.metrics.model_dump(by_alias=True),
+            "actuators": payload.actuators.model_dump(),
+            "state": payload.state.model_dump(),
+        }
+
+        future = asyncio.run_coroutine_threadsafe(
+            realtime_manager.broadcast(realtime_data),
+            loop,
+        )
+
+        def log_broadcast_result(result):
+            try:
+                result.result()
+            except Exception:
+                logger.exception("Failed to broadcast telemetry")
+
+        future.add_done_callback(log_broadcast_result)
 
     except (ValidationError, ValueError, json.JSONDecodeError) as exc:
         logger.warning(
@@ -174,18 +214,17 @@ def on_message(client, userdata, message):
         )
 
     except Exception:
-        # Không để message lỗi làm dừng MQTT callback.
         logger.exception(
             "Failed to process telemetry from %s",
             message.topic,
         )
 
-
-def start_mqtt():
+def start_mqtt(event_loop):
     client = mqtt.Client(
         mqtt.CallbackAPIVersion.VERSION2,
         client_id=settings.mqtt_client_id,
         protocol=mqtt.MQTTv311,
+        userdata={"event_loop": event_loop},
     )
 
     if settings.mqtt_username:
