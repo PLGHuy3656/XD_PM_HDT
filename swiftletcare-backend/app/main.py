@@ -1,14 +1,18 @@
 
+import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
+from app.realtime import realtime_manager
 from app.telemetry import start_mqtt
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    mqtt_client = start_mqtt()
+    app.state.event_loop = asyncio.get_running_loop()
+
+    mqtt_client = start_mqtt(app.state.event_loop)
     app.state.mqtt_client = mqtt_client
 
     try:
@@ -32,6 +36,7 @@ def health():
         "service": "swiftletcare-backend",
     }
 
+
 @app.get("/mqtt/status")
 def mqtt_status():
     client = getattr(app.state, "mqtt_client", None)
@@ -52,3 +57,17 @@ def mqtt_status():
             else "Not connected to MQTT broker"
         ),
     }
+
+
+@app.websocket("/ws/telemetry")
+async def telemetry_websocket(websocket: WebSocket):
+    await realtime_manager.connect(websocket)
+
+    try:
+        while True:
+            # Giữ kết nối và nhận các thông điệp từ client nếu có.
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await realtime_manager.disconnect(websocket)
