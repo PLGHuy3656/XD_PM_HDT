@@ -18,10 +18,21 @@ class RelayCommandRequest(ControlSchema):
     state: Literal[0, 1]
 
 
+
 class ThresholdCommandRequest(ControlSchema):
     action: Literal["UPDATE_THRESHOLDS"]
-    targetTemp: float | None = Field(default=None, allow_inf_nan=False)
-    targetHum: float | None = Field(default=None, allow_inf_nan=False)
+    targetTemp: float | None = Field(
+        default=None,
+        ge=-20,
+        le=80,
+        allow_inf_nan=False,
+    )
+    targetHum: float | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+        allow_inf_nan=False,
+    )
     isAutoMode: bool | None = None
 
     @model_validator(mode="after")

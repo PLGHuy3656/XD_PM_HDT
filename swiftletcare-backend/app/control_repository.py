@@ -60,6 +60,41 @@ def mark_command_sent(command_id: str) -> bool:
             cur.execute(query, (command_id,))
             return cur.fetchone() is not None
 
+def get_active_device_id_by_node_id(node_id: str) -> UUID | None:
+    """Return the UUID of an active device matching its MQTT node ID."""
+    query = """
+        SELECT id
+        FROM public.devices
+        WHERE node_id = %s
+          AND is_active = TRUE
+        LIMIT 1
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (node_id,))
+            row = cur.fetchone()
+
+    return row[0] if row else None
+
+
+def get_active_device_node_id(device_id: UUID) -> str | None:
+    """Return the MQTT node ID of an active device."""
+    query = """
+        SELECT node_id
+        FROM public.devices
+        WHERE id = %s
+          AND is_active = TRUE
+        LIMIT 1
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (device_id,))
+            row = cur.fetchone()
+
+    return row[0] if row else None
+
 
 def record_command_ack(
     *,
@@ -94,6 +129,30 @@ def record_command_ack(
                     Jsonb(response),
                     command_id,
                     expected_device_id,
+                ),
+            )
+            return cur.fetchone() is not None
+
+
+def mark_command_failed(command_id: str, reason: str) -> bool:
+    """Mark a pending command as failed when publishing fails."""
+    query = """
+        UPDATE public.environment_control_commands
+        SET status = 'FAILED',
+            response = %s,
+            acknowledged_at = NOW()
+        WHERE command_id = %s
+          AND status = 'PENDING'
+        RETURNING command_id
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                query,
+                (
+                    Jsonb({"error": reason}),
+                    command_id,
                 ),
             )
             return cur.fetchone() is not None

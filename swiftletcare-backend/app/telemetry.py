@@ -139,17 +139,43 @@ def save_telemetry(
     )
 
 
+
 def on_connect(client, userdata, flags, reason_code, properties):
     if reason_code == 0:
         logger.info("Connected to MQTT broker")
-        client.subscribe(TOPIC, qos=1)
-        logger.info("Subscribed to %s", TOPIC)
+
+        result, _ = client.subscribe(TOPIC, qos=1)
+        if result == mqtt.MQTT_ERR_SUCCESS:
+            logger.info("Subscribed to %s", TOPIC)
+        else:
+            logger.error("Failed to subscribe to %s: rc=%s", TOPIC, result)
+
+        ack_topic = "swiftlet/ack/+"
+        result, _ = client.subscribe(ack_topic, qos=1)
+        if result == mqtt.MQTT_ERR_SUCCESS:
+            logger.info("Subscribed to %s", ack_topic)
+        else:
+            logger.error(
+                "Failed to subscribe to %s: rc=%s",
+                ack_topic,
+                result,
+            )
     else:
         logger.error("MQTT connection failed: %s", reason_code)
 
-
-
 def on_message(client, userdata, message):
+    if message.topic.startswith("swiftlet/ack/"):
+        from app.control_ack_handler import process_ack_message
+
+        try:
+            process_ack_message(message.topic, message.payload)
+        except Exception:
+            logger.exception(
+                "Failed to process ACK from %s",
+                message.topic,
+            )
+        return
+
     try:
         parts = message.topic.split("/")
 

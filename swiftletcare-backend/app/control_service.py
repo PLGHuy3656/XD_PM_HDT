@@ -2,12 +2,19 @@
 from typing import Any
 from uuid import UUID, uuid4
 
-from app.control_repository import create_command
+import paho.mqtt.client as mqtt
+
+from app.control_repository import (
+    create_command,
+    get_active_device_node_id,
+    mark_command_failed,
+    mark_command_sent,
+)
+from app.control_mqtt import publish_command
 from app.control_schemas import (
     RelayCommandRequest,
     ThresholdCommandRequest,
 )
-
 
 def prepare_relay_command(
     device_id: UUID,
@@ -65,4 +72,42 @@ def prepare_threshold_command(
     return {
         "command": payload,
         "record": record,
+    }
+
+
+
+def send_prepared_command(
+    device_id: UUID,
+    prepared: dict[str, Any],
+    mqtt_client: mqtt.Client,
+) -> dict[str, Any]:
+    """Publish a prepared command to the active device."""
+    command = prepared["command"]
+    command_id = command["commandId"]
+
+    node_id = get_active_device_node_id(device_id)
+    if node_id is None:
+        raise ValueError("Active device not found")
+
+    try:
+        publish_command(mqtt_client, node_id, command)
+    except Exception as exc:
+        try:
+            mark_command_failed(command_id, str(exc))
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Failed to mark command %s as FAILED",
+                command_id,
+            )
+        raise
+
+    marked = mark_command_sent(command_id)
+
+    return {
+        "command": command,
+        "record": prepared["record"],
+        "nodeId": node_id,
+        "sent": marked,
     }
