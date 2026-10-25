@@ -20,6 +20,14 @@ router = APIRouter(
 
 
 @router.get(
+    "",
+    response_model=list[TechnicianProfileResponse],
+)
+def list_technicians():
+    return technician_controller.list_technicians()
+
+
+@router.get(
     "/{technician_id}/dashboard",
     response_model=TechnicianDashboardResponse,
 )
@@ -96,4 +104,19 @@ def get_assigned_farm_device_detail(
         str(technician_id),
         str(farm_id),
         device_id,
+    )
+
+
+@router.post(
+    "/{technician_id}/farms/{farm_id}/assign",
+)
+def assign_technician(
+    technician_id: UUID,
+    farm_id: UUID,
+    is_primary: bool = True,
+):
+    return technician_controller.assign_technician(
+        str(technician_id),
+        str(farm_id),
+        is_primary,
     )

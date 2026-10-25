@@ -1,6 +1,6 @@
 from fastapi import HTTPException, status
 
-from app.services.technician_service import TechnicianService
+from app.services.technician_service import TechnicianService, technician_service
 
 
 class TechnicianController:
@@ -8,7 +8,16 @@ class TechnicianController:
         self,
         service: TechnicianService | None = None,
     ):
-        self.service = service or TechnicianService()
+        self.service = service or technician_service
+
+    def list_technicians(self):
+        try:
+            return self.service.list_technicians()
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
 
     def get_profile(self, technician_id: str):
         try:
@@ -121,6 +130,22 @@ class TechnicianController:
                 technician_id,
             )
 
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+
+    def assign_technician(self, technician_id: str, farm_id: str, is_primary: bool = True):
+        try:
+            assigned_id = self.service.assign_technician(technician_id, farm_id, is_primary)
+            return {
+                "assignment_id": assigned_id,
+                "technician_id": technician_id,
+                "farm_id": farm_id,
+                "is_primary": is_primary,
+                "status": "ASSIGNED",
+            }
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

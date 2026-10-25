@@ -2,6 +2,34 @@ from app.database import get_connection
 
 
 class TechnicianRepository:
+    def list_technicians(self):
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT
+                        id,
+                        full_name,
+                        email,
+                        phone,
+                        status
+                    FROM public.technicians
+                    ORDER BY full_name
+                    """
+                )
+                rows = cur.fetchall()
+
+        return [
+            {
+                "technician_id": str(row[0]),
+                "full_name": row[1],
+                "email": row[2],
+                "phone": row[3],
+                "status": row[4],
+            }
+            for row in rows
+        ]
+
     def get_profile(self, technician_id: str):
         with get_connection() as conn:
             with conn.cursor() as cur:
@@ -101,14 +129,14 @@ class TechnicianRepository:
                         ON d.house_id = h.id
                        AND d.is_active = TRUE
                     WHERE tha.technician_id = %s
-                      AND tha.house_id = %s
+                      AND (tha.house_id = %s OR h.house_code = %s)
                       AND tha.is_active = TRUE
                     GROUP BY
                         h.id,
                         h.house_code,
                         h.name
                     """,
-                    (technician_id, farm_id),
+                    (technician_id, farm_id, farm_id),
                 )
 
                 row = cur.fetchone()
@@ -133,7 +161,10 @@ class TechnicianRepository:
         technician_id: str,
         farm_id: str,
     ):
-        # TODO: replace IoT runtime-state SQL dependency during database decoupling.
+        # TODO(MICROSERVICE-BOUNDARY):
+        # - Boundary Crossover: Reading public.device_latest_state (recorded_at, device_state JSONB).
+        # - Future Service Owner: IoT Service owns runtime state, telemetry, and device online/offline status.
+        # - Eventual Replacement: Replace with IoT Service REST API call or local read model updated via RabbitMQ telemetry events.
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -153,17 +184,19 @@ class TechnicianRepository:
                     FROM public.technician_house_assignments tha
                     JOIN public.devices d
                         ON d.house_id = tha.house_id
+                    JOIN public.houses h
+                        ON h.id = tha.house_id
                     LEFT JOIN public.zones z
                         ON z.id = d.zone_id
                     LEFT JOIN public.device_latest_state dls
                         ON dls.device_id = d.id
                     WHERE tha.technician_id = %s
-                      AND tha.house_id = %s
+                      AND (tha.house_id = %s OR h.house_code = %s)
                       AND tha.is_active = TRUE
                       AND d.is_active = TRUE
                     ORDER BY d.node_id
                     """,
-                    (technician_id, farm_id),
+                    (technician_id, farm_id, farm_id),
                 )
 
                 rows = cur.fetchall()
@@ -235,7 +268,10 @@ class TechnicianRepository:
         self,
         technician_id: str,
     ):
-        # TODO: replace IoT runtime-state SQL dependency during database decoupling.
+        # TODO(MICROSERVICE-BOUNDARY):
+        # - Boundary Crossover: Reading public.device_latest_state to compute online/offline device counts.
+        # - Future Service Owner: IoT Service owns device presence and telemetry state.
+        # - Eventual Replacement: Query IoT Service metrics endpoint or read cached state projection.
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -293,3 +329,29 @@ class TechnicianRepository:
             "online_device_count": row[3] or 0,
             "offline_device_count": row[4] or 0,
         }
+
+    def assign_technician(self, technician_id: str, farm_id: str, is_primary: bool = True):
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO public.technician_house_assignments (
+                        technician_id, house_id, is_primary, is_active
+                    )
+                    VALUES (%s, %s, %s, TRUE)
+                    ON CONFLICT (technician_id, house_id)
+                    DO UPDATE SET
+                        is_primary = EXCLUDED.is_primary,
+                        is_active = TRUE,
+                        assigned_at = NOW()
+                    RETURNING id;
+                    """,
+                    (technician_id, farm_id, is_primary),
+                )
+                assigned_id = cur.fetchone()[0]
+                conn.commit()
+
+        return str(assigned_id)
+
+
+technician_repository = TechnicianRepository()

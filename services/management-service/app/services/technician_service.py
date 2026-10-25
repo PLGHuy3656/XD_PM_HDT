@@ -1,4 +1,4 @@
-from app.repositories.technician_repository import TechnicianRepository
+from app.repositories.technician_repository import TechnicianRepository, technician_repository
 
 
 class TechnicianService:
@@ -6,7 +6,10 @@ class TechnicianService:
         self,
         repository: TechnicianRepository | None = None,
     ):
-        self.repository = repository or TechnicianRepository()
+        self.repository = repository or technician_repository
+
+    def list_technicians(self):
+        return self.repository.list_technicians()
 
     def get_profile(self, technician_id: str):
         if not technician_id:
@@ -85,3 +88,14 @@ class TechnicianService:
         return self.repository.get_dashboard_summary(
             technician_id,
         )
+
+    def assign_technician(self, technician_id: str, farm_id: str, is_primary: bool = True):
+        if not technician_id:
+            raise ValueError("technician_id is required")
+        if not farm_id:
+            raise ValueError("farm_id is required")
+
+        return self.repository.assign_technician(technician_id, farm_id, is_primary)
+
+
+technician_service = TechnicianService()
