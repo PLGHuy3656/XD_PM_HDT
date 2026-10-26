@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS farms (
     name VARCHAR(255) NOT NULL,
     address TEXT,
     status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+    owner_id UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -104,6 +105,7 @@ CREATE TABLE IF NOT EXISTS technician_assignments (
 );
 
 -- Indexes for query optimization
+CREATE INDEX IF NOT EXISTS idx_farms_owner_id ON farms(owner_id);
 CREATE INDEX IF NOT EXISTS idx_zones_farm_id ON zones(farm_id);
 CREATE INDEX IF NOT EXISTS idx_devices_farm_id ON devices(farm_id);
 CREATE INDEX IF NOT EXISTS idx_devices_zone_id ON devices(zone_id);

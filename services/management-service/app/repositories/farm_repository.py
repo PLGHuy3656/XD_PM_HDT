@@ -60,7 +60,9 @@ class FarmRepository:
                         COUNT(DISTINCT z.id) AS zone_count,
                         COUNT(DISTINCT d.id) AS device_count,
                         t.id AS technician_id,
-                        t.full_name AS technician_name
+                        t.full_name AS technician_name,
+                        u.full_name AS owner_name,
+                        u.phone AS owner_phone
                     FROM farms f
                     LEFT JOIN zones z
                         ON z.farm_id = f.id
@@ -72,6 +74,8 @@ class FarmRepository:
                        AND ta.is_active = TRUE
                     LEFT JOIN technicians t
                         ON t.id = ta.technician_id
+                    LEFT JOIN users u
+                        ON u.id = f.owner_id
                     WHERE f.id = %s OR f.farm_code = %s
                     GROUP BY
                         f.id,
@@ -81,7 +85,9 @@ class FarmRepository:
                         f.status,
                         f.created_at,
                         t.id,
-                        t.full_name
+                        t.full_name,
+                        u.full_name,
+                        u.phone
                     """,
                     (farm_id, farm_id),
                 )
@@ -99,8 +105,8 @@ class FarmRepository:
             "created_at": row[5].isoformat() if row[5] else None,
             "zone_count": row[6],
             "device_count": row[7],
-            "owner_name": None,
-            "owner_phone": None,
+            "owner_name": row[10],
+            "owner_phone": row[11],
             "technician_id": str(row[8]) if row[8] else None,
             "technician_name": row[9] if row[9] else None,
         }

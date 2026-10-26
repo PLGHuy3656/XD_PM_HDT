@@ -19,5 +19,10 @@ class Settings(BaseSettings):
     service_host: str = "127.0.0.1"
     service_port: int = 8001
 
+    # Authentication & JWT Settings
+    jwt_secret: str = ""
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 60
+
 
 settings = Settings()
