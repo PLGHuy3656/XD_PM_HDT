@@ -306,8 +306,8 @@
         document.getElementById('statusText').className = 'font-medium text-emerald-400';
         appendLog("MQTT", "Kết nối thành công! Bắt đầu subscribe các topic...");
 
-        client.subscribe([TOPIC_TELEMETRY, TOPIC_HEARTBEAT, TOPIC_ACK, TOPIC_STATUS], (err) => {
-          if (!err) appendLog("MQTT", `Đã Subscribe: Telemetry, Heartbeat, Ack, Status`);
+        client.subscribe(['swiftlet/#', TOPIC_TELEMETRY, TOPIC_HEARTBEAT, TOPIC_ACK, TOPIC_STATUS], (err) => {
+          if (!err) appendLog("MQTT", `Đã Subscribe thành công toàn bộ luồng: swiftlet/#`);
         });
       });
 
@@ -316,11 +316,11 @@
         try {
           const data = JSON.parse(payloadStr);
 
-          if (topic === TOPIC_TELEMETRY) {
+          if (topic === TOPIC_TELEMETRY || topic.includes('telemetry')) {
             handleTelemetry(data);
-          } else if (topic === TOPIC_ACK) {
+          } else if (topic === TOPIC_ACK || topic.includes('ack')) {
             appendLog("ACK", `[Lệnh: ${data.commandId}] ${data.status} - ${data.message || ''}`);
-          } else if (topic === TOPIC_HEARTBEAT) {
+          } else if (topic === TOPIC_HEARTBEAT || topic.includes('heartbeat')) {
             document.getElementById('uptime').innerText = data.uptime + "s";
             document.getElementById('freeHeap').innerText = data.freeHeap + " B";
             appendLog("HEARTBEAT", `Uptime: ${data.uptime}s | Free Heap: ${data.freeHeap}B`);
