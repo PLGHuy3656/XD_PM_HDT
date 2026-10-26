@@ -8,22 +8,26 @@ class FarmRepository:
                 cur.execute(
                     """
                     SELECT
-                        h.id,
-                        h.house_code,
-                        h.name,
+                        f.id,
+                        f.farm_code,
+                        f.name,
+                        f.address,
+                        f.status,
                         COUNT(DISTINCT z.id) AS zone_count,
                         COUNT(DISTINCT d.id) AS device_count
-                    FROM public.houses h
-                    LEFT JOIN public.zones z
-                        ON z.house_id = h.id
-                    LEFT JOIN public.devices d
-                        ON d.house_id = h.id
+                    FROM farms f
+                    LEFT JOIN zones z
+                        ON z.farm_id = f.id
+                    LEFT JOIN devices d
+                        ON d.farm_id = f.id
                        AND d.is_active = TRUE
                     GROUP BY
-                        h.id,
-                        h.house_code,
-                        h.name
-                    ORDER BY h.name
+                        f.id,
+                        f.farm_code,
+                        f.name,
+                        f.address,
+                        f.status
+                    ORDER BY f.name
                     """
                 )
                 rows = cur.fetchall()
@@ -33,10 +37,10 @@ class FarmRepository:
                 "farm_id": str(row[0]),
                 "farm_code": row[1],
                 "farm_name": row[2],
-                "address": None,
-                "status": "ACTIVE",
-                "zone_count": row[3],
-                "device_count": row[4],
+                "address": row[3],
+                "status": row[4] or "ACTIVE",
+                "zone_count": row[5],
+                "device_count": row[6],
             }
             for row in rows
         ]
@@ -47,31 +51,35 @@ class FarmRepository:
                 cur.execute(
                     """
                     SELECT
-                        h.id,
-                        h.house_code,
-                        h.name,
-                        h.created_at,
+                        f.id,
+                        f.farm_code,
+                        f.name,
+                        f.address,
+                        f.status,
+                        f.created_at,
                         COUNT(DISTINCT z.id) AS zone_count,
                         COUNT(DISTINCT d.id) AS device_count,
                         t.id AS technician_id,
                         t.full_name AS technician_name
-                    FROM public.houses h
-                    LEFT JOIN public.zones z
-                        ON z.house_id = h.id
-                    LEFT JOIN public.devices d
-                        ON d.house_id = h.id
+                    FROM farms f
+                    LEFT JOIN zones z
+                        ON z.farm_id = f.id
+                    LEFT JOIN devices d
+                        ON d.farm_id = f.id
                        AND d.is_active = TRUE
-                    LEFT JOIN public.technician_house_assignments tha
-                        ON tha.house_id = h.id
-                       AND tha.is_active = TRUE
-                    LEFT JOIN public.technicians t
-                        ON t.id = tha.technician_id
-                    WHERE h.id = %s OR h.house_code = %s
+                    LEFT JOIN technician_assignments ta
+                        ON ta.farm_id = f.id
+                       AND ta.is_active = TRUE
+                    LEFT JOIN technicians t
+                        ON t.id = ta.technician_id
+                    WHERE f.id = %s OR f.farm_code = %s
                     GROUP BY
-                        h.id,
-                        h.house_code,
-                        h.name,
-                        h.created_at,
+                        f.id,
+                        f.farm_code,
+                        f.name,
+                        f.address,
+                        f.status,
+                        f.created_at,
                         t.id,
                         t.full_name
                     """,
@@ -86,15 +94,15 @@ class FarmRepository:
             "farm_id": str(row[0]),
             "farm_code": row[1],
             "farm_name": row[2],
-            "address": None,
-            "status": "ACTIVE",
-            "created_at": row[3].isoformat() if row[3] else None,
-            "zone_count": row[4],
-            "device_count": row[5],
+            "address": row[3],
+            "status": row[4] or "ACTIVE",
+            "created_at": row[5].isoformat() if row[5] else None,
+            "zone_count": row[6],
+            "device_count": row[7],
             "owner_name": None,
             "owner_phone": None,
-            "technician_id": str(row[6]) if row[6] else None,
-            "technician_name": row[7] if row[7] else None,
+            "technician_id": str(row[8]) if row[8] else None,
+            "technician_name": row[9] if row[9] else None,
         }
 
 

@@ -5,3 +5,7 @@ __pycache__/
 
 # Pytest cache
 .pytest_cache/
+
+# Environment files
+.env
+*.env

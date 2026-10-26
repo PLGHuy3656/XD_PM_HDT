@@ -9,21 +9,21 @@ class ZoneRepository:
                     """
                     SELECT
                         z.id,
-                        z.house_id,
+                        z.farm_id,
                         z.zone_code,
                         z.name,
                         z.created_at,
                         COUNT(DISTINCT d.id) AS device_count
-                    FROM public.zones z
-                    JOIN public.houses h
-                        ON h.id = z.house_id
-                    LEFT JOIN public.devices d
+                    FROM zones z
+                    JOIN farms f
+                        ON f.id = z.farm_id
+                    LEFT JOIN devices d
                         ON d.zone_id = z.id
                        AND d.is_active = TRUE
-                    WHERE z.house_id = %s OR h.house_code = %s
+                    WHERE z.farm_id = %s OR f.farm_code = %s
                     GROUP BY
                         z.id,
-                        z.house_id,
+                        z.farm_id,
                         z.zone_code,
                         z.name,
                         z.created_at
@@ -52,19 +52,19 @@ class ZoneRepository:
                     """
                     SELECT
                         z.id,
-                        z.house_id,
+                        z.farm_id,
                         z.zone_code,
                         z.name,
                         z.created_at,
                         COUNT(DISTINCT d.id) AS device_count
-                    FROM public.zones z
-                    LEFT JOIN public.devices d
+                    FROM zones z
+                    LEFT JOIN devices d
                         ON d.zone_id = z.id
                        AND d.is_active = TRUE
                     WHERE z.id = %s OR z.zone_code = %s
                     GROUP BY
                         z.id,
-                        z.house_id,
+                        z.farm_id,
                         z.zone_code,
                         z.name,
                         z.created_at

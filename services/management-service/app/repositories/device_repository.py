@@ -1,13 +1,9 @@
+from app.adapters.legacy_iot_adapter import legacy_iot_adapter
 from app.database import get_connection
 
 
 class DeviceRepository:
     def list_devices(self, farm_id: str | None = None, zone_id: str | None = None):
-        # TODO(MICROSERVICE-BOUNDARY):
-        # - Boundary Crossover: Reading device_latest_state.recorded_at to project device online status.
-        # - Future Service Owner: IoT Service owns runtime state, device presence, heartbeat, and online/offline status.
-        # - Eventual Replacement: Replace with IoT Service REST API call (e.g., GET /api/iot/devices/presence)
-        #   or a cached runtime projection via Redis/RabbitMQ presence events.
         with get_connection() as conn:
             with conn.cursor() as cur:
                 query = """
@@ -16,25 +12,22 @@ class DeviceRepository:
                         d.node_id,
                         d.name,
                         d.device_type,
-                        d.house_id,
+                        d.farm_id,
                         d.zone_id,
                         z.name AS zone_name,
                         d.ip_address,
                         d.firmware_version,
                         d.is_active,
-                        d.created_at,
-                        dls.recorded_at
-                    FROM public.devices d
-                    LEFT JOIN public.zones z
+                        d.created_at
+                    FROM devices d
+                    LEFT JOIN zones z
                         ON z.id = d.zone_id
-                    LEFT JOIN public.device_latest_state dls
-                        ON dls.device_id = d.id
                     WHERE d.is_active = TRUE
                 """
                 params = []
 
                 if farm_id:
-                    query += " AND d.house_id = %s"
+                    query += " AND d.farm_id = %s"
                     params.append(farm_id)
 
                 if zone_id:
@@ -44,6 +37,15 @@ class DeviceRepository:
                 query += " ORDER BY d.node_id"
                 cur.execute(query, tuple(params))
                 rows = cur.fetchall()
+
+        device_ids = [str(r[0]) for r in rows]
+
+        # TODO(MICROSERVICE-BOUNDARY):
+        # - Boundary Crossover: Reading runtime state via legacy_iot_adapter to project device online status.
+        # - Future Service Owner: IoT Service owns runtime state, device presence, heartbeat, and online/offline status.
+        # - Eventual Replacement: Replace with IoT Service REST API call (e.g., GET /api/iot/devices/presence)
+        #   or a cached runtime projection via Redis/RabbitMQ presence events.
+        runtime_states = legacy_iot_adapter.get_devices_runtime_state(device_ids)
 
         return [
             {
@@ -57,17 +59,13 @@ class DeviceRepository:
                 "ip_address": row[7],
                 "firmware_version": row[8],
                 "is_active": row[9],
-                "status": "ONLINE" if row[11] is not None else "OFFLINE",
+                "status": "ONLINE" if str(row[0]) in runtime_states else "OFFLINE",
                 "created_at": row[10].isoformat() if row[10] else None,
             }
             for row in rows
         ]
 
     def get_device_by_id(self, device_id: str):
-        # TODO(MICROSERVICE-BOUNDARY):
-        # - Boundary Crossover: Reading device_latest_state.recorded_at for online/offline status.
-        # - Future Service Owner: IoT Service owns runtime status.
-        # - Eventual Replacement: Inter-service call to IoT Service or Redis presence cache.
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -77,19 +75,16 @@ class DeviceRepository:
                         d.node_id,
                         d.name,
                         d.device_type,
-                        d.house_id,
+                        d.farm_id,
                         d.zone_id,
                         z.name AS zone_name,
                         d.ip_address,
                         d.firmware_version,
                         d.is_active,
-                        d.created_at,
-                        dls.recorded_at
-                    FROM public.devices d
-                    LEFT JOIN public.zones z
+                        d.created_at
+                    FROM devices d
+                    LEFT JOIN zones z
                         ON z.id = d.zone_id
-                    LEFT JOIN public.device_latest_state dls
-                        ON dls.device_id = d.id
                     WHERE d.id = %s OR d.node_id = %s
                     """,
                     (device_id, device_id),
@@ -99,8 +94,16 @@ class DeviceRepository:
         if row is None:
             return None
 
+        dev_uuid = str(row[0])
+
+        # TODO(MICROSERVICE-BOUNDARY):
+        # - Boundary Crossover: Reading runtime status from IoT adapter.
+        # - Future Service Owner: IoT Service owns runtime status.
+        # - Eventual Replacement: Inter-service call to IoT Service or Redis presence cache.
+        runtime_states = legacy_iot_adapter.get_devices_runtime_state([dev_uuid])
+
         return {
-            "device_id": str(row[0]),
+            "device_id": dev_uuid,
             "node_id": row[1],
             "name": row[2],
             "device_type": row[3],
@@ -110,7 +113,7 @@ class DeviceRepository:
             "ip_address": row[7],
             "firmware_version": row[8],
             "is_active": row[9],
-            "status": "ONLINE" if row[11] is not None else "OFFLINE",
+            "status": "ONLINE" if dev_uuid in runtime_states else "OFFLINE",
             "created_at": row[10].isoformat() if row[10] else None,
         }
 

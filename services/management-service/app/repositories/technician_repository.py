@@ -1,3 +1,4 @@
+from app.adapters.legacy_iot_adapter import legacy_iot_adapter
 from app.database import get_connection
 
 
@@ -13,7 +14,7 @@ class TechnicianRepository:
                         email,
                         phone,
                         status
-                    FROM public.technicians
+                    FROM technicians
                     ORDER BY full_name
                     """
                 )
@@ -41,7 +42,7 @@ class TechnicianRepository:
                         email,
                         phone,
                         status
-                    FROM public.technicians
+                    FROM technicians
                     WHERE id = %s
                     """,
                     (technician_id,),
@@ -66,26 +67,26 @@ class TechnicianRepository:
                 cur.execute(
                     """
                     SELECT
-                        h.id,
-                        h.house_code,
-                        h.name,
+                        f.id,
+                        f.farm_code,
+                        f.name,
                         COUNT(DISTINCT z.id) AS zone_count,
                         COUNT(DISTINCT d.id) AS device_count
-                    FROM public.technician_house_assignments tha
-                    JOIN public.houses h
-                        ON h.id = tha.house_id
-                    LEFT JOIN public.zones z
-                        ON z.house_id = h.id
-                    LEFT JOIN public.devices d
-                        ON d.house_id = h.id
+                    FROM technician_assignments ta
+                    JOIN farms f
+                        ON f.id = ta.farm_id
+                    LEFT JOIN zones z
+                        ON z.farm_id = f.id
+                    LEFT JOIN devices d
+                        ON d.farm_id = f.id
                        AND d.is_active = TRUE
-                    WHERE tha.technician_id = %s
-                      AND tha.is_active = TRUE
+                    WHERE ta.technician_id = %s
+                      AND ta.is_active = TRUE
                     GROUP BY
-                        h.id,
-                        h.house_code,
-                        h.name
-                    ORDER BY h.name
+                        f.id,
+                        f.farm_code,
+                        f.name
+                    ORDER BY f.name
                     """,
                     (technician_id,),
                 )
@@ -115,26 +116,26 @@ class TechnicianRepository:
                 cur.execute(
                     """
                     SELECT
-                        h.id,
-                        h.house_code,
-                        h.name,
+                        f.id,
+                        f.farm_code,
+                        f.name,
                         COUNT(DISTINCT z.id) AS zone_count,
                         COUNT(DISTINCT d.id) AS device_count
-                    FROM public.technician_house_assignments tha
-                    JOIN public.houses h
-                        ON h.id = tha.house_id
-                    LEFT JOIN public.zones z
-                        ON z.house_id = h.id
-                    LEFT JOIN public.devices d
-                        ON d.house_id = h.id
+                    FROM technician_assignments ta
+                    JOIN farms f
+                        ON f.id = ta.farm_id
+                    LEFT JOIN zones z
+                        ON z.farm_id = f.id
+                    LEFT JOIN devices d
+                        ON d.farm_id = f.id
                        AND d.is_active = TRUE
-                    WHERE tha.technician_id = %s
-                      AND (tha.house_id = %s OR h.house_code = %s)
-                      AND tha.is_active = TRUE
+                    WHERE ta.technician_id = %s
+                      AND (ta.farm_id = %s OR f.farm_code = %s)
+                      AND ta.is_active = TRUE
                     GROUP BY
-                        h.id,
-                        h.house_code,
-                        h.name
+                        f.id,
+                        f.farm_code,
+                        f.name
                     """,
                     (technician_id, farm_id, farm_id),
                 )
@@ -161,10 +162,6 @@ class TechnicianRepository:
         technician_id: str,
         farm_id: str,
     ):
-        # TODO(MICROSERVICE-BOUNDARY):
-        # - Boundary Crossover: Reading public.device_latest_state (recorded_at, device_state JSONB).
-        # - Future Service Owner: IoT Service owns runtime state, telemetry, and device online/offline status.
-        # - Eventual Replacement: Replace with IoT Service REST API call or local read model updated via RabbitMQ telemetry events.
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -174,25 +171,21 @@ class TechnicianRepository:
                         d.node_id,
                         d.name,
                         d.device_type,
-                        d.house_id,
+                        d.farm_id,
                         d.zone_id,
-                        z.name,
+                        z.name AS zone_name,
                         d.ip_address,
-                        d.firmware_version,
-                        dls.recorded_at,
-                        dls.device_state
-                    FROM public.technician_house_assignments tha
-                    JOIN public.devices d
-                        ON d.house_id = tha.house_id
-                    JOIN public.houses h
-                        ON h.id = tha.house_id
-                    LEFT JOIN public.zones z
+                        d.firmware_version
+                    FROM technician_assignments ta
+                    JOIN devices d
+                        ON d.farm_id = ta.farm_id
+                    JOIN farms f
+                        ON f.id = ta.farm_id
+                    LEFT JOIN zones z
                         ON z.id = d.zone_id
-                    LEFT JOIN public.device_latest_state dls
-                        ON dls.device_id = d.id
-                    WHERE tha.technician_id = %s
-                      AND (tha.house_id = %s OR h.house_code = %s)
-                      AND tha.is_active = TRUE
+                    WHERE ta.technician_id = %s
+                      AND (ta.farm_id = %s OR f.farm_code = %s)
+                      AND ta.is_active = TRUE
                       AND d.is_active = TRUE
                     ORDER BY d.node_id
                     """,
@@ -201,15 +194,27 @@ class TechnicianRepository:
 
                 rows = cur.fetchall()
 
+        device_ids = [str(row[0]) for row in rows]
+
+        # TODO(MICROSERVICE-BOUNDARY):
+        # - Boundary Crossover: Reading runtime state (recorded_at, device_state JSONB) via legacy_iot_adapter.
+        # - Future Service Owner: IoT Service owns runtime state, telemetry, and device online/offline status.
+        # - Eventual Replacement: Replace with IoT Service REST API call or local read model updated via RabbitMQ telemetry events.
+        runtime_states = legacy_iot_adapter.get_devices_runtime_state(device_ids)
+
         devices = []
 
         for row in rows:
-            device_state = row[10] or {}
+            dev_id = str(row[0])
+            state_info = runtime_states.get(dev_id)
+            is_online = state_info is not None
+            recorded_at = state_info["recorded_at"] if state_info else None
+            device_state = state_info["device_state"] if state_info else {}
             rssi = device_state.get("networkRssi")
 
             devices.append(
                 {
-                    "device_id": str(row[0]),
+                    "device_id": dev_id,
                     "node_id": row[1],
                     "name": row[2],
                     "device_type": row[3],
@@ -223,20 +228,20 @@ class TechnicianRepository:
                     "zone_name": row[6],
                     "status": (
                         "ONLINE"
-                        if row[9] is not None
+                        if is_online
                         else "OFFLINE"
                     ),
                     "rssi": rssi,
                     "mqtt_status": (
                         "Connected"
-                        if row[9] is not None
+                        if is_online
                         else "Disconnected"
                     ),
                     "ip_address": row[7],
                     "firmware_version": row[8],
                     "last_seen": (
-                        row[9].isoformat()
-                        if row[9] is not None
+                        recorded_at.isoformat()
+                        if recorded_at is not None
                         else None
                     ),
                 }
@@ -268,16 +273,12 @@ class TechnicianRepository:
         self,
         technician_id: str,
     ):
-        # TODO(MICROSERVICE-BOUNDARY):
-        # - Boundary Crossover: Reading public.device_latest_state to compute online/offline device counts.
-        # - Future Service Owner: IoT Service owns device presence and telemetry state.
-        # - Eventual Replacement: Query IoT Service metrics endpoint or read cached state projection.
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
                     SELECT
-                        COUNT(DISTINCT tha.house_id)
+                        COUNT(DISTINCT ta.farm_id)
                             AS assigned_farm_count,
 
                         COUNT(DISTINCT z.id)
@@ -286,48 +287,43 @@ class TechnicianRepository:
                         COUNT(DISTINCT d.id)
                             AS device_count,
 
-                        COUNT(
-                            DISTINCT CASE
-                                WHEN dls.device_id IS NOT NULL
-                                THEN d.id
-                            END
-                        ) AS online_device_count,
+                        ARRAY_AGG(DISTINCT d.id) FILTER (WHERE d.id IS NOT NULL)
+                            AS device_ids
 
-                        COUNT(
-                            DISTINCT CASE
-                                WHEN d.id IS NOT NULL
-                                AND dls.device_id IS NULL
-                                THEN d.id
-                            END
-                        ) AS offline_device_count
+                    FROM technician_assignments ta
 
-                    FROM public.technician_house_assignments tha
+                    LEFT JOIN zones z
+                        ON z.farm_id = ta.farm_id
 
-                    LEFT JOIN public.zones z
-                        ON z.house_id = tha.house_id
-
-                    LEFT JOIN public.devices d
-                        ON d.house_id = tha.house_id
+                    LEFT JOIN devices d
+                        ON d.farm_id = ta.farm_id
                     AND d.is_active = TRUE
 
-                    LEFT JOIN public.device_latest_state dls
-                        ON dls.device_id = d.id
-
-                    WHERE tha.technician_id = %s
-                    AND tha.is_active = TRUE
+                    WHERE ta.technician_id = %s
+                    AND ta.is_active = TRUE
                     """,
                     (technician_id,),
                 )
 
                 row = cur.fetchone()
 
+        device_uuids = [str(did) for did in (row[3] or [])]
+
+        # TODO(MICROSERVICE-BOUNDARY):
+        # - Boundary Crossover: Reading runtime presence counts via legacy_iot_adapter.
+        # - Future Service Owner: IoT Service owns device presence and telemetry state.
+        # - Eventual Replacement: Query IoT Service metrics endpoint or read cached state projection.
+        online_count, offline_count = legacy_iot_adapter.get_devices_presence_counts(
+            device_uuids
+        )
+
         return {
             "technician_id": technician_id,
             "assigned_farm_count": row[0] or 0,
             "zone_count": row[1] or 0,
             "device_count": row[2] or 0,
-            "online_device_count": row[3] or 0,
-            "offline_device_count": row[4] or 0,
+            "online_device_count": online_count,
+            "offline_device_count": offline_count,
         }
 
     def assign_technician(self, technician_id: str, farm_id: str, is_primary: bool = True):
@@ -335,11 +331,11 @@ class TechnicianRepository:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO public.technician_house_assignments (
-                        technician_id, house_id, is_primary, is_active
+                    INSERT INTO technician_assignments (
+                        technician_id, farm_id, is_primary, is_active
                     )
                     VALUES (%s, %s, %s, TRUE)
-                    ON CONFLICT (technician_id, house_id)
+                    ON CONFLICT (technician_id, farm_id)
                     DO UPDATE SET
                         is_primary = EXCLUDED.is_primary,
                         is_active = TRUE,
