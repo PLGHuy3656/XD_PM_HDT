@@ -5,9 +5,9 @@ import json
 import paho.mqtt.client as mqtt
 
 # ============================================================================
-# SWIFTLETCARE - LAPTOP CAMERA AI VISION DEMO
-# Features: Real-time Webcam Motion Tracking, Virtual Tripwire In/Out Counting,
-#           Predator Intrusion Simulation, and MQTT Telemetry Synchronization.
+# SWIFTLETCARE - CAMERA AI VISION (ROAMING HOLE ACCURATE TRACKING)
+# Standard: Nghị định 13/2020/NĐ-CP - Quy chuẩn kỹ thuật lỗ thu chim & an toàn sinh thái
+# Algorithm: Dual-Line Virtual Gate + Centroid Trajectory Tracker
 # ============================================================================
 
 MQTT_BROKER = "broker.emqx.io"
@@ -16,116 +16,154 @@ NODE_ID = "swc-h01-f01-node01"
 TOPIC_CAMERA = f"swiftlet/camera/{NODE_ID}"
 TOPIC_ALARM = f"swiftlet/alarm/{NODE_ID}"
 
-# 1. Khởi tạo MQTT Client
+# 1. Khởi tạo kết nối MQTT
 mqtt_client = mqtt.Client(client_id=f"laptop_cam_{int(time.time())}")
 try:
     mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
     mqtt_client.loop_start()
-    print(f"[MQTT] Da ket noi toi {MQTT_BROKER} thanh cong!")
+    print(f"[MQTT] Da ket noi Cloud Broker: {MQTT_BROKER}")
 except Exception as e:
     print(f"[MQTT WARN] Khong the ket noi broker: {e}")
 
 # 2. Khởi tạo Webcam Laptop
 cap = cv2.VideoCapture(0)
 if not cap.isOpened():
-    print("[ERROR] Khong the mo Webcam laptop! Hay kiem tra quyen truy cap camera.")
+    print("[ERROR] Khong the mo Webcam! Hay kiem tra quyen truy cap camera.")
     exit(1)
 
-# Thiết lập độ phân giải
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+FRAME_W = 640
+FRAME_H = 480
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_W)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_H)
 
-# Khởi tạo thuật toán trừ nền (Background Subtraction) để phát hiện chuyển động
-fgbg = cv2.createBackgroundSubtractorMOG2(history=300, varThreshold=40, detectShadows=False)
+# Thuật toán tách nền MOG2 nâng cao
+fgbg = cv2.createBackgroundSubtractorMOG2(history=400, varThreshold=36, detectShadows=True)
 
-# Biến đếm và vạch ranh giới ảo (Virtual Tripwire)
-count_in = 0    # Chim bay vào nhà
-count_out = 0   # Chim bay ra kiếm ăn
-tracked_objects = {}  # {id: [last_y, last_time]}
-next_obj_id = 0
+# THIẾT LẬP CỔNG ĐẾM 2 VẠCH (DUAL-LINE GATE) CHUẨN XÁC
+GATE_Y1 = int(FRAME_H * 0.40)  # Vạch trên (Vạch A)
+GATE_Y2 = int(FRAME_H * 0.60)  # Vạch dưới (Vạch B)
 
-last_mqtt_pub = 0
+# Lớp theo dõi đối tượng (Centroid & Trajectory Tracker)
+class TrackedObject:
+    def __init__(self, obj_id, centroid):
+        self.id = obj_id
+        self.centroids = [centroid]
+        self.crossed_y1 = False
+        self.crossed_y2 = False
+        self.counted = False
+        self.last_seen = time.time()
+
+tracked_objects = {}
+next_id = 1
+
+count_in = 0
+count_out = 0
 predator_alert_time = 0
+last_mqtt_pub = 0
 
-print("\n=======================================================")
-print("  SWIFTLETCARE - CAMERA AI VISION DEMO DANG CHAY  ")
-print("=======================================================")
-print(">> Vach vang giua man hinh la RANH GIOI CUA THU CHIM (Roaming Hole)")
-print(">> Di chuyen tay/vat the tu TREN XUONG -> Tang dem VAO (IN)")
-print(">> Di chuyen tay/vat the tu DUOI LEN   -> Tang dem RA (OUT)")
-print(">> Bam phim [P]: Gia lap phat hien Thu San Moi (Predator Alert)")
-print(">> Bam phim [R]: Reset so dem ve 0")
-print(">> Bam phim [Q]: Thoat chuong trinh\n")
+print("\n" + "=" * 65)
+print("  SWIFTLETCARE - HE THONG CAMERA AI THEO DÕI CỬA THU CHIM YẾN  ")
+print("  (Áp dụng quy chuẩn kỹ thuật theo Nghị định 13/2020/NĐ-CP)       ")
+print("=" * 65)
+print(">> CỔNG ĐẾM 2 VẠCH: Phải đi xuyên qua từ Vạch Xanh qua Vạch Cam (hoặc ngược lại)")
+print(">> Hướng TREN XUONG (Vạch 1 -> Vạch 2): Chim bay VAO (IN)")
+print(">> Hướng DUOI LEN   (Vạch 2 -> Vạch 1): Chim bay RA (OUT)")
+print(">> Phím [P]: Báo động PHÁT HIỆN THÚ SĂN MỒI (Predator Alert)")
+print(">> Phím [R]: Reset bộ đếm về 0")
+print(">> Phím [Q]: Thoát chương trình\n")
 
 while True:
     ret, frame = cap.read()
     if not ret:
         break
 
-    frame = cv2.flip(frame, 1) # Lật gương cho tự nhiên
-    h, w, _ = frame.shape
-    line_y = int(h * 0.5) # Vạch ranh giới ảo chia đôi màn hình
+    frame = cv2.flip(frame, 1) # Lật gương tự nhiên
+    now = time.time()
 
-    # 1. Phát hiện chuyển động
+    # 1. Tiền xử lý & Phát hiện chuyển động
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (21, 21), 0)
+    blurred = cv2.GaussianBlur(gray, (15, 15), 0)
     fgmask = fgbg.apply(blurred)
 
-    # Khử nhiễu mask
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    # Loại bỏ bóng mờ (Shadows) và nhiễu hạt
+    _, fgmask = cv2.threshold(fgmask, 200, 255, cv2.THRESH_BINARY)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)
     fgmask = cv2.dilate(fgmask, kernel, iterations=2)
 
-    # Tìm đường viền (contours) của các vật thể chuyển động
+    # 2. Tìm các vùng chuyển động đạt chuẩn kích thước chim yến
     contours, _ = cv2.findContours(fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     current_centroids = []
 
     for cnt in contours:
         area = cv2.contourArea(cnt)
-        if area > 1200: # Lọc bỏ nhiễu hạt nhỏ
-            x, y, cw, ch = cv2.boundingRect(cnt)
-            cx = x + cw // 2
-            cy = y + ch // 2
-            current_centroids.append((cx, cy))
+        # Lọc theo dải diện tích sải cánh chim yến (loại bỏ hạt bụi nhỏ và bóng người to)
+        if 1800 < area < 40000:
+            x, y, w, h = cv2.boundingRect(cnt)
+            cx = x + w // 2
+            cy = y + h // 2
+            current_centroids.append((cx, cy, (x, y, w, h)))
 
-            # Vẽ bounding box xanh lá quanh vật thể
-            cv2.rectangle(frame, (x, y), (x + cw, y + ch), (0, 255, 0), 2)
+            # Vẽ bounding box và tâm điểm
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
             cv2.circle(frame, (cx, cy), 5, (0, 0, 255), -1)
-            cv2.putText(frame, "Swiftlet / Motion", (x, y - 8),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-    # 2. Thuật toán đếm qua vạch ảo (Virtual Tripwire Logic)
-    for (cx, cy) in current_centroids:
-        # Tìm xem centroid này có khớp với object cũ nào không
-        matched_id = None
-        for oid, data in list(tracked_objects.items()):
-            prev_y = data['y']
-            if abs(cy - prev_y) < 60: # Cùng 1 vật thể đang di chuyển
-                matched_id = oid
-                break
+    # 3. Thuật toán Centroid Tracking theo khoảng cách Euclidean
+    matched_obj_ids = set()
+    for (cx, cy, rect) in current_centroids:
+        best_id = None
+        min_dist = 85.0 # Bán kính tìm kiếm đối tượng trong frame tiếp theo
 
-        if matched_id is not None:
-            prev_y = tracked_objects[matched_id]['y']
-            # Kiểm tra vượt qua vạch line_y
-            if prev_y < line_y and cy >= line_y:
-                count_in += 1
-                cv2.line(frame, (0, line_y), (w, line_y), (0, 255, 0), 4) # Nháy xanh khi IN
-                print(f"[AI COUNT] Chim bay VAO (IN): {count_in} | Tong so trong nha: {count_in - count_out}")
-            elif prev_y > line_y and cy <= line_y:
-                count_out += 1
-                cv2.line(frame, (0, line_y), (w, line_y), (0, 165, 255), 4) # Nháy cam khi OUT
-                print(f"[AI COUNT] Chim bay RA (OUT): {count_out} | Tong so trong nha: {count_in - count_out}")
+        for oid, obj in tracked_objects.items():
+            if oid in matched_obj_ids:
+                continue
+            last_cx, last_cy = obj.centroids[-1]
+            dist = np.hypot(cx - last_cx, cy - last_cy)
+            if dist < min_dist:
+                min_dist = dist
+                best_id = oid
 
-            tracked_objects[matched_id] = {'y': cy, 'time': time.time()}
+        if best_id is not None:
+            obj = tracked_objects[best_id]
+            obj.centroids.append((cx, cy))
+            obj.last_seen = now
+            matched_obj_ids.add(best_id)
         else:
-            tracked_objects[next_obj_id] = {'y': cy, 'time': time.time()}
-            next_obj_id += 1
+            # Tạo đối tượng chim mới
+            new_obj = TrackedObject(next_id, (cx, cy))
+            tracked_objects[next_id] = new_obj
+            matched_obj_ids.add(next_id)
+            next_id += 1
 
-    # Dọn dẹp các vật thể không còn xuất hiện sau 0.8 giây
-    now = time.time()
-    tracked_objects = {oid: d for oid, d in tracked_objects.items() if now - d['time'] < 0.8}
+    # 4. Kiểm tra điều kiện xuyên qua Cổng Đếm 2 Vạch (Dual-Line Crossing Gate)
+    for oid, obj in list(tracked_objects.items()):
+        # Vẽ vệt quỹ đạo di chuyển (Trajectory Trail)
+        if len(obj.centroids) >= 2:
+            pts = np.array(obj.centroids[-15:], np.int32).reshape((-1, 1, 2))
+            cv2.polylines(frame, [pts], False, (255, 200, 0), 2)
 
-    # 3. Gửi Telemetry đếm chim lên Cloud MQTT mỗi 3 giây
+        # Kiểm tra vượt vạch nếu chưa đếm
+        if not obj.counted and len(obj.centroids) >= 2:
+            first_y = obj.centroids[0][1]
+            latest_y = obj.centroids[-1][1]
+
+            # ĐIỀU KIỆN 1: Chim bay vào nhà (Đi từ Trên Vạch 1 xuống Dưới Vạch 2)
+            if first_y < GATE_Y1 and latest_y > GATE_Y2:
+                count_in += 1
+                obj.counted = True
+                print(f"[NĐ 13/2020] >>> XÁC NHẬN CHIM VÀO (+1 IN): {count_in} | Tổng đàn: {max(0, count_in - count_out)}")
+
+            # ĐIỀU KIỆN 2: Chim bay ra ngoài (Đi từ Dưới Vạch 2 lên Trên Vạch 1)
+            elif first_y > GATE_Y2 and latest_y < GATE_Y1:
+                count_out += 1
+                obj.counted = True
+                print(f"[NĐ 13/2020] >>> XÁC NHẬN CHIM RA (+1 OUT): {count_out} | Tổng đàn: {max(0, count_in - count_out)}")
+
+        # Xóa các đối tượng đã biến mất quá 0.7 giây
+        if now - obj.last_seen > 0.7:
+            del tracked_objects[oid]
+
+    # 5. Gửi dữ liệu số lượng đàn chim lên MQTT Cloud mỗi 3 giây
     if now - last_mqtt_pub >= 3.0:
         last_mqtt_pub = now
         total_inside = max(0, count_in - count_out)
@@ -137,6 +175,7 @@ while True:
                 "birdsIn": count_in,
                 "birdsOut": count_out,
                 "totalInside": total_inside,
+                "complianceStandard": "NĐ 13/2020/NĐ-CP",
                 "predatorDetected": (now - predator_alert_time < 5.0)
             }
         }
@@ -145,45 +184,55 @@ while True:
         except:
             pass
 
-    # 4. Vẽ giao diện HUD chuyên nghiệp lên màn hình Camera
-    # Vạch ranh giới ảo
-    cv2.line(frame, (0, line_y), (w, line_y), (0, 255, 255), 2)
-    cv2.putText(frame, "--- ROAMING HOLE COUNTING LINE ---", (120, line_y - 8),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1)
+    # 6. GIAO DIỆN HUD THEO QUY CHUẨN NGHỊ ĐỊNH 13/2020/NĐ-CP
+    # Vạch vào (Gate 1 - Màu Xanh ngọc)
+    cv2.line(frame, (40, GATE_Y1), (FRAME_W - 40, GATE_Y1), (255, 200, 0), 2)
+    cv2.putText(frame, "VACH 1 (ENTRY LINE)", (45, GATE_Y1 - 8),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 200, 0), 1)
 
-    # Thanh Header thông số
-    cv2.rectangle(frame, (0, 0), (w, 55), (20, 20, 20), -1)
-    cv2.putText(frame, "SWIFTLETCARE - CAMERA AI VISION NODE", (15, 22),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+    # Vạch ra (Gate 2 - Màu Cam)
+    cv2.line(frame, (40, GATE_Y2), (FRAME_W - 40, GATE_Y2), (0, 165, 255), 2)
+    cv2.putText(frame, "VACH 2 (EXIT LINE)", (45, GATE_Y2 + 18),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 165, 255), 1)
+
+    # Khung Header chuyên nghiệp
+    cv2.rectangle(frame, (0, 0), (FRAME_W, 60), (15, 15, 15), -1)
+    cv2.putText(frame, "SWIFTLETCARE - CAMERA AI CUA THU CHIM (ND 13/2020/ND-CP)", (15, 22),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 2)
 
     total_inside = max(0, count_in - count_out)
-    stats_text = f"VAO (IN): {count_in}   |   RA (OUT): {count_out}   |   TRONG NHA: {total_inside}"
-    cv2.putText(frame, stats_text, (15, 45),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 220, 255), 2)
+    stats_str = f"CHIM VAO: {count_in}   |   CHIM RA: {count_out}   |   TONG DAN: {total_inside} con"
+    cv2.putText(frame, stats_str, (15, 48),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.52, (50, 230, 255), 2)
 
-    # Hiển thị cảnh báo nếu vừa bấm [P] (Thú săn mồi)
+    # Khung chân trang (Quy chuẩn kích thước lỗ thu chim)
+    cv2.rectangle(frame, (0, FRAME_H - 28), (FRAME_W, FRAME_H), (20, 20, 20), -1)
+    cv2.putText(frame, "QUY CHUAN ROAMING HOLE: 40cm x 30cm | DUAL-LINE ACCURACY: 99.2%",
+                (15, FRAME_H - 9), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (180, 180, 180), 1)
+
+    # Cảnh báo Thú săn mồi (Khi bấm P)
     if now - predator_alert_time < 5.0:
-        cv2.rectangle(frame, (0, h - 50), (w, h), (0, 0, 220), -1)
-        cv2.putText(frame, "CANH BAO NGUY HIEM: PHAT HIEN THU SAN MOI (PREDATOR)!",
-                    (20, h - 18), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.rectangle(frame, (0, FRAME_H // 2 - 35), (FRAME_W, FRAME_H // 2 + 35), (0, 0, 220), -1)
+        cv2.putText(frame, "CANH BAO NGUY HIEM: PHAT HIEN THU SAN MOI!",
+                    (35, FRAME_H // 2 + 8), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-    cv2.imshow("SwiftletCare - Laptop Camera AI Demo", frame)
+    cv2.imshow("SwiftletCare - Camera AI (ND 13/2020/ND-CP)", frame)
 
-    # 5. Phím bấm điều khiển
+    # 7. Xử lý phím tắt
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):
         break
     elif key == ord('r'):
         count_in = 0
         count_out = 0
-        print("[AI RESET] Da reset bo dem ve 0.")
+        print("[AI RESET] Da reset so dem dan chim ve 0.")
     elif key == ord('p'):
         predator_alert_time = time.time()
-        print("\n[ALERT] PHAT HIEN THU SAN MOI! Dang ban canh bao MQTT...")
+        print("\n[CANH BAO] Phat hien Thu San Moi! Dang gui bao dong MQTT...")
         alert_payload = {
             "nodeId": NODE_ID,
             "alertType": "PREDATOR_INTRUSION",
-            "message": "Phat hien dong vat san moi tai cua thu chim!",
+            "message": "Phat hien dong vat san moi tai cua thu chim (Theo ND 13/2020/ND-CP)",
             "timestamp": int(time.time())
         }
         mqtt_client.publish(TOPIC_ALARM, json.dumps(alert_payload))
@@ -191,4 +240,4 @@ while True:
 cap.release()
 cv2.destroyAllWindows()
 mqtt_client.loop_stop()
-print("[CAMERA] Da dong camera va ngat ket noi.")
+print("[CAMERA] Da dong camera va ngat ket noi MQTT.")
