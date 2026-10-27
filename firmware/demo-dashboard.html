@@ -103,6 +103,54 @@
         </div>
       </div>
 
+      <!-- CAMERA AI & AUDIO MONITORING (MULTI-MODAL) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- CAMERA ROAMING HOLE -->
+        <div class="bg-slate-800/80 p-4 rounded-2xl border border-indigo-500/30 shadow-lg">
+          <div class="flex justify-between items-center pb-2 border-b border-slate-700/50">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">📹</span>
+              <h3 class="text-sm font-semibold text-white">Camera AI Lỗ Ra Vào (Roaming Hole)</h3>
+            </div>
+            <span id="camStatus" class="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30">Chờ Webcam...</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 mt-3 text-center">
+            <div class="bg-slate-900/60 p-2 rounded-xl">
+              <span class="text-xs text-slate-400">Chim Vào (IN)</span>
+              <div id="camIn" class="text-2xl font-bold text-emerald-400 mt-1">0</div>
+            </div>
+            <div class="bg-slate-900/60 p-2 rounded-xl">
+              <span class="text-xs text-slate-400">Chim Ra (OUT)</span>
+              <div id="camOut" class="text-2xl font-bold text-amber-400 mt-1">0</div>
+            </div>
+            <div class="bg-slate-900/60 p-2 rounded-xl">
+              <span class="text-xs text-slate-400">Trong Nhà</span>
+              <div id="camTotal" class="text-2xl font-bold text-white mt-1">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AUDIO & PREDATOR ALERT -->
+        <div class="bg-slate-800/80 p-4 rounded-2xl border border-slate-700/60 shadow-lg flex flex-col justify-between">
+          <div class="flex justify-between items-center pb-2 border-b border-slate-700/50">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">🔊</span>
+              <h3 class="text-sm font-semibold text-white">Loa Ru & Đe Dọa (Audio & Predator)</h3>
+            </div>
+            <span id="audioDecibel" class="text-xs text-slate-400">-- dBA</span>
+          </div>
+          <div class="mt-2 space-y-2 text-sm">
+            <div class="flex justify-between items-center">
+              <span class="text-slate-400">Tình trạng loa ru:</span>
+              <span id="audioBadge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Đang phát bình thường</span>
+            </div>
+            <div id="alertBanner" class="p-2 rounded-xl bg-slate-900/60 text-xs text-slate-400 flex items-center gap-2">
+              <span>🛡️</span> <span>Môi trường an toàn, không có thú săn mồi.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- REAL-TIME TIME-SERIES CHART -->
       <div class="bg-slate-800/80 p-5 rounded-2xl border border-slate-700/60 shadow-lg">
         <div class="flex justify-between items-center mb-4">
@@ -316,7 +364,33 @@
         try {
           const data = JSON.parse(payloadStr);
 
-          if (topic === TOPIC_TELEMETRY || topic.includes('telemetry')) {
+          if (topic.includes('camera')) {
+            if (data.camera) {
+              document.getElementById('camIn').innerText = data.camera.birdsIn;
+              document.getElementById('camOut').innerText = data.camera.birdsOut;
+              document.getElementById('camTotal').innerText = data.camera.totalInside;
+              document.getElementById('camStatus').innerText = "Webcam Live (Active)";
+              document.getElementById('camStatus').className = "text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30";
+              appendLog("CAMERA_AI", `Vào: ${data.camera.birdsIn} | Ra: ${data.camera.birdsOut} | Tổng: ${data.camera.totalInside}`);
+            }
+          } else if (topic.includes('alarm')) {
+            appendLog("ALARM", `🚨 [${data.alertType}] ${data.message}`);
+            const ab = document.getElementById('alertBanner');
+            ab.className = "p-2 rounded-xl bg-rose-500/20 text-xs text-rose-300 border border-rose-500/30 flex items-center gap-2 font-bold animate-pulse";
+            ab.innerHTML = `<span>🚨</span> <span>[BÁO ĐỘNG] ${data.message}</span>`;
+            setTimeout(() => {
+              ab.className = "p-2 rounded-xl bg-slate-900/60 text-xs text-slate-400 flex items-center gap-2";
+              ab.innerHTML = `<span>🛡️</span> <span>Môi trường an toàn, không có thú săn mồi.</span>`;
+            }, 8000);
+          } else if (data.audio) {
+            const h = data.audio.healthy;
+            document.getElementById('audioBadge').innerText = h ? "Đang phát bình thường" : "MẤT TIẾNG / HỎNG LOA";
+            document.getElementById('audioBadge').className = h
+              ? "text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+              : "text-xs font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse";
+            document.getElementById('audioDecibel').innerText = data.audio.decibelLevel + " dBA";
+            appendLog("AUDIO", `Loa ru: ${h ? 'Hoạt động tốt' : 'MẤT TÍN HIỆU'} (${data.audio.decibelLevel} dBA)`);
+          } else if (topic === TOPIC_TELEMETRY || topic.includes('telemetry')) {
             handleTelemetry(data);
           } else if (topic === TOPIC_ACK || topic.includes('ack')) {
             appendLog("ACK", `[Lệnh: ${data.commandId}] ${data.status} - ${data.message || ''}`);
