@@ -106,26 +106,49 @@
       <!-- CAMERA AI & AUDIO MONITORING (MULTI-MODAL) -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- CAMERA ROAMING HOLE -->
-        <div class="bg-slate-800/80 p-4 rounded-2xl border border-indigo-500/30 shadow-lg">
-          <div class="flex justify-between items-center pb-2 border-b border-slate-700/50">
-            <div class="flex items-center gap-2">
-              <span class="text-xl">📹</span>
-              <h3 class="text-sm font-semibold text-white">Camera AI Lỗ Ra Vào (Roaming Hole)</h3>
+        <div class="bg-slate-800/80 p-4 rounded-2xl border border-indigo-500/30 shadow-lg flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center pb-2 border-b border-slate-700/50">
+              <div class="flex items-center gap-2">
+                <span class="text-xl">📹</span>
+                <h3 class="text-sm font-semibold text-white">Camera AI Cửa Thu Chim (NĐ 13/2020)</h3>
+              </div>
+              <span id="camStatus" class="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30">Sẵn sàng Demo</span>
             </div>
-            <span id="camStatus" class="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30">Chờ Webcam...</span>
+            <div class="grid grid-cols-3 gap-2 mt-3 text-center">
+              <div class="bg-slate-900/60 p-2 rounded-xl">
+                <span class="text-xs text-slate-400">Chim Vào (IN)</span>
+                <div id="camIn" class="text-2xl font-bold text-emerald-400 mt-1">0</div>
+              </div>
+              <div class="bg-slate-900/60 p-2 rounded-xl">
+                <span class="text-xs text-slate-400">Chim Ra (OUT)</span>
+                <div id="camOut" class="text-2xl font-bold text-amber-400 mt-1">0</div>
+              </div>
+              <div class="bg-slate-900/60 p-2 rounded-xl">
+                <span class="text-xs text-slate-400">Trong Nhà</span>
+                <div id="camTotal" class="text-2xl font-bold text-white mt-1">0</div>
+              </div>
+            </div>
           </div>
-          <div class="grid grid-cols-3 gap-2 mt-3 text-center">
-            <div class="bg-slate-900/60 p-2 rounded-xl">
-              <span class="text-xs text-slate-400">Chim Vào (IN)</span>
-              <div id="camIn" class="text-2xl font-bold text-emerald-400 mt-1">0</div>
+
+          <!-- NÚT MÔ PHỎNG NHANH CHO BUỔI DEMO (100% ĂN CHẮC) -->
+          <div class="mt-3 pt-3 border-t border-slate-700/40">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[11px] text-slate-400 uppercase font-semibold">Điều khiển Demo nhanh:</span>
+              <button onclick="toggleWebSimAuto()" id="btnWebAutoSim" class="text-[11px] bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-0.5 rounded transition">
+                ▶️ Tự động
+              </button>
             </div>
-            <div class="bg-slate-900/60 p-2 rounded-xl">
-              <span class="text-xs text-slate-400">Chim Ra (OUT)</span>
-              <div id="camOut" class="text-2xl font-bold text-amber-400 mt-1">0</div>
-            </div>
-            <div class="bg-slate-900/60 p-2 rounded-xl">
-              <span class="text-xs text-slate-400">Trong Nhà</span>
-              <div id="camTotal" class="text-2xl font-bold text-white mt-1">0</div>
+            <div class="grid grid-cols-3 gap-1.5">
+              <button onclick="simBird('IN')" class="text-xs bg-emerald-700/80 hover:bg-emerald-600 text-white font-medium py-1 px-2 rounded transition shadow">
+                +1 Vào (IN)
+              </button>
+              <button onclick="simBird('OUT')" class="text-xs bg-amber-700/80 hover:bg-amber-600 text-white font-medium py-1 px-2 rounded transition shadow">
+                +1 Ra (OUT)
+              </button>
+              <button onclick="simPredatorAlert()" class="text-xs bg-rose-700/80 hover:bg-rose-600 text-white font-medium py-1 px-2 rounded transition shadow">
+                🚨 Báo động
+              </button>
             </div>
           </div>
         </div>
@@ -493,6 +516,80 @@
       };
       client.publish(TOPIC_COMMAND, JSON.stringify(payload));
       appendLog("COMMAND", `Gửi lệnh chuyển hệ thống về chế độ [AUTO]`);
+    }
+
+    // ==========================================
+    // MÔ PHỎNG CAMERA DEMO TRỰC TIẾP TRÊN WEB
+    // ==========================================
+    let webBirdIn = 0;
+    let webBirdOut = 0;
+    let webSimTimer = null;
+
+    function simBird(dir) {
+      if (dir === 'IN') {
+        webBirdIn++;
+      } else if (dir === 'OUT') {
+        webBirdOut++;
+      }
+      const total = Math.max(0, webBirdIn - webBirdOut);
+
+      document.getElementById('camIn').innerText = webBirdIn;
+      document.getElementById('camOut').innerText = webBirdOut;
+      document.getElementById('camTotal').innerText = total;
+      document.getElementById('camStatus').innerText = "Đang nhận diện...";
+      document.getElementById('camStatus').className = "text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30";
+
+      if (client && client.connected) {
+        const payload = {
+          nodeId: NODE_ID,
+          timestamp: Math.floor(Date.now() / 1000),
+          camera: {
+            status: "ONLINE",
+            birdsIn: webBirdIn,
+            birdsOut: webBirdOut,
+            totalInside: total,
+            complianceStandard: "NĐ 13/2020/NĐ-CP"
+          }
+        };
+        client.publish(`swiftlet/camera/${NODE_ID}`, JSON.stringify(payload));
+        appendLog("CAMERA_SIM", `Mô phỏng chim ${dir === 'IN' ? 'VÀO (+1)' : 'RA (+1)'} -> Tổng trong nhà: ${total} con`);
+      }
+    }
+
+    function toggleWebSimAuto() {
+      const btn = document.getElementById('btnWebAutoSim');
+      if (webSimTimer) {
+        clearInterval(webSimTimer);
+        webSimTimer = null;
+        btn.innerText = "▶️ Tự động";
+        btn.className = "text-[11px] bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-0.5 rounded transition";
+        appendLog("CAMERA_SIM", "Đã dừng chế độ tự động đàn chim.");
+      } else {
+        btn.innerText = "⏸️ Tạm dừng";
+        btn.className = "text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-0.5 rounded transition font-bold";
+        appendLog("CAMERA_SIM", "Bật chế độ tự động mô phỏng chim bay theo chu kỳ sinh học!");
+        webSimTimer = setInterval(() => {
+          const rand = Math.random();
+          if (rand > 0.35) {
+            simBird('IN');
+          } else {
+            simBird('OUT');
+          }
+        }, 3200);
+      }
+    }
+
+    function simPredatorAlert() {
+      if (client && client.connected) {
+        const payload = {
+          nodeId: NODE_ID,
+          alertType: "PREDATOR_INTRUSION",
+          message: "Phát hiện động vật săn mồi tại cửa thu chim (Theo NĐ 13/2020/NĐ-CP)",
+          timestamp: Math.floor(Date.now() / 1000)
+        };
+        client.publish(`swiftlet/alarm/${NODE_ID}`, JSON.stringify(payload));
+        appendLog("ALARM_SIM", "🚨 Đã kích hoạt cảnh báo Thú Săn Mồi!");
+      }
     }
 
     // GHI NHẬT KÝ
