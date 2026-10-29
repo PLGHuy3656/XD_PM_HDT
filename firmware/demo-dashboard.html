@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SwiftletCare - IoT Edge Live Demo Dashboard</title>
+  <!-- Tailwind CSS & MQTT.js & Chart.js -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .pulse-dot { animation: pulse-slow 2s infinite ease-in-out; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6 font-sans">
+
+  <!-- TOP HEADER -->
+  <header class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between pb-6 border-b border-slate-800 gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-xl flex items-center justify-center font-bold text-2xl border border-emerald-500/30">
+        🕊️
+      </div>
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+          SwiftletCare <span class="text-xs bg-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full border border-emerald-500/30">IoT Demo</span>
+        </h1>
+        <p class="text-sm text-slate-400">Hệ thống Giám sát & Điều khiển Vi khí hậu Nhà Yến (ESP32 Edge)</p>
+      </div>
+    </div>
+
+    <!-- CONNECTION STATUS & NODE ID -->
+    <div class="flex items-center gap-4">
+      <div class="bg-slate-800 px-4 py-2 rounded-xl border border-slate-700 flex items-center gap-3 text-sm">
+        <span class="text-slate-400">Node:</span>
+        <span id="nodeIdBadge" class="font-mono text-emerald-400 font-semibold">swc-h01-f01-node01</span>
+      </div>
+      <div class="bg-slate-800 px-4 py-2 rounded-xl border border-slate-700 flex items-center gap-2.5 text-sm">
+        <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+        <span id="statusText" class="font-medium text-slate-300">Đang kết nối Broker...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-7xl mx-auto mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- METRICS CARDS (LEFT & MIDDLE 2 COLS) -->
+    <div class="lg:col-span-2 space-y-6">
+
+      <!-- 4 ENVIRONMENTAL GAUGES -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <!-- TEMP -->
+        <div class="bg-slate-800/80 p-4 rounded-2xl border border-slate-700/60 shadow-lg">
+          <div class="flex justify-between items-center text-slate-400 text-xs font-medium uppercase">
+            <span>Nhiệt độ</span>
+            <span>🌡️</span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-1">
+            <span id="valTemp" class="text-3xl font-extrabold text-white tracking-tight">--</span>
+            <span class="text-sm text-slate-400 font-normal">°C</span>
+          </div>
+          <p id="tempAlert" class="mt-2 text-xs text-emerald-400 font-medium">Trong dải tối ưu (27-31°C)</p>
+        </div>
+
+        <!-- HUMIDITY -->
+        <div class="bg-slate-800/80 p-4 rounded-2xl border border-slate-700/60 shadow-lg">
+          <div class="flex justify-between items-center text-slate-400 text-xs font-medium uppercase">
+            <span>Độ ẩm</span>
+            <span>💧</span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-1">
+            <span id="valHum" class="text-3xl font-extrabold text-white tracking-tight">--</span>
+            <span class="text-sm text-slate-400 font-normal">%</span>
+          </div>
+          <p id="humAlert" class="mt-2 text-xs text-emerald-400 font-medium">Trong dải tối ưu (75-90%)</p>
+        </div>
+
+        <!-- CO2 -->
+        <div class="bg-slate-800/80 p-4 rounded-2xl border border-slate-700/60 shadow-lg">
+          <div class="flex justify-between items-center text-slate-400 text-xs font-medium uppercase">
+            <span>Khí CO2</span>
+            <span>🌱</span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-1">
+            <span id="valCO2" class="text-3xl font-extrabold text-white tracking-tight">--</span>
+            <span class="text-sm text-slate-400 font-normal">ppm</span>
+          </div>
+          <p id="co2Alert" class="mt-2 text-xs text-slate-400 font-medium">An toàn (< 700 ppm)</p>
+        </div>
+
+        <!-- LIGHT -->
+        <div class="bg-slate-800/80 p-4 rounded-2xl border border-slate-700/60 shadow-lg">
+          <div class="flex justify-between items-center text-slate-400 text-xs font-medium uppercase">
+            <span>Ánh sáng</span>
+            <span>☀️</span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-1">
+            <span id="valLux" class="text-3xl font-extrabold text-white tracking-tight">--</span>
+            <span class="text-sm text-slate-400 font-normal">Lux</span>
+          </div>
+          <p id="luxAlert" class="mt-2 text-xs text-slate-400 font-medium">Phòng tối (< 0.2 Lux)</p>
+        </div>
+      </div>
+
+      <!-- CAMERA AI & AUDIO MONITORING (MULTI-MODAL) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- CAMERA ROAMING HOLE -->
+        <div class="bg-slate-800/80 p-4 rounded-2xl border border-indigo-500/30 shadow-lg flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center pb-2 border-b border-slate-700/50">
+              <div class="flex items-center gap-2">
+                <span class="text-xl">📹</span>
+                <h3 class="text-sm font-semibold text-white">Camera AI Cửa Thu Chim (NĐ 13/2020)</h3>
+              </div>
+              <span id="camStatus" class="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30">Sẵn sàng Demo</span>
+            </div>
+            <div class="grid grid-cols-3 gap-2 mt-3 text-center">
+              <div class="bg-slate-900/60 p-2 rounded-xl">
+                <span class="text-xs text-slate-400">Chim Vào (IN)</span>
+                <div id="camIn" class="text-2xl font-bold text-emerald-400 mt-1">0</div>
+              </div>
+              <div class="bg-slate-900/60 p-2 rounded-xl">
+                <span class="text-xs text-slate-400">Chim Ra (OUT)</span>
+                <div id="camOut" class="text-2xl font-bold text-amber-400 mt-1">0</div>
+              </div>
+              <div class="bg-slate-900/60 p-2 rounded-xl">
+                <span class="text-xs text-slate-400">Trong Nhà</span>
+                <div id="camTotal" class="text-2xl font-bold text-white mt-1">0</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- NÚT MÔ PHỎNG NHANH CHO BUỔI DEMO (100% ĂN CHẮC) -->
+          <div class="mt-3 pt-3 border-t border-slate-700/40">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[11px] text-slate-400 uppercase font-semibold">Điều khiển Demo nhanh:</span>
+              <button onclick="toggleWebSimAuto()" id="btnWebAutoSim" class="text-[11px] bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-0.5 rounded transition">
+                ▶️ Tự động
+              </button>
+            </div>
+            <div class="grid grid-cols-3 gap-1.5">
+              <button onclick="simBird('IN')" class="text-xs bg-emerald-700/80 hover:bg-emerald-600 text-white font-medium py-1 px-2 rounded transition shadow">
+                +1 Vào (IN)
+              </button>
+              <button onclick="simBird('OUT')" class="text-xs bg-amber-700/80 hover:bg-amber-600 text-white font-medium py-1 px-2 rounded transition shadow">
+                +1 Ra (OUT)
+              </button>
+              <button onclick="simPredatorAlert()" class="text-xs bg-rose-700/80 hover:bg-rose-600 text-white font-medium py-1 px-2 rounded transition shadow">
+                🚨 Báo động
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- AUDIO & PREDATOR ALERT -->
+        <div class="bg-slate-800/80 p-4 rounded-2xl border border-slate-700/60 shadow-lg flex flex-col justify-between">
+          <div class="flex justify-between items-center pb-2 border-b border-slate-700/50">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">🔊</span>
+              <h3 class="text-sm font-semibold text-white">Loa Ru & Đe Dọa (Audio & Predator)</h3>
+            </div>
+            <span id="audioDecibel" class="text-xs text-slate-400">-- dBA</span>
+          </div>
+          <div class="mt-2 space-y-2 text-sm">
+            <div class="flex justify-between items-center">
+              <span class="text-slate-400">Tình trạng loa ru:</span>
+              <span id="audioBadge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Đang phát bình thường</span>
+            </div>
+            <div id="alertBanner" class="p-2 rounded-xl bg-slate-900/60 text-xs text-slate-400 flex items-center gap-2">
+              <span>🛡️</span> <span>Môi trường an toàn, không có thú săn mồi.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REAL-TIME TIME-SERIES CHART -->
+      <div class="bg-slate-800/80 p-5 rounded-2xl border border-slate-700/60 shadow-lg">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-base font-semibold text-white flex items-center gap-2">
+            📊 Biến thiên Vi khí hậu Thời gian thực
+          </h2>
+          <span class="text-xs text-slate-400">Cập nhật mỗi 5 giây</span>
+        </div>
+        <div class="h-64">
+          <canvas id="telemetryChart"></canvas>
+        </div>
+      </div>
+
+      <!-- ACTUATOR CONTROLS (RELAY SWITCHES) -->
+      <div class="bg-slate-800/80 p-5 rounded-2xl border border-slate-700/60 shadow-lg">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-slate-700/60 gap-3">
+          <div>
+            <h2 class="text-base font-semibold text-white">⚡ Trạng thái & Điều khiển Rơ-le (Actuators)</h2>
+            <p class="text-xs text-slate-400">Bấm nút để gửi lệnh Manual Override tức thời tới ESP32</p>
+          </div>
+          <!-- AUTO / MANUAL BADGE -->
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400">Chế độ:</span>
+            <span id="badgeMode" class="text-xs font-bold px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 uppercase">
+              AUTO
+            </span>
+            <button onclick="restoreAutoMode()" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2.5 py-1 rounded-lg border border-slate-600 transition">
+              🔄 Trả về AUTO
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <!-- RELAY 1: MISTING -->
+          <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/40 text-center">
+            <span class="text-2xl">💨</span>
+            <h3 class="text-sm font-semibold mt-2 text-white">Phun Sương</h3>
+            <span id="statusMisting" class="inline-block my-2 text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400">OFF</span>
+            <div class="flex gap-1 justify-center mt-1">
+              <button onclick="sendRelayCmd('misting', 1)" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-1 px-3 rounded shadow transition">Bật</button>
+              <button onclick="sendRelayCmd('misting', 0)" class="text-xs bg-rose-600 hover:bg-rose-500 text-white font-medium py-1 px-3 rounded shadow transition">Tắt</button>
+            </div>
+          </div>
+
+          <!-- RELAY 2: FAN -->
+          <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/40 text-center">
+            <span class="text-2xl">🌀</span>
+            <h3 class="text-sm font-semibold mt-2 text-white">Quạt Thông Gió</h3>
+            <span id="statusFan" class="inline-block my-2 text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400">OFF</span>
+            <div class="flex gap-1 justify-center mt-1">
+              <button onclick="sendRelayCmd('fan', 1)" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-1 px-3 rounded shadow transition">Bật</button>
+              <button onclick="sendRelayCmd('fan', 0)" class="text-xs bg-rose-600 hover:bg-rose-500 text-white font-medium py-1 px-3 rounded shadow transition">Tắt</button>
+            </div>
+          </div>
+
+          <!-- RELAY 3: HEATER -->
+          <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/40 text-center">
+            <span class="text-2xl">🔥</span>
+            <h3 class="text-sm font-semibold mt-2 text-white">Đèn Sưởi Ấm</h3>
+            <span id="statusHeater" class="inline-block my-2 text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400">OFF</span>
+            <div class="flex gap-1 justify-center mt-1">
+              <button onclick="sendRelayCmd('heater', 1)" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-1 px-3 rounded shadow transition">Bật</button>
+              <button onclick="sendRelayCmd('heater', 0)" class="text-xs bg-rose-600 hover:bg-rose-500 text-white font-medium py-1 px-3 rounded shadow transition">Tắt</button>
+            </div>
+          </div>
+
+          <!-- RELAY 4: ALARM -->
+          <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/40 text-center">
+            <span class="text-2xl">🚨</span>
+            <h3 class="text-sm font-semibold mt-2 text-white">Còi Báo Động</h3>
+            <span id="statusAlarm" class="inline-block my-2 text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400">OFF</span>
+            <div class="flex gap-1 justify-center mt-1">
+              <button onclick="sendRelayCmd('alarm', 1)" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-1 px-3 rounded shadow transition">Bật</button>
+              <button onclick="sendRelayCmd('alarm', 0)" class="text-xs bg-rose-600 hover:bg-rose-500 text-white font-medium py-1 px-3 rounded shadow transition">Tắt</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- LOGS & SYSTEM HEALTH (RIGHT 1 COL) -->
+    <div class="space-y-6">
+
+      <!-- SYSTEM VITALS -->
+      <div class="bg-slate-800/80 p-5 rounded-2xl border border-slate-700/60 shadow-lg">
+        <h2 class="text-base font-semibold text-white mb-3 flex items-center gap-2">
+          💓 Tình trạng Node (Heartbeat)
+        </h2>
+        <div class="space-y-3 text-sm">
+          <div class="flex justify-between py-1.5 border-b border-slate-700/40">
+            <span class="text-slate-400">Loa ru nhà yến:</span>
+            <span id="audioStatus" class="font-semibold text-emerald-400">Đang phát bình thường</span>
+          </div>
+          <div class="flex justify-between py-1.5 border-b border-slate-700/40">
+            <span class="text-slate-400">Bộ nhớ trống (Free Heap):</span>
+            <span id="freeHeap" class="font-mono text-slate-200">-- bytes</span>
+          </div>
+          <div class="flex justify-between py-1.5 border-b border-slate-700/40">
+            <span class="text-slate-400">Sóng Wi-Fi (RSSI):</span>
+            <span id="wifiRssi" class="font-mono text-slate-200">-- dBm</span>
+          </div>
+          <div class="flex justify-between py-1.5">
+            <span class="text-slate-400">Thời gian chạy (Uptime):</span>
+            <span id="uptime" class="font-mono text-slate-200">-- giây</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIVE MQTT CONSOLE LOGS -->
+      <div class="bg-slate-800/80 p-5 rounded-2xl border border-slate-700/60 shadow-lg flex flex-col h-[380px]">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="text-base font-semibold text-white flex items-center gap-2">
+            📜 MQTT Terminal Logs
+          </h2>
+          <button onclick="clearLogs()" class="text-xs text-slate-400 hover:text-white transition">Xóa log</button>
+        </div>
+        <div id="logBox" class="flex-1 bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-xs overflow-y-auto space-y-2 text-slate-300">
+          <div class="text-slate-500">// Đang chờ nhận bản tin Telemetry và ACK...</div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    const NODE_ID = "swc-h01-f01-node01";
+    const BROKER_WS_URL = "wss://broker.emqx.io:8084/mqtt";
+
+    const TOPIC_TELEMETRY = `swiftlet/telemetry/${NODE_ID}`;
+    const TOPIC_HEARTBEAT = `swiftlet/heartbeat/${NODE_ID}`;
+    const TOPIC_COMMAND   = `swiftlet/command/${NODE_ID}`;
+    const TOPIC_ACK       = `swiftlet/ack/${NODE_ID}`;
+    const TOPIC_STATUS    = `swiftlet/status/${NODE_ID}`;
+
+    let client = null;
+
+    // KHỞI TẠO BIỂU ĐỒ CHART.JS
+    const ctx = document.getElementById('telemetryChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Nhiệt độ (°C)',
+            data: [],
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+            tension: 0.3,
+            yAxisID: 'y'
+          },
+          {
+            label: 'Độ ẩm (%)',
+            data: [],
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+            tension: 0.3,
+            yAxisID: 'y1'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+          y: {
+            type: 'linear',
+            position: 'left',
+            min: 20, max: 40,
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#f59e0b' }
+          },
+          y1: {
+            type: 'linear',
+            position: 'right',
+            min: 50, max: 100,
+            grid: { drawOnChartArea: false },
+            ticks: { color: '#38bdf8' }
+          }
+        },
+        plugins: {
+          legend: { labels: { color: '#cbd5e1' } }
+        }
+      }
+    });
+
+    // KẾT NỐI TỚI MQTT BROKER
+    function initMqtt() {
+      appendLog("System", `Đang kết nối tới ${BROKER_WS_URL}...`);
+      client = mqtt.connect(BROKER_WS_URL, {
+        clientId: 'web_dashboard_' + Math.random().toString(16).substring(2, 8),
+        clean: true
+      });
+
+      client.on('connect', () => {
+        document.getElementById('statusDot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 pulse-dot';
+        document.getElementById('statusText').innerText = 'Online (MQTT Connected)';
+        document.getElementById('statusText').className = 'font-medium text-emerald-400';
+        appendLog("MQTT", "Kết nối thành công! Bắt đầu subscribe các topic...");
+
+        client.subscribe(['swiftlet/#', TOPIC_TELEMETRY, TOPIC_HEARTBEAT, TOPIC_ACK, TOPIC_STATUS], (err) => {
+          if (!err) appendLog("MQTT", `Đã Subscribe thành công toàn bộ luồng: swiftlet/#`);
+        });
+      });
+
+      client.on('message', (topic, message) => {
+        const payloadStr = message.toString();
+        try {
+          const data = JSON.parse(payloadStr);
+
+          if (topic.includes('camera')) {
+            if (data.camera) {
+              document.getElementById('camIn').innerText = data.camera.birdsIn;
+              document.getElementById('camOut').innerText = data.camera.birdsOut;
+              document.getElementById('camTotal').innerText = data.camera.totalInside;
+              document.getElementById('camStatus').innerText = "Webcam Live (Active)";
+              document.getElementById('camStatus').className = "text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30";
+              appendLog("CAMERA_AI", `Vào: ${data.camera.birdsIn} | Ra: ${data.camera.birdsOut} | Tổng: ${data.camera.totalInside}`);
+            }
+          } else if (topic.includes('alarm')) {
+            appendLog("ALARM", `🚨 [${data.alertType}] ${data.message}`);
+            const ab = document.getElementById('alertBanner');
+            ab.className = "p-2 rounded-xl bg-rose-500/20 text-xs text-rose-300 border border-rose-500/30 flex items-center gap-2 font-bold animate-pulse";
+            ab.innerHTML = `<span>🚨</span> <span>[BÁO ĐỘNG] ${data.message}</span>`;
+            setTimeout(() => {
+              ab.className = "p-2 rounded-xl bg-slate-900/60 text-xs text-slate-400 flex items-center gap-2";
+              ab.innerHTML = `<span>🛡️</span> <span>Môi trường an toàn, không có thú săn mồi.</span>`;
+            }, 8000);
+          } else if (data.audio) {
+            const h = data.audio.healthy;
+            document.getElementById('audioBadge').innerText = h ? "Đang phát bình thường" : "MẤT TIẾNG / HỎNG LOA";
+            document.getElementById('audioBadge').className = h
+              ? "text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+              : "text-xs font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse";
+            document.getElementById('audioDecibel').innerText = data.audio.decibelLevel + " dBA";
+            appendLog("AUDIO", `Loa ru: ${h ? 'Hoạt động tốt' : 'MẤT TÍN HIỆU'} (${data.audio.decibelLevel} dBA)`);
+          } else if (topic === TOPIC_TELEMETRY || topic.includes('telemetry')) {
+            handleTelemetry(data);
+          } else if (topic === TOPIC_ACK || topic.includes('ack')) {
+            appendLog("ACK", `[Lệnh: ${data.commandId}] ${data.status} - ${data.message || ''}`);
+          } else if (topic === TOPIC_HEARTBEAT || topic.includes('heartbeat')) {
+            document.getElementById('uptime').innerText = data.uptime + "s";
+            document.getElementById('freeHeap').innerText = data.freeHeap + " B";
+            appendLog("HEARTBEAT", `Uptime: ${data.uptime}s | Free Heap: ${data.freeHeap}B`);
+          }
+        } catch (e) {
+          appendLog("WARN", `Nhận tin thô: ${payloadStr}`);
+        }
+      });
+
+      client.on('error', (err) => {
+        appendLog("ERROR", err.message);
+      });
+    }
+
+    // XỬ LÝ DỮ LIỆU TELEMETRY ĐỔ VỀ
+    function handleTelemetry(data) {
+      const m = data.metrics;
+      const r = data.actuators;
+
+      // Cập nhật số đo
+      document.getElementById('valTemp').innerText = parseFloat(m.temp).toFixed(1);
+      document.getElementById('valHum').innerText = parseFloat(m.humidity).toFixed(1);
+      document.getElementById('valCO2').innerText = m.co2 || 480;
+      document.getElementById('valLux').innerText = parseFloat(m.lux).toFixed(2);
+
+      // Cập nhật rơ-le
+      updateRelayBadge('statusMisting', r.misting, 'bg-blue-500/20 text-blue-400 border border-blue-500/30');
+      updateRelayBadge('statusFan', r.fan, 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30');
+      updateRelayBadge('statusHeater', r.heater, 'bg-rose-500/20 text-rose-400 border border-rose-500/30');
+      updateRelayBadge('statusAlarm', r.alarm, 'bg-amber-500/20 text-amber-400 border border-amber-500/30');
+
+      // Chế độ
+      const mode = data.state ? data.state.mode : "AUTO";
+      document.getElementById('badgeMode').innerText = mode;
+      document.getElementById('badgeMode').className = mode === "AUTO" 
+        ? "text-xs font-bold px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 uppercase"
+        : "text-xs font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase";
+
+      if (data.state && data.state.wifiRssi) {
+        document.getElementById('wifiRssi').innerText = data.state.wifiRssi + " dBm";
+      }
+
+      // Cập nhật biểu đồ
+      const nowTime = new Date().toLocaleTimeString();
+      if (chart.data.labels.length > 12) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+        chart.data.datasets[1].data.shift();
+      }
+      chart.data.labels.push(nowTime);
+      chart.data.datasets[0].data.push(m.temp);
+      chart.data.datasets[1].data.push(m.humidity);
+      chart.update();
+
+      appendLog("TELEMETRY", `T: ${m.temp}°C | H: ${m.humidity}% | Mode: ${mode}`);
+    }
+
+    function updateRelayBadge(elemId, isActive, activeClass) {
+      const el = document.getElementById(elemId);
+      if (isActive) {
+        el.innerText = "ON (ĐANG CHẠY)";
+        el.className = "inline-block my-2 text-xs font-bold px-2.5 py-0.5 rounded-full " + activeClass;
+      } else {
+        el.innerText = "OFF (TẮT)";
+        el.className = "inline-block my-2 text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400";
+      }
+    }
+
+    // GỬI LỆNH ĐIỀU KHIỂN RƠ-LE
+    function sendRelayCmd(target, state) {
+      if (!client || !client.connected) {
+        alert("Chưa kết nối MQTT Broker!");
+        return;
+      }
+      const cmdId = "web-" + Math.floor(Math.random() * 10000);
+      const payload = {
+        commandId: cmdId,
+        action: "SET_RELAY",
+        target: target,
+        state: state
+      };
+      client.publish(TOPIC_COMMAND, JSON.stringify(payload));
+      appendLog("COMMAND", `Gửi lệnh [${cmdId}]: Bật/Tắt '${target}' -> ${state === 1 ? 'ON' : 'OFF'}`);
+    }
+
+    // TRẢ VỀ CHẾ ĐỘ AUTO
+    function restoreAutoMode() {
+      if (!client || !client.connected) return;
+      const cmdId = "web-auto-" + Math.floor(Math.random() * 10000);
+      const payload = {
+        commandId: cmdId,
+        action: "UPDATE_THRESHOLDS",
+        targetTemp: 29.0,
+        targetHum: 80.0,
+        isAutoMode: true
+      };
+      client.publish(TOPIC_COMMAND, JSON.stringify(payload));
+      appendLog("COMMAND", `Gửi lệnh chuyển hệ thống về chế độ [AUTO]`);
+    }
+
+    // ==========================================
+    // MÔ PHỎNG CAMERA DEMO TRỰC TIẾP TRÊN WEB
+    // ==========================================
+    let webBirdIn = 0;
+    let webBirdOut = 0;
+    let webSimTimer = null;
+
+    function simBird(dir) {
+      if (dir === 'IN') {
+        webBirdIn++;
+      } else if (dir === 'OUT') {
+        webBirdOut++;
+      }
+      const total = Math.max(0, webBirdIn - webBirdOut);
+
+      document.getElementById('camIn').innerText = webBirdIn;
+      document.getElementById('camOut').innerText = webBirdOut;
+      document.getElementById('camTotal').innerText = total;
+      document.getElementById('camStatus').innerText = "Đang nhận diện...";
+      document.getElementById('camStatus').className = "text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30";
+
+      if (client && client.connected) {
+        const payload = {
+          nodeId: NODE_ID,
+          timestamp: Math.floor(Date.now() / 1000),
+          camera: {
+            status: "ONLINE",
+            birdsIn: webBirdIn,
+            birdsOut: webBirdOut,
+            totalInside: total,
+            complianceStandard: "NĐ 13/2020/NĐ-CP"
+          }
+        };
+        client.publish(`swiftlet/camera/${NODE_ID}`, JSON.stringify(payload));
+        appendLog("CAMERA_SIM", `Mô phỏng chim ${dir === 'IN' ? 'VÀO (+1)' : 'RA (+1)'} -> Tổng trong nhà: ${total} con`);
+      }
+    }
+
+    function toggleWebSimAuto() {
+      const btn = document.getElementById('btnWebAutoSim');
+      if (webSimTimer) {
+        clearInterval(webSimTimer);
+        webSimTimer = null;
+        btn.innerText = "▶️ Tự động";
+        btn.className = "text-[11px] bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-0.5 rounded transition";
+        appendLog("CAMERA_SIM", "Đã dừng chế độ tự động đàn chim.");
+      } else {
+        btn.innerText = "⏸️ Tạm dừng";
+        btn.className = "text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-0.5 rounded transition font-bold";
+        appendLog("CAMERA_SIM", "Bật chế độ tự động mô phỏng chim bay theo chu kỳ sinh học!");
+        webSimTimer = setInterval(() => {
+          const rand = Math.random();
+          if (rand > 0.35) {
+            simBird('IN');
+          } else {
+            simBird('OUT');
+          }
+        }, 3200);
+      }
+    }
+
+    function simPredatorAlert() {
+      if (client && client.connected) {
+        const payload = {
+          nodeId: NODE_ID,
+          alertType: "PREDATOR_INTRUSION",
+          message: "Phát hiện động vật săn mồi tại cửa thu chim (Theo NĐ 13/2020/NĐ-CP)",
+          timestamp: Math.floor(Date.now() / 1000)
+        };
+        client.publish(`swiftlet/alarm/${NODE_ID}`, JSON.stringify(payload));
+        appendLog("ALARM_SIM", "🚨 Đã kích hoạt cảnh báo Thú Săn Mồi!");
+      }
+    }
+
+    // GHI NHẬT KÝ
+    function appendLog(tag, msg) {
+      const box = document.getElementById('logBox');
+      const time = new Date().toLocaleTimeString();
+      const div = document.createElement('div');
+      div.innerHTML = `<span class="text-slate-500">[${time}]</span> <span class="text-emerald-400 font-semibold">[${tag}]</span> ${msg}`;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function clearLogs() {
+      document.getElementById('logBox').innerHTML = '';
+    }
+
+    // Khởi chạy khi mở trang
+    window.onload = initMqtt;
+  </script>
+</body>
+</html>
