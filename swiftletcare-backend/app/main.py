@@ -1,11 +1,11 @@
-
 import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
-from app.realtime import realtime_manager
-from app.telemetry import start_mqtt
+from app.mqtt.client import start_mqtt, stop_mqtt
+from app.realtime.manager import realtime_manager
+from app.routes.technician_routes import router as technician_router
 
 
 @asynccontextmanager
@@ -18,8 +18,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        mqtt_client.disconnect()
-        mqtt_client.loop_stop()
+        stop_mqtt(mqtt_client)
 
 
 app = FastAPI(
@@ -27,6 +26,8 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.include_router(technician_router)
 
 
 @app.get("/health")
@@ -47,7 +48,10 @@ def mqtt_status():
             "message": "MQTT client not initialized",
         }
 
-    connected = client.is_connected()
+    try:
+        connected = client.is_connected()
+    except Exception:
+        connected = False
 
     return {
         "connected": connected,
@@ -65,9 +69,10 @@ async def telemetry_websocket(websocket: WebSocket):
 
     try:
         while True:
-            # Giữ kết nối và nhận các thông điệp từ client nếu có.
             await websocket.receive_text()
+
     except WebSocketDisconnect:
         pass
+
     finally:
         await realtime_manager.disconnect(websocket)
