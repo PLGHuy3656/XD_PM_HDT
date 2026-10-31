@@ -1,17 +1,17 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-from app.control_schemas import (
+from app.schemas.control import (
     RelayCommandRequest,
     ThresholdCommandRequest,
 )
-from app.control_service import (
+from app.services.control_service import (
     prepare_relay_command,
     prepare_threshold_command,
 )
 
 
-@patch("app.control_service.create_command")
+@patch("app.services.control_service.create_command")
 def test_prepare_relay_command(mock_create_command):
     mock_create_command.return_value = {
         "status": "PENDING",
@@ -36,7 +36,7 @@ def test_prepare_relay_command(mock_create_command):
     mock_create_command.assert_called_once()
 
 
-@patch("app.control_service.create_command")
+@patch("app.services.control_service.create_command")
 def test_prepare_threshold_command(mock_create_command):
     mock_create_command.return_value = {
         "status": "PENDING",
@@ -63,10 +63,10 @@ def test_prepare_threshold_command(mock_create_command):
 
 from unittest.mock import MagicMock
 
-from app.control_mqtt import publish_command
+from app.mqtt.control import publish_command
 
 
-@patch("app.control_mqtt.mqtt.Client")
+@patch("app.mqtt.control.mqtt.Client")
 def test_publish_command_when_connected(mock_client_class):
     client = MagicMock()
     client.is_connected.return_value = True
@@ -105,12 +105,12 @@ def test_publish_command_when_disconnected():
     client.publish.assert_not_called()
 
 
-from app.control_service import send_prepared_command
+from app.services.control_service import send_prepared_command
 
 
-@patch("app.control_service.get_active_device_node_id")
-@patch("app.control_service.publish_command")
-@patch("app.control_service.mark_command_sent")
+@patch("app.services.control_service.get_active_device_node_id")
+@patch("app.services.control_service.publish_command")
+@patch("app.services.control_service.mark_command_sent")
 def test_send_prepared_command_success(
     mock_mark_sent,
     mock_publish,
@@ -149,8 +149,8 @@ def test_send_prepared_command_success(
     assert result["nodeId"] == "device01"
 
 
-@patch("app.control_service.get_active_device_node_id")
-@patch("app.control_service.publish_command")
+@patch("app.services.control_service.get_active_device_node_id")
+@patch("app.services.control_service.publish_command")
 def test_send_prepared_command_when_device_inactive(
     mock_publish,
     mock_get_node,
@@ -177,9 +177,9 @@ def test_send_prepared_command_when_device_inactive(
     mock_publish.assert_not_called()
 
 
-@patch("app.control_service.get_active_device_node_id")
-@patch("app.control_service.mark_command_failed")
-@patch("app.control_service.publish_command")
+@patch("app.services.control_service.get_active_device_node_id")
+@patch("app.services.control_service.mark_command_failed")
+@patch("app.services.control_service.publish_command")
 def test_send_prepared_command_when_publish_fails(
     mock_publish,
     mock_mark_failed,

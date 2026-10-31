@@ -4,7 +4,7 @@ from uuid import UUID
 
 from psycopg.types.json import Jsonb
 
-from app.database import get_connection
+from app.database.connection import get_connection
 
 
 def create_command(
@@ -94,6 +94,69 @@ def get_active_device_node_id(device_id: UUID) -> str | None:
             row = cur.fetchone()
 
     return row[0] if row else None
+
+
+def get_active_device_control_state(device_id: UUID):
+    """Return control configuration for an active device, if it exists."""
+    query = """
+        SELECT
+            d.id,
+            d.node_id,
+            c.mode,
+            c.target_temp,
+            c.target_hum,
+            c.temp_deadband,
+            c.hum_deadband,
+            c.co2_threshold,
+            c.updated_at
+        FROM public.devices AS d
+        LEFT JOIN public.environment_control_configs AS c
+            ON c.device_id = d.id
+        WHERE d.id = %s
+          AND d.is_active = TRUE
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (device_id,))
+            return cur.fetchone()
+
+
+def get_active_device_commands(device_id: UUID, limit: int):
+    """Return recent commands for an active device, or None if inactive."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT 1
+                FROM public.devices
+                WHERE id = %s
+                  AND is_active = TRUE
+                """,
+                (device_id,),
+            )
+            if cur.fetchone() is None:
+                return None
+
+            cur.execute(
+                """
+                SELECT
+                    command_id,
+                    action,
+                    status,
+                    payload,
+                    response,
+                    created_at,
+                    sent_at,
+                    acknowledged_at
+                FROM public.environment_control_commands
+                WHERE device_id = %s
+                ORDER BY created_at DESC
+                LIMIT %s
+                """,
+                (device_id, limit),
+            )
+            return cur.fetchall()
 
 
 def record_command_ack(

@@ -4,17 +4,72 @@ from uuid import UUID, uuid4
 
 import paho.mqtt.client as mqtt
 
-from app.control_repository import (
+from app.repositories.control_repository import (
     create_command,
+    get_active_device_commands,
+    get_active_device_control_state,
     get_active_device_node_id,
     mark_command_failed,
     mark_command_sent,
 )
-from app.control_mqtt import publish_command
-from app.control_schemas import (
+from app.mqtt.control import publish_command
+from app.schemas.control import (
     RelayCommandRequest,
     ThresholdCommandRequest,
 )
+
+
+def get_control_state(device_id: UUID) -> dict[str, Any] | None:
+    row = get_active_device_control_state(device_id)
+    if row is None:
+        return None
+
+    return {
+        "deviceId": str(row[0]),
+        "nodeId": row[1],
+        "config": (
+            {
+                "mode": row[2],
+                "targetTemp": row[3],
+                "targetHum": row[4],
+                "tempDeadband": row[5],
+                "humDeadband": row[6],
+                "co2Threshold": row[7],
+                "updatedAt": row[8].isoformat() if row[8] else None,
+            }
+            if row[2] is not None
+            else None
+        ),
+    }
+
+
+def get_control_commands(
+    device_id: UUID,
+    limit: int,
+) -> dict[str, Any] | None:
+    rows = get_active_device_commands(device_id, limit)
+    if rows is None:
+        return None
+
+    return {
+        "deviceId": str(device_id),
+        "items": [
+            {
+                "commandId": row[0],
+                "action": row[1],
+                "status": row[2],
+                "payload": row[3],
+                "response": row[4],
+                "createdAt": row[5].isoformat(),
+                "sentAt": row[6].isoformat() if row[6] else None,
+                "acknowledgedAt": (
+                    row[7].isoformat() if row[7] else None
+                ),
+            }
+            for row in rows
+        ],
+    }
+
 
 def prepare_relay_command(
     device_id: UUID,

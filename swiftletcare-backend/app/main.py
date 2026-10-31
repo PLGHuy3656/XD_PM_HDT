@@ -2,11 +2,11 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI
 
-from app.realtime import realtime_manager
-from app.telemetry import start_mqtt
-from app.control_router import router as control_router
+from app.mqtt.client import start_mqtt
+from app.routes.control_router import router as control_router
+from app.routes.system_router import router as system_router
 
 
 @asynccontextmanager
@@ -29,47 +29,4 @@ app = FastAPI(
 )
 
 app.include_router(control_router)
-
-
-@app.get("/health")
-def health():
-    return {
-        "status": "ok",
-        "service": "swiftletcare-backend",
-    }
-
-
-@app.get("/mqtt/status")
-def mqtt_status():
-    client = getattr(app.state, "mqtt_client", None)
-
-    if client is None:
-        return {
-            "connected": False,
-            "message": "MQTT client not initialized",
-        }
-
-    connected = client.is_connected()
-
-    return {
-        "connected": connected,
-        "message": (
-            "Connected to MQTT broker"
-            if connected
-            else "Not connected to MQTT broker"
-        ),
-    }
-
-
-@app.websocket("/ws/telemetry")
-async def telemetry_websocket(websocket: WebSocket):
-    await realtime_manager.connect(websocket)
-
-    try:
-        while True:
-            # Giữ kết nối và nhận các thông điệp từ client nếu có.
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        pass
-    finally:
-        await realtime_manager.disconnect(websocket)
+app.include_router(system_router)

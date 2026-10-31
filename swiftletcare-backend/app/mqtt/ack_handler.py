@@ -6,11 +6,11 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.control_ack import ControlAck
+from app.schemas.control_ack import ControlAck
 
 from uuid import UUID
 
-from app.control_repository import (
+from app.repositories.control_repository import (
     get_active_device_id_by_node_id,
     record_command_ack,
 )
