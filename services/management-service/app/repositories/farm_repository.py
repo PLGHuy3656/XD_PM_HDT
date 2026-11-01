@@ -2,11 +2,31 @@ from app.database import get_connection
 
 
 class FarmRepository:
-    def list_farms(self):
+    def list_farms(self, user_id: str, is_admin: bool, is_owner: bool, is_technician: bool):
+        access_conditions = []
+        params = []
+
+        if not is_admin:
+            if is_owner:
+                access_conditions.append("f.owner_id::text = %s")
+                params.append(user_id)
+            if is_technician:
+                access_conditions.append(
+                    """
+                    EXISTS (
+                        SELECT 1
+                        FROM technician_assignments ta
+                        WHERE ta.farm_id = f.id
+                          AND ta.technician_id::text = %s
+                          AND ta.is_active = TRUE
+                    )
+                    """
+                )
+                params.append(user_id)
+
         with get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
+                query = """
                     SELECT
                         f.id,
                         f.farm_code,
@@ -21,6 +41,14 @@ class FarmRepository:
                     LEFT JOIN devices d
                         ON d.farm_id = f.id
                        AND d.is_active = TRUE
+                """
+                if not is_admin:
+                    if access_conditions:
+                        query += " WHERE (" + " OR ".join(access_conditions) + ")"
+                    else:
+                        query += " WHERE FALSE"
+
+                query += """
                     GROUP BY
                         f.id,
                         f.farm_code,
@@ -28,8 +56,8 @@ class FarmRepository:
                         f.address,
                         f.status
                     ORDER BY f.name
-                    """
-                )
+                """
+                cur.execute(query, tuple(params))
                 rows = cur.fetchall()
 
         return [
@@ -69,14 +97,24 @@ class FarmRepository:
                     LEFT JOIN devices d
                         ON d.farm_id = f.id
                        AND d.is_active = TRUE
-                    LEFT JOIN technician_assignments ta
-                        ON ta.farm_id = f.id
-                       AND ta.is_active = TRUE
-                    LEFT JOIN technicians t
-                        ON t.id = ta.technician_id
+                    LEFT JOIN LATERAL (
+                        SELECT
+                            tech.id,
+                             tech.full_name
+                        FROM technician_assignments ta
+                        JOIN technicians tech
+                            ON tech.id = ta.technician_id
+                        WHERE ta.farm_id = f.id
+                            AND ta.is_active = TRUE
+                        ORDER BY
+                            ta.is_primary DESC,
+                            ta.assigned_at DESC,
+                            ta.technician_id ASC
+                        LIMIT 1
+                    ) AS t ON TRUE
                     LEFT JOIN users u
                         ON u.id = f.owner_id
-                    WHERE f.id = %s OR f.farm_code = %s
+                    WHERE f.id::text = %s OR f.farm_code = %s
                     GROUP BY
                         f.id,
                         f.farm_code,

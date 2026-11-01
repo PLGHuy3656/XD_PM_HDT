@@ -50,8 +50,7 @@ class FakeUserRepository:
 @pytest.fixture(autouse=True)
 def setup_jwt_secret():
     old_secret = settings.jwt_secret
-    if not settings.jwt_secret:
-        settings.jwt_secret = "test_jwt_secret_key_for_unit_tests_32_bytes_long"
+    settings.jwt_secret = "test_jwt_secret_key_for_unit_tests_32_bytes_long"
     yield
     settings.jwt_secret = old_secret
 

@@ -3,7 +3,16 @@ from app.services.farm_service import FarmService
 
 
 class FakeFarmRepository:
-    def list_farms(self):
+    def __init__(self):
+        self.list_farms_arguments = None
+
+    def list_farms(self, user_id, is_admin, is_owner, is_technician):
+        self.list_farms_arguments = {
+            "user_id": user_id,
+            "is_admin": is_admin,
+            "is_owner": is_owner,
+            "is_technician": is_technician,
+        }
         return [
             {
                 "farm_id": "farm-001",
@@ -41,9 +50,17 @@ def service():
 
 
 def test_list_farms(service):
-    farms = service.list_farms()
+    farms = service.list_farms(
+        {"id": "tech-001", "roles": ["TECHNICIAN"]},
+    )
     assert len(farms) == 1
     assert farms[0]["farm_code"] == "NM-BA-01"
+    assert service.repository.list_farms_arguments == {
+        "user_id": "tech-001",
+        "is_admin": False,
+        "is_owner": False,
+        "is_technician": True,
+    }
 
 
 def test_get_farm_detail(service):

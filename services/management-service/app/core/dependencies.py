@@ -142,10 +142,23 @@ def require_device_access(device_id: str = Path(...), current_user: dict = Depen
     return device_id
 
 
-def check_technician_permission(technician_id: str, farm_id: str, required_permission: str = "MONITOR") -> bool:
-    """
-    Helper for future control_permission (MONITOR vs OPERATE).
-    control_permission is not currently present in the schema (SCHEMA GAP).
-    Defaults to checking if technician has active assignment.
-    """
-    return user_repository.is_farm_assigned_to_technician(technician_id, farm_id)
+def check_technician_permission(
+    technician_id: str,
+    farm_id: str,
+    required_permission: str = "MONITOR",
+) -> bool:
+    if required_permission not in {"MONITOR", "OPERATE"}:
+        raise ValueError("Unsupported technician permission")
+
+    granted_permission = user_repository.get_technician_farm_permission(
+        technician_id,
+        farm_id,
+    )
+
+    if granted_permission is None:
+        return False
+
+    if required_permission == "MONITOR":
+        return granted_permission in {"MONITOR", "OPERATE"}
+
+    return granted_permission == "OPERATE"

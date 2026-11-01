@@ -89,13 +89,26 @@ class TechnicianService:
             technician_id,
         )
 
-    def assign_technician(self, technician_id: str, farm_id: str, is_primary: bool = True):
+    def assign_technician(
+        self,
+        technician_id: str,
+        farm_id: str,
+        is_primary: bool = True,
+        control_permission: str = "MONITOR",
+    ):
         if not technician_id:
             raise ValueError("technician_id is required")
         if not farm_id:
             raise ValueError("farm_id is required")
+        if control_permission not in {"MONITOR", "OPERATE"}:
+            raise ValueError("Unsupported control permission")
 
-        return self.repository.assign_technician(technician_id, farm_id, is_primary)
+        return self.repository.assign_technician(
+            technician_id,
+            farm_id,
+            is_primary,
+            control_permission,
+        )
 
 
 technician_service = TechnicianService()

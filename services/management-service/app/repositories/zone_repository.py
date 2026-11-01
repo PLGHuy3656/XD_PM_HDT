@@ -61,7 +61,7 @@ class ZoneRepository:
                     LEFT JOIN devices d
                         ON d.zone_id = z.id
                        AND d.is_active = TRUE
-                    WHERE z.id = %s OR z.zone_code = %s
+                    WHERE z.id::text = %s OR z.zone_code = %s
                     GROUP BY
                         z.id,
                         z.farm_id,

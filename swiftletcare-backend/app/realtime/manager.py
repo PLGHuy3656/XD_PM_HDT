@@ -9,14 +9,16 @@ logger = logging.getLogger("realtime")
 
 class RealtimeManager:
     def __init__(self):
-        self.active_connections: set[WebSocket] = set()
+        self.active_connections: dict[WebSocket, frozenset[str]] = {}
         self.lock = asyncio.Lock()
 
-    async def connect(self, websocket: WebSocket) -> None:
-        await websocket.accept()
-
+    async def register(
+        self,
+        websocket: WebSocket,
+        allowed_node_ids: set[str],
+    ) -> None:
         async with self.lock:
-            self.active_connections.add(websocket)
+            self.active_connections[websocket] = frozenset(allowed_node_ids)
 
         logger.info(
             "WebSocket client connected. Total clients: %s",
@@ -25,7 +27,7 @@ class RealtimeManager:
 
     async def disconnect(self, websocket: WebSocket) -> None:
         async with self.lock:
-            self.active_connections.discard(websocket)
+            self.active_connections.pop(websocket, None)
 
         logger.info(
             "WebSocket client disconnected. Total clients: %s",
@@ -34,7 +36,11 @@ class RealtimeManager:
 
     async def broadcast(self, data: dict) -> None:
         async with self.lock:
-            connections = list(self.active_connections)
+            connections = [
+                websocket
+                for websocket, allowed_node_ids in self.active_connections.items()
+                if data.get("nodeId") in allowed_node_ids
+            ]
 
         if not connections:
             return

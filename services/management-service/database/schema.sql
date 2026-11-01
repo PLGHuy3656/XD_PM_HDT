@@ -99,6 +99,8 @@ CREATE TABLE IF NOT EXISTS technician_assignments (
     technician_id UUID NOT NULL REFERENCES technicians(id) ON DELETE CASCADE,
     farm_id UUID NOT NULL REFERENCES farms(id) ON DELETE CASCADE,
     is_primary BOOLEAN NOT NULL DEFAULT TRUE,
+    control_permission VARCHAR(20) NOT NULL DEFAULT 'MONITOR'
+        CHECK (control_permission IN ('MONITOR', 'OPERATE')),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     assigned_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(technician_id, farm_id)
@@ -111,3 +113,19 @@ CREATE INDEX IF NOT EXISTS idx_devices_farm_id ON devices(farm_id);
 CREATE INDEX IF NOT EXISTS idx_devices_zone_id ON devices(zone_id);
 CREATE INDEX IF NOT EXISTS idx_technician_assignments_tech ON technician_assignments(technician_id);
 CREATE INDEX IF NOT EXISTS idx_technician_assignments_farm ON technician_assignments(farm_id);
+
+CREATE TABLE IF NOT EXISTS event_outbox (
+    event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_type VARCHAR(150) NOT NULL,
+    payload JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    published_at TIMESTAMPTZ,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    locked_until TIMESTAMPTZ,
+    last_error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_outbox_pending
+    ON event_outbox (next_attempt_at, created_at)
+    WHERE published_at IS NULL;

@@ -1,0 +1,7 @@
+fastapi[standard]
+psycopg[binary]
+pydantic-settings
+python-dotenv
+httpx
+aio-pika
+pywebpush

@@ -1,3 +1,8 @@
+from datetime import datetime, timezone
+from uuid import uuid4
+
+from psycopg.types.json import Jsonb
+
 from app.adapters.legacy_iot_adapter import legacy_iot_adapter
 from app.database import get_connection
 
@@ -326,25 +331,93 @@ class TechnicianRepository:
             "offline_device_count": offline_count,
         }
 
-    def assign_technician(self, technician_id: str, farm_id: str, is_primary: bool = True):
+    def assign_technician(
+        self,
+        technician_id: str,
+        farm_id: str,
+        is_primary: bool = True,
+        control_permission: str = "MONITOR",
+    ):
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
                     INSERT INTO technician_assignments (
-                        technician_id, farm_id, is_primary, is_active
+                        technician_id,
+                        farm_id,
+                        is_primary,
+                        control_permission,
+                        is_active
                     )
-                    VALUES (%s, %s, %s, TRUE)
+                    VALUES (%s, %s, %s, %s, TRUE)
                     ON CONFLICT (technician_id, farm_id)
                     DO UPDATE SET
                         is_primary = EXCLUDED.is_primary,
+                        control_permission = EXCLUDED.control_permission,
                         is_active = TRUE,
                         assigned_at = NOW()
                     RETURNING id;
                     """,
-                    (technician_id, farm_id, is_primary),
+                    (
+                        technician_id,
+                        farm_id,
+                        is_primary,
+                        control_permission
+                    ),
                 )
                 assigned_id = cur.fetchone()[0]
+
+                cur.execute(
+                    """
+                    SELECT
+                        f.farm_code,
+                        f.name,
+                        f.owner_id,
+                        t.full_name
+                    FROM farms f
+                    JOIN technicians t ON t.id = %s
+                    WHERE f.id = %s
+                    """,
+                    (technician_id, farm_id),
+                )
+                farm = cur.fetchone()
+                if farm is None:
+                    raise ValueError("Farm or technician not found")
+
+                recipient_user_ids = list(
+                    dict.fromkeys(
+                        str(user_id)
+                        for user_id in (technician_id, farm[2])
+                        if user_id is not None
+                    )
+                )
+                event_id = str(uuid4())
+                payload = {
+                    "event_id": event_id,
+                    "event_type": "management.technician_assigned",
+                    "occurred_at": datetime.now(timezone.utc).isoformat(),
+                    "recipient_user_ids": recipient_user_ids,
+                    "data": {
+                        "assignment_id": str(assigned_id),
+                        "technician_id": technician_id,
+                        "technician_name": farm[3],
+                        "farm_id": farm_id,
+                        "farm_code": farm[0],
+                        "farm_name": farm[1],
+                        "control_permission": control_permission,
+                    },
+                }
+                cur.execute(
+                    """
+                    INSERT INTO event_outbox (event_id, event_type, payload)
+                    VALUES (%s, %s, %s)
+                    """,
+                    (
+                        event_id,
+                        "management.technician_assigned",
+                        Jsonb(payload),
+                    ),
+                )
                 conn.commit()
 
         return str(assigned_id)

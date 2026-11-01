@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     legacy_iot_database_url: str = ""
     service_host: str = "127.0.0.1"
     service_port: int = 8001
+    rabbitmq_url: str = ""
+    event_exchange: str = "swiftletcare.events"
 
     # Authentication & JWT Settings
     jwt_secret: str = ""

@@ -19,8 +19,7 @@ from app.core.security import create_access_token
 @pytest.fixture(autouse=True)
 def setup_jwt_secret():
     old_secret = settings.jwt_secret
-    if not settings.jwt_secret:
-        settings.jwt_secret = "test_jwt_secret_key_for_unit_tests_32_bytes_long"
+    settings.jwt_secret = "test_jwt_secret_key_for_unit_tests_32_bytes_long"
     yield
     settings.jwt_secret = old_secret
 
@@ -262,9 +261,14 @@ def test_check_technician_permission(monkeypatch):
     from app.repositories.user_repository import user_repository
     monkeypatch.setattr(
         user_repository,
-        "is_farm_assigned_to_technician",
-        lambda tid, fid: fid == "farm-01",
+        "get_technician_farm_permission",
+        lambda technician_id, farm_id: {
+            "farm-01": "MONITOR",
+            "farm-02": "OPERATE",
+        }.get(farm_id),
     )
 
     assert check_technician_permission("tech-01", "farm-01", "MONITOR") is True
-    assert check_technician_permission("tech-01", "farm-02", "OPERATE") is False
+    assert check_technician_permission("tech-01", "farm-01", "OPERATE") is False
+    assert check_technician_permission("tech-01", "farm-02", "OPERATE") is True
+    assert check_technician_permission("tech-01", "farm-03", "OPERATE") is False

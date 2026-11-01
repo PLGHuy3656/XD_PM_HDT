@@ -6,12 +6,18 @@ from app.config.settings import settings
 from app.mqtt.telemetry import on_connect, on_message
 
 
-def start_mqtt(event_loop: asyncio.AbstractEventLoop) -> mqtt.Client:
+def start_mqtt(
+    event_loop: asyncio.AbstractEventLoop,
+    event_publisher=None,
+) -> mqtt.Client:
     client = mqtt.Client(
         mqtt.CallbackAPIVersion.VERSION2,
         client_id=settings.mqtt_client_id,
         protocol=mqtt.MQTTv311,
-        userdata={"event_loop": event_loop},
+        userdata={
+            "event_loop": event_loop,
+            "event_publisher": event_publisher,
+        },
     )
 
     if settings.mqtt_username:

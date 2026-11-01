@@ -19,6 +19,11 @@ from app.schemas.control import (
 )
 
 
+def get_control_device_node_id(device_id: UUID) -> str | None:
+    """Return the active device's MQTT node ID for authorization checks."""
+    return get_active_device_node_id(device_id)
+
+
 def get_control_state(device_id: UUID) -> dict[str, Any] | None:
     row = get_active_device_control_state(device_id)
     if row is None:

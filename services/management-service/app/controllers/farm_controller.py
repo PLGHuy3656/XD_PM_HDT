@@ -6,9 +6,9 @@ class FarmController:
     def __init__(self, service: FarmService | None = None):
         self.service = service or farm_service
 
-    def list_farms(self):
+    def list_farms(self, current_user: dict):
         try:
-            return self.service.list_farms()
+            return self.service.list_farms(current_user)
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

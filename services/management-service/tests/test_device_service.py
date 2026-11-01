@@ -3,7 +3,7 @@ from app.services.device_service import DeviceService
 
 
 class FakeDeviceRepository:
-    def list_devices(self, farm_id=None, zone_id=None):
+    def list_devices(self, farm_id=None, zone_id=None, farm_ids=None):
         devices = [
             {
                 "device_id": "dev-001",
@@ -23,6 +23,8 @@ class FakeDeviceRepository:
             devices = [d for d in devices if d["farm_id"] == farm_id]
         if zone_id:
             devices = [d for d in devices if d["zone_id"] == zone_id]
+        if farm_ids is not None:
+            devices = [d for d in devices if d["farm_id"] in farm_ids]
         return devices
 
     def get_device_by_id(self, device_id: str):
@@ -52,6 +54,11 @@ def test_list_devices(service):
     devices = service.list_devices()
     assert len(devices) == 1
     assert devices[0]["node_id"] == "ESP32-001"
+
+
+def test_list_devices_applies_accessible_farm_scope(service):
+    devices = service.list_devices(farm_ids=[])
+    assert devices == []
 
 
 def test_get_device(service):

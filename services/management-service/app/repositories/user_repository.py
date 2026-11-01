@@ -95,6 +95,28 @@ class UserRepository:
                 conn.commit()
         return updated
 
+    def get_technician_farm_permission(
+        self,
+        technician_id: str,
+        farm_id: str
+    ) -> str | None:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT ta.control_permission
+                    FROM technician_assignments ta
+                    JOIN farms f ON f.id = ta.farm_id
+                    WHERE ta.technician_id::text = %s
+                    AND (ta.farm_id::text = %s OR f.farm_code = %s)
+                    AND ta.is_active = TRUE
+                 """,
+                    (technician_id, farm_id, farm_id),
+                )
+                row = cur.fetchone()
+
+        return row[0] if row else None
+
     def is_farm_assigned_to_technician(self, technician_id: str, farm_id: str) -> bool:
         """
         Verifies if a farm is actively assigned to the technician.

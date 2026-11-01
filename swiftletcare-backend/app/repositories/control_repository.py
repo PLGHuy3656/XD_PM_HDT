@@ -78,6 +78,52 @@ def get_active_device_id_by_node_id(node_id: str) -> UUID | None:
     return row[0] if row else None
 
 
+def get_device_notification_context(device_id: UUID) -> dict[str, Any] | None:
+    """Resolve farm and user recipients for a device notification."""
+    query = """
+        SELECT
+            d.node_id,
+            f.id,
+            f.farm_code,
+            f.name,
+            z.name,
+            ARRAY(
+                SELECT recipients.user_id
+                FROM (
+                    SELECT f.owner_id AS user_id
+                    UNION
+                    SELECT ta.technician_id AS user_id
+                    FROM public.technician_assignments AS ta
+                    WHERE ta.farm_id = f.id
+                      AND ta.is_active = TRUE
+                ) AS recipients
+                WHERE recipients.user_id IS NOT NULL
+            )
+        FROM public.devices AS d
+        JOIN public.farms AS f ON f.id = d.farm_id
+        LEFT JOIN public.zones AS z ON z.id = d.zone_id
+        WHERE d.id = %s
+          AND d.is_active = TRUE
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (device_id,))
+            row = cur.fetchone()
+
+    if row is None:
+        return None
+
+    return {
+        "node_id": row[0],
+        "farm_id": str(row[1]),
+        "farm_code": row[2],
+        "farm_name": row[3],
+        "zone_name": row[4],
+        "recipient_user_ids": [str(user_id) for user_id in row[5]],
+    }
+
+
 def get_active_device_node_id(device_id: UUID) -> str | None:
     """Return the MQTT node ID of an active device."""
     query = """

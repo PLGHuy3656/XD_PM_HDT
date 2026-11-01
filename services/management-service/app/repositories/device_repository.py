@@ -3,7 +3,15 @@ from app.database import get_connection
 
 
 class DeviceRepository:
-    def list_devices(self, farm_id: str | None = None, zone_id: str | None = None):
+    def list_devices(
+        self,
+        farm_id: str | None = None,
+        zone_id: str | None = None,
+        farm_ids: list[str] | None = None,
+    ):
+        if farm_ids is not None and not farm_ids:
+            return []
+
         with get_connection() as conn:
             with conn.cursor() as cur:
                 query = """
@@ -27,12 +35,36 @@ class DeviceRepository:
                 params = []
 
                 if farm_id:
-                    query += " AND d.farm_id = %s"
-                    params.append(farm_id)
+                    query += """
+                        AND EXISTS (
+                            SELECT 1
+                            FROM farms farm_filter
+                            WHERE farm_filter.id = d.farm_id
+                              AND (
+                                  farm_filter.id::text = %s
+                                  OR farm_filter.farm_code = %s
+                              )
+                        )
+                    """
+                    params.extend((farm_id, farm_id))
 
                 if zone_id:
-                    query += " AND d.zone_id = %s"
-                    params.append(zone_id)
+                    query += """
+                        AND EXISTS (
+                            SELECT 1
+                            FROM zones zone_filter
+                            WHERE zone_filter.id = d.zone_id
+                              AND (
+                                  zone_filter.id::text = %s
+                                  OR zone_filter.zone_code = %s
+                              )
+                        )
+                    """
+                    params.extend((zone_id, zone_id))
+
+                if farm_ids is not None:
+                    query += " AND d.farm_id::text = ANY(%s)"
+                    params.append(farm_ids)
 
                 query += " ORDER BY d.node_id"
                 cur.execute(query, tuple(params))
@@ -85,7 +117,7 @@ class DeviceRepository:
                     FROM devices d
                     LEFT JOIN zones z
                         ON z.id = d.zone_id
-                    WHERE d.id = %s OR d.node_id = %s
+                    WHERE d.id::text = %s OR d.node_id = %s
                     """,
                     (device_id, device_id),
                 )
@@ -116,6 +148,40 @@ class DeviceRepository:
             "status": "ONLINE" if dev_uuid in runtime_states else "OFFLINE",
             "created_at": row[10].isoformat() if row[10] else None,
         }
+
+    def update_device_zone(
+        self,
+        device_id: str,
+        farm_id: str,
+        zone_id: str,
+    ):
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE devices AS d
+                    SET zone_id = z.id,
+                        updated_at = NOW()
+                    FROM zones AS z
+                    WHERE (d.id::text = %s OR d.node_id = %s)
+                      AND d.farm_id::text = %s
+                      AND z.farm_id = d.farm_id
+                      AND (z.id::text = %s OR z.zone_code = %s)
+                      AND d.is_active = TRUE
+                    RETURNING d.id
+                    """,
+                    (
+                        device_id,
+                        device_id,
+                        farm_id,
+                        zone_id,
+                        zone_id,
+                    ),
+                )
+                updated = cur.fetchone() is not None
+                if updated:
+                    conn.commit()
+                return updated
 
 
 device_repository = DeviceRepository()

@@ -16,7 +16,7 @@ router = APIRouter(
     summary="List farms accessible to current user",
 )
 def list_farms(current_user: dict = Depends(get_current_user)):
-    return farm_controller.list_farms()
+    return farm_controller.list_farms(current_user)
 
 
 @router.get(

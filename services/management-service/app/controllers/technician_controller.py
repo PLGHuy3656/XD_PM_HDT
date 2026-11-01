@@ -136,14 +136,26 @@ class TechnicianController:
                 detail=str(exc),
             ) from exc
 
-    def assign_technician(self, technician_id: str, farm_id: str, is_primary: bool = True):
+    def assign_technician(
+        self,
+        technician_id: str,
+        farm_id: str,
+        is_primary: bool = True,
+        control_permission: str = "MONITOR",
+    ):
         try:
-            assigned_id = self.service.assign_technician(technician_id, farm_id, is_primary)
+            assigned_id = self.service.assign_technician(
+                technician_id,
+                farm_id,
+                is_primary,
+                control_permission,
+            )
             return {
                 "assignment_id": assigned_id,
                 "technician_id": technician_id,
                 "farm_id": farm_id,
                 "is_primary": is_primary,
+                "control_permission": control_permission,
                 "status": "ASSIGNED",
             }
         except ValueError as exc:

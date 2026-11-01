@@ -3,8 +3,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.controllers.technician_controller import technician_controller
-from app.core.dependencies import get_current_user, require_admin, require_roles
+from app.core.dependencies import get_current_user, require_admin
 from app.repositories.user_repository import user_repository
+from typing import Literal
 from app.schemas.technician import (
     AssignedFarmResponse,
     TechnicianDashboardResponse,
@@ -45,7 +46,7 @@ def _verify_technician_farm_assignment(technician_id: str, farm_id: str):
     summary="List all technicians (Admin/Technician)",
 )
 def list_technicians(
-    current_user: dict = Depends(require_roles("ADMIN", "TECHNICIAN")),
+    current_user: dict = Depends(require_admin),
 ):
     return technician_controller.list_technicians()
 
@@ -162,10 +163,12 @@ def assign_technician(
     technician_id: UUID,
     farm_id: UUID,
     is_primary: bool = True,
+    control_permission: Literal["MONITOR", "OPERATE"] = "MONITOR",
     current_user: dict = Depends(require_admin),
 ):
     return technician_controller.assign_technician(
         str(technician_id),
         str(farm_id),
         is_primary,
+        control_permission,
     )

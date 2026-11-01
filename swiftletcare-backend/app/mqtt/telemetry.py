@@ -41,7 +41,12 @@ def on_message(client, userdata, message):
         from app.mqtt.ack_handler import process_ack_message
 
         try:
-            process_ack_message(message.topic, message.payload)
+            process_ack_message(
+                message.topic,
+                message.payload,
+                event_publisher=userdata.get("event_publisher"),
+                event_loop=userdata.get("event_loop"),
+            )
         except Exception:
             logger.exception(
                 "Failed to process ACK from %s",

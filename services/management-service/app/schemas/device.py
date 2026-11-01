@@ -24,3 +24,7 @@ class DeviceCreateRequest(BaseModel):
     device_type: str = "CONTROLLER"
     firmware_version: str | None = None
     ip_address: str | None = None
+
+
+class DeviceZoneUpdateRequest(BaseModel):
+    zone_id: str

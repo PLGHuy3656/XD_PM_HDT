@@ -1,6 +1,9 @@
 
 import json
 import logging
+import asyncio
+from datetime import datetime, timezone
+from uuid import uuid4
 
 from typing import Any
 
@@ -11,6 +14,7 @@ from app.schemas.control_ack import ControlAck
 from uuid import UUID
 
 from app.repositories.control_repository import (
+    get_device_notification_context,
     get_active_device_id_by_node_id,
     record_command_ack,
 )
@@ -53,7 +57,12 @@ def parse_ack_message(
 
     return node_id, ack
 
-def process_ack_message(topic: str, payload: bytes) -> bool:
+def process_ack_message(
+    topic: str,
+    payload: bytes,
+    event_publisher=None,
+    event_loop: asyncio.AbstractEventLoop | None = None,
+) -> bool:
     """Validate an MQTT ACK and record it for the matching active device."""
     try:
         node_id, ack = parse_ack_message(topic, payload)
@@ -85,6 +94,39 @@ def process_ack_message(topic: str, payload: bytes) -> bool:
         )
         return False
 
+    if event_publisher and event_loop and event_loop.is_running():
+        try:
+            context = get_device_notification_context(UUID(str(device_id)))
+            if context and context["recipient_user_ids"]:
+                event_id = str(uuid4())
+                event = {
+                    "event_id": event_id,
+                    "event_type": "device.command.acknowledged",
+                    "occurred_at": datetime.now(timezone.utc).isoformat(),
+                    "recipient_user_ids": context["recipient_user_ids"],
+                    "data": {
+                        "command_id": ack.commandId,
+                        "node_id": context["node_id"],
+                        "status": ack.status,
+                        "farm_id": context["farm_id"],
+                        "farm_code": context["farm_code"],
+                        "farm_name": context["farm_name"],
+                        "zone_name": context["zone_name"],
+                    },
+                }
+                future = asyncio.run_coroutine_threadsafe(
+                    event_publisher.publish(
+                        "device.command.acknowledged",
+                        event,
+                    ),
+                    event_loop,
+                )
+                future.add_done_callback(_log_event_publish_result)
+        except Exception:
+            logger.exception(
+                "ACK was saved but its notification event could not be prepared"
+            )
+
     logger.info(
         "Recorded ACK: command_id=%s node_id=%s status=%s",
         ack.commandId,
@@ -92,3 +134,10 @@ def process_ack_message(topic: str, payload: bytes) -> bool:
         ack.status,
     )
     return True
+
+
+def _log_event_publish_result(future) -> None:
+    try:
+        future.result()
+    except Exception:
+        logger.exception("Failed to publish command ACK notification event")

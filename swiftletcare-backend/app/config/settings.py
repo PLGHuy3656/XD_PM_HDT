@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     mqtt_username: str | None = None
     mqtt_password: str | None = None
     mqtt_client_id: str = "swiftletcare-telemetry-backend"
+    management_service_url: str = "http://127.0.0.1:8001"
+    rabbitmq_url: str = ""
+    event_exchange: str = "swiftletcare.events"
 
 
 settings = Settings()
