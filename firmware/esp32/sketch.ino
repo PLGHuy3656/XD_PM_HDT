@@ -34,15 +34,15 @@ const char* WIFI_PASSWORD   = "";
 const char* MQTT_BROKER     = "broker.emqx.io";
 const int   MQTT_PORT       = 1883;
 
-// Định danh thiết bị chuẩn: swc-{houseId}-{floorZone}-{nodeId}
-const char* DEVICE_ID       = "swc-h01-f01-node01";
+// Định danh thiết bị chuẩn: SWC-NODE-001 (Canonical MQTT Contract V1)
+const char* DEVICE_ID       = "SWC-NODE-001";
 
 // Cây Topic MQTT
-const char* TOPIC_TELEMETRY = "swiftlet/telemetry/swc-h01-f01-node01";
-const char* TOPIC_HEARTBEAT = "swiftlet/heartbeat/swc-h01-f01-node01";
-const char* TOPIC_COMMAND   = "swiftlet/command/swc-h01-f01-node01";
-const char* TOPIC_ACK       = "swiftlet/ack/swc-h01-f01-node01";
-const char* TOPIC_STATUS    = "swiftlet/status/swc-h01-f01-node01";
+const char* TOPIC_TELEMETRY = "swiftlet/telemetry/SWC-NODE-001";
+const char* TOPIC_HEARTBEAT = "swiftlet/heartbeat/SWC-NODE-001";
+const char* TOPIC_COMMAND   = "swiftlet/command/SWC-NODE-001";
+const char* TOPIC_ACK       = "swiftlet/ack/SWC-NODE-001";
+const char* TOPIC_STATUS    = "swiftlet/status/SWC-NODE-001";
 
 // --- 3. CẤU TRÚC DỮ LIỆU CẢM BIẾN ---
 struct SensorData {
@@ -226,11 +226,10 @@ void Task_ControlLoop(void *pvParameters) {
 void sendAck(const char* cmdId, const char* status, const char* message) {
   StaticJsonDocument<256> ack;
   ack["commandId"] = cmdId;
-  ack["nodeId"] = DEVICE_ID;
+  ack["deviceId"] = DEVICE_ID;
   ack["status"] = status;
   ack["mode"] = sysConfig.isAutoMode ? "AUTO" : "MANUAL";
   if (message != NULL) ack["message"] = message;
-  ack["timestamp"] = millis() / 1000;
 
   char buf[256];
   serializeJson(ack, buf);
@@ -256,6 +255,10 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     else if (strcmp(target, "fan") == 0) digitalWrite(PIN_FAN, pinState);
     else if (strcmp(target, "heater") == 0) digitalWrite(PIN_HEATER, pinState);
     else if (strcmp(target, "alarm") == 0) digitalWrite(PIN_ALARM, pinState);
+    else {
+      sendAck(cmdId, "FAILED", "Unsupported relay target");
+      return;
+    }
 
     sysConfig.isAutoMode = false; // Chuyển sang MANUAL override
     sendAck(cmdId, "SUCCESS", "Actuator switched; mode changed to MANUAL");
@@ -280,6 +283,7 @@ void Task_NetworkManager(void *pvParameters) {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+  mqttClient.setBufferSize(512);
   mqttClient.setCallback(mqttCallback);
 
   SensorData sData;
@@ -312,15 +316,15 @@ void Task_NetworkManager(void *pvParameters) {
       lastTelemetryTick = now;
       if (xQueuePeek(sensorQueue, &sData, 0) == pdTRUE) {
         StaticJsonDocument<512> doc;
-        doc["nodeId"] = DEVICE_ID;
-        doc["timestamp"] = millis() / 1000;
+        doc["deviceId"] = DEVICE_ID;
 
         JsonObject metrics = doc.createNestedObject("metrics");
-        metrics["temp"] = serialized(String(sData.temperature, 2));
+        metrics["temperature"] = serialized(String(sData.temperature, 2));
         metrics["humidity"] = serialized(String(sData.humidity, 2));
-        metrics["co2"] = round(sData.co2_ppm);
         metrics["lux"] = serialized(String(sData.light_lux, 2));
-        metrics["soundOk"] = sData.soundHealthy;
+        metrics["co2"] = round(sData.co2_ppm);
+        metrics["audioRms"] = serialized(String((float)sData.soundRaw / 4095.0, 2));
+        metrics["audioHealthy"] = sData.soundHealthy;
 
         JsonObject relays = doc.createNestedObject("actuators");
         relays["misting"] = (digitalRead(PIN_MISTING) == RELAY_ACTIVE);
@@ -330,7 +334,7 @@ void Task_NetworkManager(void *pvParameters) {
 
         JsonObject state = doc.createNestedObject("state");
         state["mode"] = sysConfig.isAutoMode ? "AUTO" : "MANUAL";
-        state["wifiRssi"] = WiFi.RSSI();
+        state["networkRssi"] = WiFi.RSSI();
         state["freeHeap"] = ESP.getFreeHeap();
 
         char buf[512];
@@ -345,8 +349,7 @@ void Task_NetworkManager(void *pvParameters) {
     if (now - lastHeartbeatTick >= pdMS_TO_TICKS(30000)) {
       lastHeartbeatTick = now;
       StaticJsonDocument<256> hb;
-      hb["nodeId"] = DEVICE_ID;
-      hb["type"] = "HEARTBEAT";
+      hb["deviceId"] = DEVICE_ID;
       hb["uptime"] = millis() / 1000;
       hb["ip"] = WiFi.localIP().toString();
       hb["freeHeap"] = ESP.getFreeHeap();

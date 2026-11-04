@@ -1,0 +1,19 @@
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Large model files & logs
+*.pt
+*.log
+firmware.zip
+
+# Environment files
+.env
+*.env
