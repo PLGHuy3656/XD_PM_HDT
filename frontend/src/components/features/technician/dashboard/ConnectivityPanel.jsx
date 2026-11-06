@@ -8,8 +8,8 @@ function ConnectivityPanel() {
       <div className="technician-card-heading">
         <div>
           <span>CONNECTIVITY</span>
-          <h3>K?t n?i h? th?ng</h3>
-          <p>Tr?ng th?i giao ti?p gi?a thi?t b? v? h? th?ng</p>
+          <h3>Kết nối hệ thống</h3>
+          <p>Trạng thái giao tiếp giữa thiết bị và hệ thống</p>
         </div>
       </div>
 

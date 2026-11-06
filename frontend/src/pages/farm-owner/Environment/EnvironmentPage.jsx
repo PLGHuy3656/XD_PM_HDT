@@ -4,7 +4,6 @@ import AppLayout from '../../../components/layout/AppLayout'
 import './EnvironmentPage.css'
 
 import EnvironmentTabs from '../../../components/features/farm-owner/environment/EnvironmentTabs'
-import './EnvironmentControlPage.css'
 
 import MetricCard, {
   MetricIcon,

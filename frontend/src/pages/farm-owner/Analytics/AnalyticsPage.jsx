@@ -42,7 +42,7 @@ function AnalyticsPage() {
 
   return (
     <AppLayout>
-      <main className="analytics-page">
+      <div className="analytics-page">
         <header className="analytics-page-heading">
           <div>
             <span className="analytics-eyebrow">
@@ -57,7 +57,7 @@ function AnalyticsPage() {
             </p>
           </div>
 
-          <label className="analytics-farm-selector">
+          <div className="analytics-farm-selector">
             <span>Nhà yến</span>
 
             <EnvironmentSelect
@@ -68,7 +68,7 @@ function AnalyticsPage() {
                 label: farm.name,
               }))}
             />
-          </label>
+          </div>
         </header>
 
         <AnalyticsTabs
@@ -109,7 +109,7 @@ function AnalyticsPage() {
         <span className="analytics-selected-farm">
           Dữ liệu minh họa · {selectedFarm.name}
         </span>
-      </main>
+      </div>
     </AppLayout>
   )
 }

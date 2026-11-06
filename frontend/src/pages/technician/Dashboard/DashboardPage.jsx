@@ -141,7 +141,7 @@ function DashboardPage() {
             <button type="button">
               <div>
                 <StatusDot status="healthy" />
-                <strong>Trại Bình Chánh</strong>
+                <strong>Nhà yến Bình An</strong>
               </div>
 
               <span>›</span>

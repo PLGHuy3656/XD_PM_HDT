@@ -11,6 +11,8 @@ function FarmDetailPanel({ farm }) {
     )
   }
 
+  const technician = farm.assignedTechnician
+
   return (
     <section className="farm-detail">
       <div className="farm-detail__header">
@@ -54,6 +56,60 @@ function FarmDetailPanel({ farm }) {
           <strong>{farm.humidity}%</strong>
           <small>Mức hiện tại</small>
         </article>
+      </div>
+
+      <div className="farm-technician">
+        <div className="farm-technician__heading">
+          <div>
+            <span className="farm-technician__eyebrow">
+              HỖ TRỢ KỸ THUẬT
+            </span>
+            <h3>Kỹ thuật viên phụ trách</h3>
+            <p>
+              Thông tin kỹ thuật viên đang được phân công hỗ trợ nhà yến này.
+            </p>
+          </div>
+
+          {technician && (
+            <span className="farm-technician__status">
+              <i />
+              {technician.status}
+            </span>
+          )}
+        </div>
+
+        {technician ? (
+          <div className="farm-technician__profile">
+            <div className="farm-technician__identity">
+              <div className="farm-technician__avatar">
+                {technician.name
+                  .split(' ')
+                  .slice(-2)
+                  .map((word) => word[0])
+                  .join('')}
+              </div>
+
+              <div>
+                <strong>{technician.name}</strong>
+                <span>{technician.role}</span>
+              </div>
+            </div>
+
+            <div className="farm-technician__contact">
+              <span>Số điện thoại</span>
+              <strong>{technician.phone}</strong>
+            </div>
+
+            <div className="farm-technician__contact">
+              <span>Email</span>
+              <strong>{technician.email}</strong>
+            </div>
+          </div>
+        ) : (
+          <div className="farm-technician__empty">
+            Nhà yến hiện chưa được phân công kỹ thuật viên phụ trách.
+          </div>
+        )}
       </div>
 
       <div className="farm-detail__section-heading">

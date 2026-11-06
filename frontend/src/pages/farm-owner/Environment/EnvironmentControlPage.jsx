@@ -6,7 +6,6 @@ import Toggle from '../../../components/features/farm-owner/environment/Toggle'
 import AutomaticRulesPanel from '../../../components/features/farm-owner/environment/AutomaticRulesPanel'
 import ActuatorControlPanel from '../../../components/features/farm-owner/environment/ActuatorControlPanel'
 import { controlFarms as farms } from '../../../components/features/farm-owner/environment/environmentMockData'
-import './EnvironmentPage.css'
 import './EnvironmentControlPage.css'
 
 function EnvironmentControlPage() {

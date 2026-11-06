@@ -50,7 +50,6 @@
 
   color: var(--color-navy-800);
   font-family:
-    "Segoe UI",
     Arial,
     sans-serif;
   font-size: 18px;
@@ -125,7 +124,7 @@
 
   border-radius: var(--radius-pill);
 
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -223,7 +222,7 @@
   overflow: hidden;
 
   color: var(--color-navy-700);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -231,7 +230,7 @@
 
 .device-quick-copy > span {
   color: #94a0aa;
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .device-connection {
@@ -257,7 +256,7 @@
 
   border-radius: 7px;
 
-  font-size: 7px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-align: center;
@@ -353,7 +352,7 @@
   overflow: hidden;
 
   color: var(--color-navy-700);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -363,7 +362,7 @@
   overflow: hidden;
 
   color: #929ea8;
-  font-size: 8px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -372,7 +371,7 @@
   flex: 0 0 auto;
 
   color: #a2abb3;
-  font-size: 8px;
+  font-size: 11px;
 }
 
 /* ========================================

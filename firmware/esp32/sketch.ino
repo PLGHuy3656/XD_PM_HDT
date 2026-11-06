@@ -28,11 +28,37 @@
 #define RELAY_ACTIVE        HIGH
 #define RELAY_INACTIVE      LOW
 
-// --- 2. CẤU HÌNH ĐỊNH DANH & MQTT TOPIC TAXONOMY ---
-const char* WIFI_SSID       = "Wokwi-GUEST";
-const char* WIFI_PASSWORD   = "";
-const char* MQTT_BROKER     = "broker.emqx.io";
-const int   MQTT_PORT       = 1883;
+// --- 2. CẤU HÌNH ĐỊNH DANH & MQTT TOPIC TAXONOMY (CANONICAL CONTRACT V1) ---
+#ifndef WIFI_SSID_CFG
+#define WIFI_SSID_CFG       "Wokwi-GUEST"
+#endif
+
+#ifndef WIFI_PASSWORD_CFG
+#define WIFI_PASSWORD_CFG   ""
+#endif
+
+#ifndef MQTT_BROKER_HOST
+#define MQTT_BROKER_HOST    "broker.emqx.io"
+#endif
+
+#ifndef MQTT_BROKER_PORT
+#define MQTT_BROKER_PORT    1883
+#endif
+
+#ifndef MQTT_USER_CFG
+#define MQTT_USER_CFG       ""
+#endif
+
+#ifndef MQTT_PASSWORD_CFG
+#define MQTT_PASSWORD_CFG   ""
+#endif
+
+const char* WIFI_SSID       = WIFI_SSID_CFG;
+const char* WIFI_PASSWORD   = WIFI_PASSWORD_CFG;
+const char* MQTT_BROKER     = MQTT_BROKER_HOST;
+const int   MQTT_PORT       = MQTT_BROKER_PORT;
+const char* MQTT_USER       = MQTT_USER_CFG;
+const char* MQTT_PASSWORD   = MQTT_PASSWORD_CFG;
 
 // Định danh thiết bị chuẩn: SWC-NODE-001 (Canonical MQTT Contract V1)
 const char* DEVICE_ID       = "SWC-NODE-001";
@@ -239,16 +265,33 @@ void sendAck(const char* cmdId, const char* status, const char* message) {
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   StaticJsonDocument<512> doc;
   if (deserializeJson(doc, payload, length)) {
-    sendAck("unknown", "FAILED", "Invalid JSON format");
+    sendAck("00000000-0000-0000-0000-000000000000", "FAILED", "Invalid JSON format");
     return;
   }
 
-  const char* cmdId = doc["commandId"] | "unassigned";
+  const char* cmdId = doc["commandId"] | "00000000-0000-0000-0000-000000000000";
   const char* action = doc["action"];
+
+  // NULL guard cho action
+  if (action == NULL) {
+    sendAck(cmdId, "FAILED", "Missing command action");
+    return;
+  }
 
   if (strcmp(action, "SET_RELAY") == 0) {
     const char* target = doc["target"];
-    int state = doc["state"];
+    // NULL guard cho target va kiem tra kieu du lieu state
+    if (target == NULL || !doc["state"].is<int>()) {
+      sendAck(cmdId, "FAILED", "Missing target or integer state");
+      return;
+    }
+
+    int state = doc["state"].as<int>();
+    if (state != 0 && state != 1) {
+      sendAck(cmdId, "FAILED", "Invalid relay state; must be 0 or 1");
+      return;
+    }
+
     int pinState = (state == 1) ? RELAY_ACTIVE : RELAY_INACTIVE;
 
     if (strcmp(target, "misting") == 0) digitalWrite(PIN_MISTING, pinState);
@@ -260,15 +303,37 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       return;
     }
 
-    sysConfig.isAutoMode = false; // Chuyển sang MANUAL override
+    sysConfig.isAutoMode = false; // Chuyen sang MANUAL override
     sendAck(cmdId, "SUCCESS", "Actuator switched; mode changed to MANUAL");
   }
   else if (strcmp(action, "UPDATE_THRESHOLDS") == 0) {
-    if (doc.containsKey("targetTemp")) sysConfig.targetTemp = doc["targetTemp"];
-    if (doc.containsKey("targetHum")) sysConfig.targetHum = doc["targetHum"];
-    if (doc.containsKey("isAutoMode")) sysConfig.isAutoMode = doc["isAutoMode"];
+    if (!doc["targetTemp"].is<float>() && !doc["targetTemp"].is<int>()) {
+      sendAck(cmdId, "FAILED", "Missing or invalid targetTemp");
+      return;
+    }
+    if (!doc["targetHum"].is<float>() && !doc["targetHum"].is<int>()) {
+      sendAck(cmdId, "FAILED", "Missing or invalid targetHum");
+      return;
+    }
+    if (!doc["isAutoMode"].is<bool>()) {
+      sendAck(cmdId, "FAILED", "Missing or invalid isAutoMode");
+      return;
+    }
 
-    // Lưu vào Flash NVS
+    float newTemp = doc["targetTemp"].as<float>();
+    float newHum  = doc["targetHum"].as<float>();
+    bool  newMode = doc["isAutoMode"].as<bool>();
+
+    if (newTemp < -20.0f || newTemp > 60.0f || newHum < 0.0f || newHum > 100.0f) {
+      sendAck(cmdId, "FAILED", "Threshold values out of valid range");
+      return;
+    }
+
+    sysConfig.targetTemp = newTemp;
+    sysConfig.targetHum  = newHum;
+    sysConfig.isAutoMode = newMode;
+
+    // Luu vao Flash NVS
     prefs.begin("swc_cfg", false);
     prefs.putFloat("temp", sysConfig.targetTemp);
     prefs.putFloat("hum", sysConfig.targetHum);
@@ -276,6 +341,10 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     prefs.end();
 
     sendAck(cmdId, "SUCCESS", "Thresholds updated in NVS; mode updated");
+  }
+  else {
+    // Unknown action: gui ACK FAILED theo yeu cau contract
+    sendAck(cmdId, "FAILED", "Unsupported command action");
   }
 }
 
@@ -294,9 +363,17 @@ void Task_NetworkManager(void *pvParameters) {
     // 1. Quản lý kết nối Wi-Fi & MQTT (Auto-Reconnect)
     if (WiFi.status() == WL_CONNECTED) {
       if (!mqttClient.connected()) {
-        if (mqttClient.connect(DEVICE_ID, TOPIC_STATUS, 1, true, "{\"status\":\"offline\"}")) {
+        bool connected = false;
+        if (strlen(MQTT_USER) > 0) {
+          connected = mqttClient.connect(DEVICE_ID, MQTT_USER, MQTT_PASSWORD, TOPIC_STATUS, 1, true, "{\"status\":\"offline\"}");
+        } else {
+          connected = mqttClient.connect(DEVICE_ID, TOPIC_STATUS, 1, true, "{\"status\":\"offline\"}");
+        }
+
+        if (connected) {
           mqttClient.publish(TOPIC_STATUS, "{\"status\":\"online\"}", true);
-          mqttClient.subscribe(TOPIC_COMMAND);
+          // PubSubClient ho tro QoS 0 hoac 1 khi subscribe (nhan lenh dam bao hon)
+          mqttClient.subscribe(TOPIC_COMMAND, 1);
           Serial.println("[MQTT] Connected and subscribed to commands.");
         } else {
           vTaskDelay(pdMS_TO_TICKS(3000));
@@ -412,3 +489,4 @@ void setup() {
 void loop() {
   vTaskDelete(NULL); // FreeRTOS nắm toàn quyền quản lý CPU
 }
+
