@@ -176,9 +176,11 @@ In CP7.5, consumers may inspect `x-death[0].count` or maintain an explicit appli
 | `RABBITMQ_DEFAULT_USER` | `swiftlet` | Default administrator username |
 | `RABBITMQ_DEFAULT_PASS` | `swiftlet123` | Default administrator password |
 | `RABBITMQ_PREFETCH` | `10` | Consumer concurrency buffer setting (conservative dev default) |
-| `RABBITMQ_RETRY_TTL_MS` | `5000` | Retry queue message time-to-live in milliseconds |
 | `REDIS_BIND_IP` | `127.0.0.1` | Host interface IP binding for Redis (use `0.0.0.0` if LAN access is required) |
 | `REDIS_PORT` | `6379` | Redis port exposed to host |
+
+### Topology Constants & Code Defaults (`constants.py`)
+- `DEFAULT_RETRY_TTL_MS`: `5000` (5,000 ms message TTL for `notification.alert-events.v1.retry`; configured programmatically via `get_v1_topology(retry_ttl_ms=...)` and `apply_topology(retry_ttl_ms=...)`).
 
 ---
 
@@ -230,9 +232,14 @@ PYTHONPATH=. python3 -c "from infrastructure.rabbitmq.declarator import RabbitMQ
 
 ### Running Automated Offline Topology Tests (No Broker Required)
 
-**Cross-platform:**
+**Windows (PowerShell):**
+```powershell
+python -m pytest tests/test_rabbitmq_topology_offline.py -v
+```
+
+**Linux / macOS (Bash / Zsh):**
 ```bash
-pytest tests/test_rabbitmq_topology_offline.py -v
+python3 -m pytest tests/test_rabbitmq_topology_offline.py -v
 ```
 
 ### Running Automated Live Verification Suite (Requires Running Broker)
