@@ -1,5 +1,0 @@
-fastapi[standard]
-paho-mqtt
-psycopg[binary]
-pydantic-settings
-python-dotenv
