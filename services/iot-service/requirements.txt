@@ -1,0 +1,8 @@
+fastapi[standard]
+uvicorn[standard]
+pydantic-settings
+python-dotenv
+paho-mqtt
+websockets
+httpx
+pytest
