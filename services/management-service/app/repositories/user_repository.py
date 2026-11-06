@@ -136,17 +136,58 @@ class UserRepository:
                 return cur.fetchone() is not None
 
     def get_farm_id_for_zone(self, zone_id: str) -> str | None:
-        """Resolves the parent farm_id for a zone."""
+        """Resolves the parent farm_id for a zone by UUID strictly."""
+        if not zone_id or not str(zone_id).strip():
+            return None
+        import uuid
+        zone_id_str = str(zone_id).strip()
+        try:
+            uuid.UUID(zone_id_str)
+        except (ValueError, AttributeError, TypeError):
+            return None
+
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
                     SELECT farm_id
                     FROM zones
-                    WHERE id::text = %s OR zone_code = %s;
+                    WHERE id = %s;
                     """,
-                    (zone_id, zone_id),
+                    (zone_id_str,),
                 )
+                row = cur.fetchone()
+                return str(row[0]) if row else None
+
+    def resolve_farm_uuid(self, farm_id_or_code: str) -> str | None:
+        """
+        Resolves a farm identifier (canonical UUID or farm_code) to its canonical UUID.
+        Returns None if farm does not exist.
+        """
+        if not farm_id_or_code or not str(farm_id_or_code).strip():
+            return None
+
+        import uuid
+        raw_val = str(farm_id_or_code).strip()
+        is_uuid = False
+        try:
+            uuid.UUID(raw_val)
+            is_uuid = True
+        except (ValueError, AttributeError, TypeError):
+            is_uuid = False
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                if is_uuid:
+                    cur.execute(
+                        "SELECT id FROM farms WHERE id = %s OR farm_code = %s LIMIT 1;",
+                        (raw_val, raw_val),
+                    )
+                else:
+                    cur.execute(
+                        "SELECT id FROM farms WHERE farm_code = %s LIMIT 1;",
+                        (raw_val,),
+                    )
                 row = cur.fetchone()
                 return str(row[0]) if row else None
 

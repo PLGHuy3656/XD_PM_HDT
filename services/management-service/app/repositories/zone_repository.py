@@ -62,24 +62,23 @@ class ZoneRepository:
         ]
 
     def get_zone_by_id(self, zone_id: str):
+        """
+        Loads a Zone strictly by its primary key UUID.
+        Non-UUID identifiers are safely rejected (returns None) to eliminate cross-tenant IDOR.
+        """
         if not zone_id or not str(zone_id).strip():
             return None
 
         zone_id_str = str(zone_id).strip()
-        is_uuid = False
         try:
             uuid.UUID(zone_id_str)
-            is_uuid = True
         except (ValueError, AttributeError, TypeError):
-            is_uuid = False
-
-        where_clause = "WHERE z.id = %s OR z.zone_code = %s" if is_uuid else "WHERE z.zone_code = %s"
-        params = (zone_id_str, zone_id_str) if is_uuid else (zone_id_str,)
+            return None
 
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"""
+                    """
                     SELECT
                         z.id,
                         z.farm_id,
@@ -91,7 +90,7 @@ class ZoneRepository:
                     LEFT JOIN devices d
                         ON d.zone_id = z.id
                        AND d.is_active = TRUE
-                    {where_clause}
+                    WHERE z.id = %s
                     GROUP BY
                         z.id,
                         z.farm_id,
@@ -99,7 +98,7 @@ class ZoneRepository:
                         z.name,
                         z.created_at
                     """,
-                    params,
+                    (zone_id_str,),
                 )
                 row = cur.fetchone()
 

@@ -30,46 +30,83 @@ class DeviceRepository:
                 params = []
 
                 if farm_id:
-                    query += " AND d.farm_id = %s"
-                    params.append(farm_id)
+                    import uuid
+                    farm_str = str(farm_id).strip()
+                    is_f_uuid = False
+                    try:
+                        uuid.UUID(farm_str)
+                        is_f_uuid = True
+                    except (ValueError, AttributeError, TypeError):
+                        is_f_uuid = False
+
+                    if is_f_uuid:
+                        query += " AND d.farm_id = %s"
+                        params.append(farm_str)
+                    else:
+                        query += " AND d.farm_id IN (SELECT f.id FROM farms f WHERE f.farm_code = %s)"
+                        params.append(farm_str)
 
                 if zone_id:
-                    query += " AND d.zone_id = %s"
-                    params.append(zone_id)
+                    import uuid
+                    zone_str = str(zone_id).strip()
+                    is_z_uuid = False
+                    try:
+                        uuid.UUID(zone_str)
+                        is_z_uuid = True
+                    except (ValueError, AttributeError, TypeError):
+                        is_z_uuid = False
+
+                    if is_z_uuid:
+                        query += " AND d.zone_id = %s"
+                        params.append(zone_str)
+                    else:
+                        query += " AND d.zone_id IN (SELECT z.id FROM zones z WHERE z.zone_code = %s)"
+                        params.append(zone_str)
 
                 query += " ORDER BY d.node_id"
                 cur.execute(query, tuple(params))
                 rows = cur.fetchall()
 
-        identifiers: list[str] = []
-        for r in rows:
-            identifiers.append(str(r[0]))
-            if r[1]:
-                identifiers.append(str(r[1]))
+        all_presence = self._iot_adapter.list_devices_presence()
+        iot_reachable = all_presence is not None
 
-        runtime_states = self._iot_adapter.get_devices_runtime_state(identifiers)
+        devices = []
+        for row in rows:
+            dev_id = str(row[0])
+            node_id = str(row[1]) if row[1] else None
 
-        return [
-            {
-                "device_id": str(row[0]),
-                "node_id": row[1],
-                "name": row[2],
-                "device_type": row[3],
-                "farm_id": str(row[4]),
-                "zone_id": str(row[5]) if row[5] else None,
-                "zone_name": row[6],
-                "ip_address": row[7],
-                "firmware_version": row[8],
-                "is_active": row[9],
-                "status": (
-                    "ONLINE"
-                    if (str(row[0]) in runtime_states or (row[1] and str(row[1]) in runtime_states))
-                    else "OFFLINE"
-                ),
-                "created_at": row[10].isoformat() if row[10] else None,
-            }
-            for row in rows
-        ]
+            if not iot_reachable:
+                status_val = "UNKNOWN"
+            else:
+                presence_info = (
+                    all_presence.get(node_id)
+                    if node_id and node_id in all_presence
+                    else all_presence.get(dev_id)
+                )
+                if presence_info:
+                    raw_status = presence_info.get("status")
+                    status_val = raw_status if raw_status in ("ONLINE", "OFFLINE") else "UNKNOWN"
+                else:
+                    status_val = "OFFLINE"
+
+            devices.append(
+                {
+                    "device_id": dev_id,
+                    "node_id": row[1],
+                    "name": row[2],
+                    "device_type": row[3],
+                    "farm_id": str(row[4]),
+                    "zone_id": str(row[5]) if row[5] else None,
+                    "zone_name": row[6],
+                    "ip_address": row[7],
+                    "firmware_version": row[8],
+                    "is_active": row[9],
+                    "status": status_val,
+                    "created_at": row[10].isoformat() if row[10] else None,
+                }
+            )
+
+        return devices
 
     def get_device_by_id(self, device_id: str):
         import uuid
@@ -135,14 +172,13 @@ class DeviceRepository:
         dev_uuid = str(row[0])
         node_id = str(row[1]) if row[1] else None
 
-        presence = None
-        if node_id:
-            presence = self._iot_adapter.get_device_presence(node_id)
-        if presence is None:
-            presence = self._iot_adapter.get_device_presence(dev_uuid)
+        # M-1: Query presence ONCE using primary identifier (node_id preferred, dev_uuid as fallback)
+        primary_id = node_id or dev_uuid
+        presence = self._iot_adapter.resolve_device_presence(primary_id)
 
-        is_online = bool(presence and presence.get("is_online"))
-        presence_status = presence["status"] if presence and presence.get("status") else "UNKNOWN"
+        # M-3: Distinguish confirmed OFFLINE from UNKNOWN (IoT unavailable / no presence record)
+        raw_status = presence.get("status") if presence else None
+        status_val = raw_status if raw_status in ("ONLINE", "OFFLINE") else "UNKNOWN"
 
         return {
             "device_id": dev_uuid,
@@ -155,8 +191,8 @@ class DeviceRepository:
             "ip_address": row[7],
             "firmware_version": row[8],
             "is_active": row[9],
-            "status": "ONLINE" if is_online else "OFFLINE",
-            "presence_status": presence_status,
+            "status": status_val,
+            "presence_status": status_val,
             "created_at": row[10].isoformat() if row[10] else None,
         }
 

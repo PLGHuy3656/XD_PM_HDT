@@ -173,20 +173,21 @@ class IoTServiceAdapter:
             )
             return None
 
-    def list_devices_presence(self) -> dict[str, dict[str, Any]]:
+    def list_devices_presence(self) -> dict[str, dict[str, Any]] | None:
         """
         Queries IoT Service canonical endpoint:
             GET /api/iot/devices/presence
-        Returns dict mapping deviceId -> normalized presence dict.
+        Returns dict mapping deviceId -> normalized presence dict when reachable,
+        or None when IoT Service is unreachable / unconfigured.
         """
         if not self._base_url:
-            return {}
+            return None
 
         url = f"{self._base_url}/api/iot/devices/presence"
         try:
             status_code, body = self._http_get(url, self._timeout)
             if status_code != 200 or not isinstance(body, list):
-                return {}
+                return None
             results: dict[str, dict[str, Any]] = {}
             for item in body:
                 if isinstance(item, dict) and item.get("deviceId"):
@@ -199,7 +200,7 @@ class IoTServiceAdapter:
                 url,
                 exc,
             )
-            return {}
+            return None
 
     def get_devices_runtime_state(
         self, device_identifiers: list[str]
@@ -215,7 +216,7 @@ class IoTServiceAdapter:
             return {}
 
         all_presence = self.list_devices_presence()
-        if not all_presence:
+        if all_presence is None:
             return {}
 
         results: dict[str, dict[str, Any]] = {}
@@ -238,6 +239,9 @@ class IoTServiceAdapter:
             return counts
 
         all_presence = self.list_devices_presence()
+        if all_presence is None:
+            counts["unknown"] = len(device_identifiers)
+            return counts
         for identifier in device_identifiers:
             key = str(identifier)
             info = all_presence.get(key)

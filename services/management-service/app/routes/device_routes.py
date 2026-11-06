@@ -40,10 +40,15 @@ def list_devices(
             detail="Forbidden: 'farm_id' parameter is required for non-admin users",
         )
 
+    canonical_farm_uuid = None
     if effective_farm_id:
         verify_farm_resource_access(current_user, effective_farm_id)
+        # Normalize farm_code to canonical UUID to prevent PostgreSQL UUID cast error
+        canonical_farm_uuid = user_repository.resolve_farm_uuid(effective_farm_id)
+        if not canonical_farm_uuid:
+            return []
 
-    return device_controller.list_devices(farm_id=effective_farm_id, zone_id=zone_id)
+    return device_controller.list_devices(farm_id=canonical_farm_uuid, zone_id=zone_id)
 
 
 @router.get(
