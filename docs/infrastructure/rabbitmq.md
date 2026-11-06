@@ -170,39 +170,82 @@ In CP7.5, consumers may inspect `x-death[0].count` or maintain an explicit appli
 
 | Environment Variable | Default | Purpose |
 |---|---|---|
+| `RABBITMQ_BIND_IP` | `127.0.0.1` | Host interface IP binding for AMQP and HTTP UI (use `0.0.0.0` if LAN access is explicitly required) |
 | `RABBITMQ_AMQP_PORT` | `5672` | AMQP port exposed to host |
 | `RABBITMQ_MANAGEMENT_PORT`| `15672` | Management HTTP UI / API port |
 | `RABBITMQ_DEFAULT_USER` | `swiftlet` | Default administrator username |
 | `RABBITMQ_DEFAULT_PASS` | `swiftlet123` | Default administrator password |
 | `RABBITMQ_PREFETCH` | `10` | Consumer concurrency buffer setting (conservative dev default) |
 | `RABBITMQ_RETRY_TTL_MS` | `5000` | Retry queue message time-to-live in milliseconds |
+| `REDIS_BIND_IP` | `127.0.0.1` | Host interface IP binding for Redis (use `0.0.0.0` if LAN access is required) |
+| `REDIS_PORT` | `6379` | Redis port exposed to host |
 
 ---
 
 ## 7. Operational & Verification Procedures
 
-### Running RabbitMQ
+### Prerequisites & Dependencies
+- **Broker & Cache:** Docker & Docker Compose v2+.
+- **Python Runtime:** Python 3.10+ (Standard library `urllib.request`, `json`, `base64`, `uuid`, `time`, `logging` covers declarator and live verifier; no extra pip packages required for topology bootstrap).
+- **Testing:** `pytest>=8.0` for running automated offline/unit test suites.
+
+### Running RabbitMQ & Redis
+
+**Windows (PowerShell):**
 ```powershell
 # Create the external Docker network if it does not already exist
 docker network create swiftletcare-network 2>$null
 
-# Start broker in detached mode
-docker compose up -d rabbitmq
+# Start broker and cache in detached mode
+docker compose up -d rabbitmq redis
 
 # Check container health status
-docker ps --filter "name=swiftletcare-rabbitmq"
+docker ps --filter "name=swiftletcare-"
+```
+
+**Linux / macOS (Bash / Zsh):**
+```bash
+# Create the external Docker network if it does not already exist
+docker network create swiftletcare-network 2>/dev/null || true
+
+# Start broker and cache in detached mode
+docker compose up -d rabbitmq redis
+
+# Check container health status
+docker ps --filter "name=swiftletcare-"
 ```
 
 ### Applying Topology Idempotently
+
+**Windows (PowerShell):**
 ```powershell
-$env:PYTHONPATH=".;services/notification-service"
+$env:PYTHONPATH="."
 python -c "from infrastructure.rabbitmq.declarator import RabbitMQDeclarator; RabbitMQDeclarator().apply_topology()"
 ```
 
-### Running Automated Topology Verification
+**Linux / macOS (Bash / Zsh):**
+```bash
+PYTHONPATH=. python3 -c "from infrastructure.rabbitmq.declarator import RabbitMQDeclarator; RabbitMQDeclarator().apply_topology()"
+```
+
+### Running Automated Offline Topology Tests (No Broker Required)
+
+**Cross-platform:**
+```bash
+pytest tests/test_rabbitmq_topology_offline.py -v
+```
+
+### Running Automated Live Verification Suite (Requires Running Broker)
+
+**Windows (PowerShell):**
 ```powershell
-$env:PYTHONPATH=".;services/notification-service"
+$env:PYTHONPATH="."
 python infrastructure/rabbitmq/verifier.py
+```
+
+**Linux / macOS (Bash / Zsh):**
+```bash
+PYTHONPATH=. python3 infrastructure/rabbitmq/verifier.py
 ```
 This script executes:
 1. Main routing verification (`ai.predator.detected` $\rightarrow$ received count = 1).

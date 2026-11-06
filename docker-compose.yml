@@ -5,8 +5,8 @@ services:
     hostname: rabbitmq
     restart: unless-stopped
     ports:
-      - "${RABBITMQ_AMQP_PORT:-5672}:5672"
-      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+      - "${RABBITMQ_BIND_IP:-127.0.0.1}:${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "${RABBITMQ_BIND_IP:-127.0.0.1}:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-swiftlet}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-swiftlet123}
@@ -27,7 +27,7 @@ services:
     hostname: redis
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_BIND_IP:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
