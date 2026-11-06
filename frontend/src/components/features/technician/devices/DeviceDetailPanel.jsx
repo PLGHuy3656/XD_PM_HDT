@@ -1,6 +1,6 @@
 import { statusMeta } from './devicesMockData'
 
-function DeviceDetailModal({
+function DeviceDetailPanel({
   device,
   zoneName,
   onClose,
@@ -64,6 +64,11 @@ function DeviceDetailModal({
           </div>
 
           <div>
+            <span>MQTT</span>
+            <strong>{device.mqttStatus}</strong>
+          </div>
+
+          <div>
             <span>IP ADDRESS</span>
             <strong>{device.ip}</strong>
           </div>
@@ -74,15 +79,30 @@ function DeviceDetailModal({
           </div>
 
           <div>
-            <span>LAST SEEN</span>
+            <span>LAST HEARTBEAT</span>
             <strong>{device.lastSeen}</strong>
+          </div>
+
+          <div>
+            <span>TECHNICAL HEALTH</span>
+            <strong>{device.technicalHealth}</strong>
+          </div>
+
+          <div>
+            <span>SENSORS</span>
+            <strong>{device.sensorHealth}</strong>
+          </div>
+
+          <div>
+            <span>ACTUATORS</span>
+            <strong>{device.actuatorHealth}</strong>
           </div>
         </div>
 
         <div className="tech-modal-info">
-          Chẩn đoán Sensor / Camera / Actuator / MQTT sẽ được thực
-          hiện tại module Chẩn đoán thiết bị. Trang này chỉ quản lý
-          registry, trạng thái kết nối và assignment.
+          Đây là trạng thái kỹ thuật tổng quan của node. Kiểm tra kết nối,
+          Sensor, Actuator và MQTT chuyên sâu được thực hiện tại module
+          Chẩn đoán thiết bị.
         </div>
 
         <div className="tech-modal-footer">
@@ -107,4 +127,4 @@ function DeviceDetailModal({
   )
 }
 
-export default DeviceDetailModal
+export default DeviceDetailPanel

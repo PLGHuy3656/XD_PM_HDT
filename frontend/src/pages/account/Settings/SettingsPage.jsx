@@ -76,7 +76,7 @@ function SettingsPage() {
 
   return (
     <AppLayout>
-      <main className="account-settings">
+      <div className="account-settings">
         <header className="account-settings__heading">
           <div>
             <span>ACCOUNT SETTINGS</span>
@@ -300,7 +300,7 @@ function SettingsPage() {
             </button>
           </div>
         </form>
-      </main>
+      </div>
     </AppLayout>
   )
 }

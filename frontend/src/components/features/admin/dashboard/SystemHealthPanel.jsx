@@ -1,4 +1,4 @@
-﻿import { services } from './dashboardMockData'
+import { services } from './dashboardMockData'
 
 function StatusDot({ status = 'healthy' }) {
   return <span className={`admin-status-dot ${status}`} />
@@ -21,6 +21,10 @@ function ArrowIcon() {
 }
 
 function SystemHealthPanel({ onOpen }) {
+  const healthyCount = services.filter(
+    (service) => service.status === 'healthy',
+  ).length
+
   return (
     <button
       type="button"
@@ -44,7 +48,9 @@ function SystemHealthPanel({ onOpen }) {
       <div className="admin-health-strip__end">
         <div>
           <StatusDot />
-          <strong>5 / 5</strong>
+          <strong>
+            {healthyCount} / {services.length}
+          </strong>
           <span>Operational</span>
         </div>
 

@@ -545,7 +545,7 @@ function DashboardPage() {
             <span className="farm-status-dot" />
 
             <span className="farm-selector-copy">
-              <strong>Trại Bình Chánh</strong>
+              <strong>Nhà yến Bình An</strong>
               <small>Hoạt động bình thường</small>
             </span>
 

@@ -1,19 +1,41 @@
 export const alertFarms = [
   {
-    id: 'farm-01',
-    name: 'Nhà yến Bình Chánh',
+    id: 'farm-binh-an',
+    name: 'Nh� y?n B�nh An',
     zones: [
       {
         id: 'all',
-        name: 'Tất cả khu vực',
+        name: 'T?t c? khu v?c',
       },
       {
         id: 'zone-a',
-        name: 'Khu vực A · Cửa chính',
+        name: 'Khu v?c A � C?a ch�nh',
       },
       {
         id: 'zone-b',
-        name: 'Khu vực B · Tầng 2',
+        name: 'Khu v?c B � T?ng 2',
+      },
+      {
+        id: 'zone-c',
+        name: 'Khu v?c C � T?ng 3',
+      },
+    ],
+  },
+  {
+    id: 'farm-phu-an',
+    name: 'Nh� y?n Ph� An',
+    zones: [
+      {
+        id: 'all',
+        name: 'T?t c? khu v?c',
+      },
+      {
+        id: 'zone-a',
+        name: 'Khu v?c A � T?ng 1',
+      },
+      {
+        id: 'zone-d',
+        name: 'Khu v?c D � T?ng 2',
       },
     ],
   },
@@ -29,7 +51,7 @@ export const alerts = [
     title: 'Phát hiện cú gần cửa vào',
     description:
       'Camera AI phát hiện đối tượng có đặc trưng của cú xuất hiện gần lối vào nhà yến.',
-    farmId: 'farm-01',
+    farmId: 'farm-binh-an',
     zoneId: 'zone-b',
     zoneName: 'Khu vực B · Tầng 2',
     device: 'CAM-02',
@@ -47,7 +69,7 @@ export const alerts = [
     title: 'Nhiệt độ vượt ngưỡng',
     description:
       'Nhiệt độ tại khu vực A vượt ngưỡng vận hành được cấu hình.',
-    farmId: 'farm-01',
+    farmId: 'farm-binh-an',
     zoneId: 'zone-a',
     zoneName: 'Khu vực A · Cửa chính',
     device: 'SHT31-01',
@@ -65,7 +87,7 @@ export const alerts = [
     title: 'Camera Node mất kết nối',
     description:
       'Hệ thống không nhận được heartbeat từ Camera Node trong khoảng thời gian cho phép.',
-    farmId: 'farm-01',
+    farmId: 'farm-binh-an',
     zoneId: 'zone-b',
     zoneName: 'Khu vực B · Tầng 2',
     device: 'EDGE-03',
@@ -83,7 +105,7 @@ export const alerts = [
     title: 'Âm thanh bất thường',
     description:
       'Edge AI phát hiện mẫu âm thanh khác biệt so với trạng thái hoạt động bình thường.',
-    farmId: 'farm-01',
+    farmId: 'farm-binh-an',
     zoneId: 'zone-a',
     zoneName: 'Khu vực A · Cửa chính',
     device: 'MIC-01',
@@ -101,7 +123,7 @@ export const alerts = [
     title: 'Độ ẩm xuống dưới ngưỡng',
     description:
       'Độ ẩm đã giảm xuống dưới ngưỡng vận hành và hiện đã trở lại mức bình thường.',
-    farmId: 'farm-01',
+    farmId: 'farm-binh-an',
     zoneId: 'zone-a',
     zoneName: 'Khu vực A · Cửa chính',
     device: 'SHT31-01',
@@ -119,7 +141,7 @@ export const alerts = [
     title: 'Cảm biến mất kết nối tạm thời',
     description:
       'Cảm biến đã tự động kết nối lại sau một khoảng gián đoạn ngắn.',
-    farmId: 'farm-01',
+    farmId: 'farm-binh-an',
     zoneId: 'zone-b',
     zoneName: 'Khu vực B · Tầng 2',
     device: 'SHT31-02',

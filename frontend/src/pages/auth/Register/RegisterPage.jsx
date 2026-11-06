@@ -1,5 +1,4 @@
 import { Link, useNavigate } from 'react-router-dom'
-import '../Login/LoginPage.css'
 import './RegisterPage.css'
 
 function RegisterPage() {

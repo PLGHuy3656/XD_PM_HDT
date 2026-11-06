@@ -2,17 +2,17 @@ import { useMemo, useState } from 'react'
 
 import AppLayout from '../../../components/layout/AppLayout'
 import EnvironmentSelect from '../../../components/ui/Select'
+
+import DeviceAssignmentModal from '../../../components/features/technician/devices/DeviceAssignmentModal'
+import DeviceDetailPanel from '../../../components/features/technician/devices/DeviceDetailPanel'
+import DeviceTable from '../../../components/features/technician/devices/DeviceTable'
+
 import {
   farms,
   initialDevices,
-  statusMeta,
   statusOptions,
   typeOptions,
 } from '../../../components/features/technician/devices/devicesMockData'
-
-import DeviceDetailModal from '../../../components/features/technician/devices/DeviceDetailModal'
-import DeviceAssignmentModal from '../../../components/features/technician/devices/DeviceAssignmentModal'
-import TechnicianDeviceTable from '../../../components/features/technician/devices/TechnicianDeviceTable'
 
 import './DevicesPage.css'
 
@@ -62,10 +62,18 @@ function TechnicianDevicesPage() {
     })
   )
 
+  const farmDevices = useMemo(
+    () =>
+      devices.filter(
+        (device) => device.farmId === farmId,
+      ),
+    [devices, farmId],
+  )
+
   const filteredDevices = useMemo(() => {
     const keyword = search.trim().toLowerCase()
 
-    return devices.filter((device) => {
+    return farmDevices.filter((device) => {
       const matchesZone =
         zoneFilter === 'ALL' ||
         device.zoneId === zoneFilter
@@ -92,7 +100,7 @@ function TechnicianDevicesPage() {
       )
     })
   }, [
-    devices,
+    farmDevices,
     zoneFilter,
     statusFilter,
     typeFilter,
@@ -109,26 +117,29 @@ function TechnicianDevicesPage() {
       (device) => device.id === assignmentDeviceId
     ) ?? null
 
-  const onlineCount = devices.filter(
+  const onlineCount = farmDevices.filter(
     (device) => device.status === 'ONLINE'
   ).length
 
-  const attentionCount = devices.filter(
+  const attentionCount = farmDevices.filter(
     (device) =>
       device.status === 'WARNING' ||
       device.status === 'OFFLINE'
   ).length
 
-  const averageRssiValues = devices
+  const averageRssiValues = farmDevices
     .filter((device) => device.rssi !== null)
     .map((device) => device.rssi)
 
-  const averageRssi = Math.round(
-    averageRssiValues.reduce(
-      (sum, value) => sum + value,
-      0
-    ) / averageRssiValues.length
-  )
+  const averageRssi =
+    averageRssiValues.length > 0
+      ? Math.round(
+          averageRssiValues.reduce(
+            (sum, value) => sum + value,
+            0
+          ) / averageRssiValues.length
+        )
+      : null
 
   const getZoneName = (zoneId) =>
     selectedFarm.zones.find(
@@ -200,7 +211,7 @@ function TechnicianDevicesPage() {
             <div>
               <strong>Device Network Active</strong>
               <span>
-                {onlineCount}/{devices.length} nodes online
+                {onlineCount}/{farmDevices.length} nodes online
               </span>
             </div>
           </div>
@@ -209,7 +220,7 @@ function TechnicianDevicesPage() {
         <section className="tech-device-metrics">
           <article>
             <span>TOTAL NODES</span>
-            <strong>{devices.length}</strong>
+            <strong>{farmDevices.length}</strong>
             <small>Registered devices</small>
           </article>
 
@@ -227,7 +238,11 @@ function TechnicianDevicesPage() {
 
           <article>
             <span>AVG. SIGNAL</span>
-            <strong>{averageRssi} dBm</strong>
+            <strong>
+              {averageRssi !== null
+                ? `${averageRssi} dBm`
+                : '--'}
+            </strong>
             <small>Connected nodes</small>
           </article>
         </section>
@@ -242,8 +257,8 @@ function TechnicianDevicesPage() {
               <h2>Node & Connectivity</h2>
 
               <p>
-                Kiểm tra nhanh trạng thái kết nối và vị trí
-                được gán của từng node.
+                Kiểm tra nhanh trạng thái kết nối, heartbeat
+                và vị trí được gán của từng node.
               </p>
             </div>
 
@@ -272,7 +287,7 @@ function TechnicianDevicesPage() {
                 onChange={(event) =>
                   setSearch(event.target.value)
                 }
-                placeholder="Search Device ID, node name..."
+                placeholder="Tìm Device ID, tên node..."
               />
             </label>
 
@@ -305,17 +320,17 @@ function TechnicianDevicesPage() {
             </div>
           )}
 
-        <TechnicianDeviceTable
-          devices={filteredDevices}
-          farmName={selectedFarm.name}
-          getZoneName={getZoneName}
-          onOpenDetail={setSelectedDeviceId}
-          onOpenAssignment={openAssignment}
-        />
+          <DeviceTable
+            devices={filteredDevices}
+            farmName={selectedFarm.name}
+            getZoneName={getZoneName}
+            onOpenDetail={setSelectedDeviceId}
+            onOpenAssignment={openAssignment}
+          />
         </section>
 
         {selectedDevice && (
-          <DeviceDetailModal
+          <DeviceDetailPanel
             device={selectedDevice}
             zoneName={getZoneName(selectedDevice.zoneId)}
             onClose={() => setSelectedDeviceId(null)}
@@ -329,7 +344,9 @@ function TechnicianDevicesPage() {
         {assignmentDevice && (
           <DeviceAssignmentModal
             device={assignmentDevice}
-            currentZoneName={getZoneName(assignmentDevice.zoneId)}
+            currentZoneName={getZoneName(
+              assignmentDevice.zoneId
+            )}
             farmName={selectedFarm.name}
             zoneId={assignmentZoneId}
             zoneOptions={assignmentZoneOptions}
