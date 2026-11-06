@@ -13,6 +13,7 @@ class DeviceRegistryResponse(BaseModel):
     firmware_version: str | None = None
     is_active: bool = True
     status: str | None = None
+    presence_status: str | None = None
     created_at: str | None = None
 
 

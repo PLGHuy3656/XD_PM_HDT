@@ -158,13 +158,16 @@ def test_device_and_technician_repositories_use_http_adapter_not_legacy_sql():
         assert len(devices) == 2
         assert devices[0]["node_id"] == "ESP32-NODE-01"
         assert devices[0]["status"] == "ONLINE"
+        assert devices[0]["presence_status"] == "ONLINE"
         assert devices[1]["node_id"] == "ESP32-NODE-02"
         assert devices[1]["status"] == "OFFLINE"
+        assert devices[1]["presence_status"] == "OFFLINE"
 
         mock_cur.fetchone.return_value = fake_device_rows[0]
         single_dev = dev_repo.get_device_by_id("uuid-dev-1")
         assert single_dev is not None
         assert single_dev["status"] == "ONLINE"
+        assert single_dev["presence_status"] == "ONLINE"
 
     with patch("app.repositories.technician_repository.get_connection", return_value=mock_conn):
         mock_cur.fetchone.return_value = (
@@ -399,5 +402,71 @@ def test_technician_dashboard_and_devices_when_iot_service_up_mixed():
         assert summary["online_device_count"] == 1
         assert summary["offline_device_count"] == 3
         assert summary["unknown_device_count"] == 0
+
+
+def test_device_repository_stale_presence_maps_to_offline_and_presence_status():
+    """
+    L-1 & Schema Polish:
+    - DeviceRepository must treat STALE presence identically to OFFLINE, matching TechnicianRepository.
+    - Both `status` and `presence_status` fields are populated consistently.
+    """
+    def fake_http_get(url: str, timeout: float) -> tuple[int, Any]:
+        if url.endswith("/api/iot/devices/presence"):
+            return 200, [
+                {
+                    "deviceId": "ESP32-NODE-01",
+                    "status": "STALE",
+                    "lastSeen": "2026-11-04T10:00:00Z",
+                    "uptime": 200,
+                    "ip": "192.168.1.101",
+                    "freeHeap": 170000,
+                    "mockMode": False,
+                }
+            ]
+        if url.endswith("/api/iot/devices/ESP32-NODE-01/presence"):
+            return 200, {
+                "deviceId": "ESP32-NODE-01",
+                "status": "STALE",
+                "lastSeen": "2026-11-04T10:00:00Z",
+            }
+        return 404, None
+
+    adapter = IoTServiceAdapter(base_url="http://127.0.0.1:8002", http_get=fake_http_get)
+    dev_repo = DeviceRepository(iot_adapter=adapter)
+
+    fake_device_rows = [
+        (
+            "uuid-dev-1",
+            "ESP32-NODE-01",
+            "Controller 1",
+            "CONTROLLER",
+            "uuid-farm-1",
+            "uuid-zone-1",
+            "Zone A",
+            "192.168.1.101",
+            "v1.0.0",
+            True,
+            datetime(2026, 11, 1, 8, 0, 0, tzinfo=timezone.utc),
+        ),
+    ]
+
+    mock_conn = MagicMock()
+    mock_cur = MagicMock()
+    mock_conn.__enter__.return_value = mock_conn
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+
+    with patch("app.repositories.device_repository.get_connection", return_value=mock_conn):
+        mock_cur.fetchall.return_value = fake_device_rows
+        devices = dev_repo.list_devices()
+        assert len(devices) == 1
+        assert devices[0]["status"] == "OFFLINE"
+        assert devices[0]["presence_status"] == "OFFLINE"
+
+        mock_cur.fetchone.return_value = fake_device_rows[0]
+        single = dev_repo.get_device_by_id("uuid-dev-1")
+        assert single is not None
+        assert single["status"] == "OFFLINE"
+        assert single["presence_status"] == "OFFLINE"
+
 
 

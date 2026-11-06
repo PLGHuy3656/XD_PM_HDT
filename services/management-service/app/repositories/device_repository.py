@@ -75,19 +75,15 @@ class DeviceRepository:
             dev_id = str(row[0])
             node_id = str(row[1]) if row[1] else None
 
-            if not iot_reachable:
-                status_val = "UNKNOWN"
-            else:
-                presence_info = (
-                    all_presence.get(node_id)
-                    if node_id and node_id in all_presence
-                    else all_presence.get(dev_id)
-                )
-                if presence_info:
-                    raw_status = presence_info.get("status")
-                    status_val = raw_status if raw_status in ("ONLINE", "OFFLINE") else "UNKNOWN"
-                else:
-                    status_val = "OFFLINE"
+            presence_info = (
+                all_presence.get(node_id)
+                if (all_presence and node_id and node_id in all_presence)
+                else (all_presence.get(dev_id) if all_presence else None)
+            )
+            status_val, _, _, _ = self._iot_adapter.resolve_status(
+                presence_info,
+                iot_reachable,
+            )
 
             devices.append(
                 {
@@ -102,6 +98,7 @@ class DeviceRepository:
                     "firmware_version": row[8],
                     "is_active": row[9],
                     "status": status_val,
+                    "presence_status": status_val,
                     "created_at": row[10].isoformat() if row[10] else None,
                 }
             )
@@ -176,9 +173,13 @@ class DeviceRepository:
         primary_id = node_id or dev_uuid
         presence = self._iot_adapter.resolve_device_presence(primary_id)
 
-        # M-3: Distinguish confirmed OFFLINE from UNKNOWN (IoT unavailable / no presence record)
-        raw_status = presence.get("status") if presence else None
-        status_val = raw_status if raw_status in ("ONLINE", "OFFLINE") else "UNKNOWN"
+        # L-1 & M-3: Re-use central resolve_status helper to unify Owner and Technician behavior
+        iot_reachable = presence.get("reason") != "IOT_SERVICE_UNREACHABLE"
+        presence_info = presence if presence.get("reason") != "PRESENCE_NOT_FOUND" else None
+        status_val, _, _, _ = self._iot_adapter.resolve_status(
+            presence_info,
+            iot_reachable,
+        )
 
         return {
             "device_id": dev_uuid,

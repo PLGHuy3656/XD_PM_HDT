@@ -186,6 +186,8 @@ def seeded_multitenant_env():
         "colliding_zone_code": colliding_zone_code,
         "dev_a_id": dev_a_id,
         "dev_b_id": dev_b_id,
+        "node_a": node_a,
+        "node_b": node_b,
         "headers_a": headers_a,
         "headers_b": headers_b,
         "headers_tech": headers_tech,
@@ -320,11 +322,13 @@ def test_inactive_technician_assignment_enforcement(seeded_multitenant_env):
     assert resp_tech_devices.status_code == 403
 
 
-def test_m1_m3_device_detail_single_presence_and_status_distinction(seeded_multitenant_env):
+def test_m1_m3_device_detail_single_presence_and_status_distinction(seeded_multitenant_env, monkeypatch):
     """
-    M-1 & M-3 Verification:
+    M-1, M-3 & L-1/L-2 Verification:
     - GET /api/devices/{device_id} resolves presence and returns status ("ONLINE", "OFFLINE", or "UNKNOWN").
+    - Schema exposes both `status` and `presence_status`.
     - Parent farm authorization is properly verified.
+    - Fully isolated from any live IoT service via monkeypatch.
     """
     client = seeded_multitenant_env["client"]
     headers_a = seeded_multitenant_env["headers_a"]
@@ -332,23 +336,32 @@ def test_m1_m3_device_detail_single_presence_and_status_distinction(seeded_multi
     dev_a_id = seeded_multitenant_env["dev_a_id"]
     dev_b_id = seeded_multitenant_env["dev_b_id"]
 
-    # 1. Owner A reads Device A -> 200 OK
+    def failing_http_get(url: str, timeout: float):
+        raise ConnectionError("Mocked unreachable IoT service for deterministic E2E test")
+
+    from app.repositories.device_repository import device_repository
+    monkeypatch.setattr(device_repository._iot_adapter, "_http_get", failing_http_get)
+
+    # 1. Owner A reads Device A -> 200 OK (isolated IoT -> UNKNOWN)
     resp_dev_a = client.get(f"/api/devices/{dev_a_id}", headers=headers_a)
     assert resp_dev_a.status_code == 200
     data = resp_dev_a.json()
     assert data["device_id"] == dev_a_id
-    assert data["status"] in ("ONLINE", "OFFLINE", "UNKNOWN")
+    assert data["status"] == "UNKNOWN"
+    assert data["presence_status"] == "UNKNOWN"
 
     # 2. Owner A attempts to read Device B -> 403 Forbidden
     resp_dev_b_attack = client.get(f"/api/devices/{dev_b_id}", headers=headers_a)
     assert resp_dev_b_attack.status_code == 403
 
 
-def test_m3_technician_dashboard_and_devices_e2e(seeded_multitenant_env):
+def test_m3_technician_dashboard_and_devices_e2e(seeded_multitenant_env, monkeypatch):
     """
-    M-3 Verification:
+    M-3 & L-2 Verification:
     - Technician dashboard does not count UNKNOWN as OFFLINE when IoT service is unreachable.
     - Technician device list & detail return UNKNOWN status when IoT presence is unavailable.
+    - Deterministically isolated from any live IoT service running on port 8002 via monkeypatch.
+    - Both unreachable (Scenario A) and online presence (Scenario B) are verified deterministically.
     - Tenant isolation & RBAC are preserved:
       * Technician can access actively assigned Farm A devices.
       * Technician cannot access inactive Farm B devices (403 Forbidden).
@@ -361,8 +374,17 @@ def test_m3_technician_dashboard_and_devices_e2e(seeded_multitenant_env):
     farm_a_id = seeded_multitenant_env["farm_a_id"]
     farm_b_id = seeded_multitenant_env["farm_b_id"]
     dev_a_id = seeded_multitenant_env["dev_a_id"]
+    node_a = seeded_multitenant_env["node_a"]
 
-    # 1. Technician dashboard when IoT service is down -> unknown_device_count > 0, offline == 0
+    from app.repositories.technician_repository import technician_repository
+
+    # Scenario A: IoT service unreachable -> unknown_device_count > 0, offline == 0
+    def failing_http_get(url: str, timeout: float):
+        raise ConnectionError("Mocked unreachable IoT service for deterministic E2E test")
+
+    monkeypatch.setattr(technician_repository._iot_adapter, "_http_get", failing_http_get)
+
+    # 1. Technician dashboard when IoT service is down
     resp_dash = client.get(f"/api/technicians/{tech_id}/dashboard", headers=headers_tech)
     assert resp_dash.status_code == 200
     dash_data = resp_dash.json()
@@ -392,6 +414,30 @@ def test_m3_technician_dashboard_and_devices_e2e(seeded_multitenant_env):
     assert dev_data["device_id"] == dev_a_id
     assert dev_data["status"] == "UNKNOWN"
     assert dev_data["mqtt_status"] == "Unknown"
+
+    # Scenario B: IoT service is reachable and reports device ONLINE
+    def online_http_get(url: str, timeout: float):
+        if url.endswith("/api/iot/devices/presence"):
+            return 200, [
+                {
+                    "deviceId": node_a,
+                    "status": "ONLINE",
+                    "lastSeen": "2026-11-06T12:00:00Z",
+                    "uptime": 1200,
+                    "ip": "192.168.1.50",
+                    "freeHeap": 190000,
+                    "mockMode": False,
+                }
+            ]
+        return 404, None
+
+    monkeypatch.setattr(technician_repository._iot_adapter, "_http_get", online_http_get)
+    resp_dash_online = client.get(f"/api/technicians/{tech_id}/dashboard", headers=headers_tech)
+    assert resp_dash_online.status_code == 200
+    dash_online = resp_dash_online.json()
+    assert dash_online["online_device_count"] == 1
+    assert dash_online["offline_device_count"] == 0
+    assert dash_online["unknown_device_count"] == 0
 
     # 4. RBAC & Tenant Isolation: Technician accesses unassigned/inactive Farm B devices -> 403 Forbidden
     resp_dev_b = client.get(f"/api/technicians/{tech_id}/farms/{farm_b_id}/devices", headers=headers_tech)
