@@ -28,21 +28,47 @@
 #define RELAY_ACTIVE        HIGH
 #define RELAY_INACTIVE      LOW
 
-// --- 2. CẤU HÌNH ĐỊNH DANH & MQTT TOPIC TAXONOMY ---
-const char* WIFI_SSID       = "Wokwi-GUEST";
-const char* WIFI_PASSWORD   = "";
-const char* MQTT_BROKER     = "broker.emqx.io";
-const int   MQTT_PORT       = 1883;
+// --- 2. CẤU HÌNH ĐỊNH DANH & MQTT TOPIC TAXONOMY (CANONICAL CONTRACT V1) ---
+#ifndef WIFI_SSID_CFG
+#define WIFI_SSID_CFG       "Wokwi-GUEST"
+#endif
 
-// Định danh thiết bị chuẩn: swc-{houseId}-{floorZone}-{nodeId}
-const char* DEVICE_ID       = "swc-h01-f01-node01";
+#ifndef WIFI_PASSWORD_CFG
+#define WIFI_PASSWORD_CFG   ""
+#endif
+
+#ifndef MQTT_BROKER_HOST
+#define MQTT_BROKER_HOST    "broker.emqx.io"
+#endif
+
+#ifndef MQTT_BROKER_PORT
+#define MQTT_BROKER_PORT    1883
+#endif
+
+#ifndef MQTT_USER_CFG
+#define MQTT_USER_CFG       ""
+#endif
+
+#ifndef MQTT_PASSWORD_CFG
+#define MQTT_PASSWORD_CFG   ""
+#endif
+
+const char* WIFI_SSID       = WIFI_SSID_CFG;
+const char* WIFI_PASSWORD   = WIFI_PASSWORD_CFG;
+const char* MQTT_BROKER     = MQTT_BROKER_HOST;
+const int   MQTT_PORT       = MQTT_BROKER_PORT;
+const char* MQTT_USER       = MQTT_USER_CFG;
+const char* MQTT_PASSWORD   = MQTT_PASSWORD_CFG;
+
+// Định danh thiết bị chuẩn: SWC-NODE-001 (Canonical MQTT Contract V1)
+const char* DEVICE_ID       = "SWC-NODE-001";
 
 // Cây Topic MQTT
-const char* TOPIC_TELEMETRY = "swiftlet/telemetry/swc-h01-f01-node01";
-const char* TOPIC_HEARTBEAT = "swiftlet/heartbeat/swc-h01-f01-node01";
-const char* TOPIC_COMMAND   = "swiftlet/command/swc-h01-f01-node01";
-const char* TOPIC_ACK       = "swiftlet/ack/swc-h01-f01-node01";
-const char* TOPIC_STATUS    = "swiftlet/status/swc-h01-f01-node01";
+const char* TOPIC_TELEMETRY = "swiftlet/telemetry/SWC-NODE-001";
+const char* TOPIC_HEARTBEAT = "swiftlet/heartbeat/SWC-NODE-001";
+const char* TOPIC_COMMAND   = "swiftlet/command/SWC-NODE-001";
+const char* TOPIC_ACK       = "swiftlet/ack/SWC-NODE-001";
+const char* TOPIC_STATUS    = "swiftlet/status/SWC-NODE-001";
 
 // --- 3. CẤU TRÚC DỮ LIỆU CẢM BIẾN ---
 struct SensorData {
@@ -226,11 +252,10 @@ void Task_ControlLoop(void *pvParameters) {
 void sendAck(const char* cmdId, const char* status, const char* message) {
   StaticJsonDocument<256> ack;
   ack["commandId"] = cmdId;
-  ack["nodeId"] = DEVICE_ID;
+  ack["deviceId"] = DEVICE_ID;
   ack["status"] = status;
   ack["mode"] = sysConfig.isAutoMode ? "AUTO" : "MANUAL";
   if (message != NULL) ack["message"] = message;
-  ack["timestamp"] = millis() / 1000;
 
   char buf[256];
   serializeJson(ack, buf);
@@ -240,32 +265,75 @@ void sendAck(const char* cmdId, const char* status, const char* message) {
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   StaticJsonDocument<512> doc;
   if (deserializeJson(doc, payload, length)) {
-    sendAck("unknown", "FAILED", "Invalid JSON format");
+    sendAck("00000000-0000-0000-0000-000000000000", "FAILED", "Invalid JSON format");
     return;
   }
 
-  const char* cmdId = doc["commandId"] | "unassigned";
+  const char* cmdId = doc["commandId"] | "00000000-0000-0000-0000-000000000000";
   const char* action = doc["action"];
+
+  // NULL guard cho action
+  if (action == NULL) {
+    sendAck(cmdId, "FAILED", "Missing command action");
+    return;
+  }
 
   if (strcmp(action, "SET_RELAY") == 0) {
     const char* target = doc["target"];
-    int state = doc["state"];
+    // NULL guard cho target va kiem tra kieu du lieu state
+    if (target == NULL || !doc["state"].is<int>()) {
+      sendAck(cmdId, "FAILED", "Missing target or integer state");
+      return;
+    }
+
+    int state = doc["state"].as<int>();
+    if (state != 0 && state != 1) {
+      sendAck(cmdId, "FAILED", "Invalid relay state; must be 0 or 1");
+      return;
+    }
+
     int pinState = (state == 1) ? RELAY_ACTIVE : RELAY_INACTIVE;
 
     if (strcmp(target, "misting") == 0) digitalWrite(PIN_MISTING, pinState);
     else if (strcmp(target, "fan") == 0) digitalWrite(PIN_FAN, pinState);
     else if (strcmp(target, "heater") == 0) digitalWrite(PIN_HEATER, pinState);
     else if (strcmp(target, "alarm") == 0) digitalWrite(PIN_ALARM, pinState);
+    else {
+      sendAck(cmdId, "FAILED", "Unsupported relay target");
+      return;
+    }
 
-    sysConfig.isAutoMode = false; // Chuyển sang MANUAL override
+    sysConfig.isAutoMode = false; // Chuyen sang MANUAL override
     sendAck(cmdId, "SUCCESS", "Actuator switched; mode changed to MANUAL");
   }
   else if (strcmp(action, "UPDATE_THRESHOLDS") == 0) {
-    if (doc.containsKey("targetTemp")) sysConfig.targetTemp = doc["targetTemp"];
-    if (doc.containsKey("targetHum")) sysConfig.targetHum = doc["targetHum"];
-    if (doc.containsKey("isAutoMode")) sysConfig.isAutoMode = doc["isAutoMode"];
+    if (!doc["targetTemp"].is<float>() && !doc["targetTemp"].is<int>()) {
+      sendAck(cmdId, "FAILED", "Missing or invalid targetTemp");
+      return;
+    }
+    if (!doc["targetHum"].is<float>() && !doc["targetHum"].is<int>()) {
+      sendAck(cmdId, "FAILED", "Missing or invalid targetHum");
+      return;
+    }
+    if (!doc["isAutoMode"].is<bool>()) {
+      sendAck(cmdId, "FAILED", "Missing or invalid isAutoMode");
+      return;
+    }
 
-    // Lưu vào Flash NVS
+    float newTemp = doc["targetTemp"].as<float>();
+    float newHum  = doc["targetHum"].as<float>();
+    bool  newMode = doc["isAutoMode"].as<bool>();
+
+    if (newTemp < -20.0f || newTemp > 60.0f || newHum < 0.0f || newHum > 100.0f) {
+      sendAck(cmdId, "FAILED", "Threshold values out of valid range");
+      return;
+    }
+
+    sysConfig.targetTemp = newTemp;
+    sysConfig.targetHum  = newHum;
+    sysConfig.isAutoMode = newMode;
+
+    // Luu vao Flash NVS
     prefs.begin("swc_cfg", false);
     prefs.putFloat("temp", sysConfig.targetTemp);
     prefs.putFloat("hum", sysConfig.targetHum);
@@ -274,12 +342,17 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
     sendAck(cmdId, "SUCCESS", "Thresholds updated in NVS; mode updated");
   }
+  else {
+    // Unknown action: gui ACK FAILED theo yeu cau contract
+    sendAck(cmdId, "FAILED", "Unsupported command action");
+  }
 }
 
 void Task_NetworkManager(void *pvParameters) {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+  mqttClient.setBufferSize(512);
   mqttClient.setCallback(mqttCallback);
 
   SensorData sData;
@@ -290,9 +363,17 @@ void Task_NetworkManager(void *pvParameters) {
     // 1. Quản lý kết nối Wi-Fi & MQTT (Auto-Reconnect)
     if (WiFi.status() == WL_CONNECTED) {
       if (!mqttClient.connected()) {
-        if (mqttClient.connect(DEVICE_ID, TOPIC_STATUS, 1, true, "{\"status\":\"offline\"}")) {
+        bool connected = false;
+        if (strlen(MQTT_USER) > 0) {
+          connected = mqttClient.connect(DEVICE_ID, MQTT_USER, MQTT_PASSWORD, TOPIC_STATUS, 1, true, "{\"status\":\"offline\"}");
+        } else {
+          connected = mqttClient.connect(DEVICE_ID, TOPIC_STATUS, 1, true, "{\"status\":\"offline\"}");
+        }
+
+        if (connected) {
           mqttClient.publish(TOPIC_STATUS, "{\"status\":\"online\"}", true);
-          mqttClient.subscribe(TOPIC_COMMAND);
+          // PubSubClient ho tro QoS 0 hoac 1 khi subscribe (nhan lenh dam bao hon)
+          mqttClient.subscribe(TOPIC_COMMAND, 1);
           Serial.println("[MQTT] Connected and subscribed to commands.");
         } else {
           vTaskDelay(pdMS_TO_TICKS(3000));
@@ -312,15 +393,15 @@ void Task_NetworkManager(void *pvParameters) {
       lastTelemetryTick = now;
       if (xQueuePeek(sensorQueue, &sData, 0) == pdTRUE) {
         StaticJsonDocument<512> doc;
-        doc["nodeId"] = DEVICE_ID;
-        doc["timestamp"] = millis() / 1000;
+        doc["deviceId"] = DEVICE_ID;
 
         JsonObject metrics = doc.createNestedObject("metrics");
-        metrics["temp"] = serialized(String(sData.temperature, 2));
+        metrics["temperature"] = serialized(String(sData.temperature, 2));
         metrics["humidity"] = serialized(String(sData.humidity, 2));
-        metrics["co2"] = round(sData.co2_ppm);
         metrics["lux"] = serialized(String(sData.light_lux, 2));
-        metrics["soundOk"] = sData.soundHealthy;
+        metrics["co2"] = round(sData.co2_ppm);
+        metrics["audioRms"] = serialized(String((float)sData.soundRaw / 4095.0, 2));
+        metrics["audioHealthy"] = sData.soundHealthy;
 
         JsonObject relays = doc.createNestedObject("actuators");
         relays["misting"] = (digitalRead(PIN_MISTING) == RELAY_ACTIVE);
@@ -330,7 +411,7 @@ void Task_NetworkManager(void *pvParameters) {
 
         JsonObject state = doc.createNestedObject("state");
         state["mode"] = sysConfig.isAutoMode ? "AUTO" : "MANUAL";
-        state["wifiRssi"] = WiFi.RSSI();
+        state["networkRssi"] = WiFi.RSSI();
         state["freeHeap"] = ESP.getFreeHeap();
 
         char buf[512];
@@ -345,8 +426,7 @@ void Task_NetworkManager(void *pvParameters) {
     if (now - lastHeartbeatTick >= pdMS_TO_TICKS(30000)) {
       lastHeartbeatTick = now;
       StaticJsonDocument<256> hb;
-      hb["nodeId"] = DEVICE_ID;
-      hb["type"] = "HEARTBEAT";
+      hb["deviceId"] = DEVICE_ID;
       hb["uptime"] = millis() / 1000;
       hb["ip"] = WiFi.localIP().toString();
       hb["freeHeap"] = ESP.getFreeHeap();
@@ -409,3 +489,4 @@ void setup() {
 void loop() {
   vTaskDelete(NULL); // FreeRTOS nắm toàn quyền quản lý CPU
 }
+
