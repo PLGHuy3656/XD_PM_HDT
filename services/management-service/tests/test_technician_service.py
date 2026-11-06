@@ -52,6 +52,41 @@ class FakeTechnicianRepository:
             "owner_phone": "0901234567",
         }
 
+    def get_assigned_farm_devices(self, technician_id: str, farm_id: str):
+        return [
+            {
+                "device_id": "dev-01",
+                "node_id": "NODE-01",
+                "name": "Sensor 1",
+                "device_type": "SENSOR",
+                "farm_id": farm_id,
+                "status": "UNKNOWN",
+                "mqtt_status": "Unknown",
+            }
+        ]
+
+    def get_assigned_farm_device_detail(self, technician_id: str, farm_id: str, device_id: str):
+        return {
+            "device_id": device_id,
+            "node_id": "NODE-01",
+            "name": "Sensor 1",
+            "device_type": "SENSOR",
+            "farm_id": farm_id,
+            "status": "UNKNOWN",
+            "mqtt_status": "Unknown",
+        }
+
+    def get_dashboard_summary(self, technician_id: str):
+        return {
+            "technician_id": technician_id,
+            "assigned_farm_count": 2,
+            "zone_count": 5,
+            "device_count": 10,
+            "online_device_count": 0,
+            "offline_device_count": 0,
+            "unknown_device_count": 10,
+        }
+
 
 @pytest.fixture
 def service():
@@ -83,6 +118,29 @@ def test_get_assigned_farm_detail(service):
 
     assert result["farm_name"] == "Nhà yến Bình An"
     assert result["zone_count"] == 3
+
+
+def test_get_assigned_farm_devices(service):
+    result = service.get_assigned_farm_devices("tech-001", "farm-binh-an")
+    assert len(result) == 1
+    assert result[0]["status"] == "UNKNOWN"
+    assert result[0]["mqtt_status"] == "Unknown"
+
+
+def test_get_assigned_farm_device_detail(service):
+    result = service.get_assigned_farm_device_detail("tech-001", "farm-binh-an", "dev-01")
+    assert result["device_id"] == "dev-01"
+    assert result["status"] == "UNKNOWN"
+    assert result["mqtt_status"] == "Unknown"
+
+
+def test_get_dashboard_summary_includes_unknown_device_count(service):
+    result = service.get_dashboard_summary("tech-001")
+    assert result["technician_id"] == "tech-001"
+    assert result["device_count"] == 10
+    assert result["online_device_count"] == 0
+    assert result["offline_device_count"] == 0
+    assert result["unknown_device_count"] == 10
 
 
 def test_empty_technician_id_is_rejected(service):

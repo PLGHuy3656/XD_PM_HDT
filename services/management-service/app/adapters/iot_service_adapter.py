@@ -119,6 +119,37 @@ class IoTServiceAdapter:
             },
         }
 
+    @staticmethod
+    def resolve_status(
+        presence_info: dict[str, Any] | None,
+        iot_reachable: bool,
+    ) -> tuple[str, str, int | None, datetime | None]:
+        """
+        Determines (status, mqtt_status, rssi, recorded_at) consistently across repositories:
+        - If IoT service is unreachable -> ("UNKNOWN", "Unknown", None, None)
+        - If presence_info exists:
+            - status "ONLINE" -> ("ONLINE", "Connected", rssi, recorded_at)
+            - status "OFFLINE" or "STALE" -> ("OFFLINE", "Disconnected", rssi, recorded_at)
+            - other/unknown -> ("UNKNOWN", "Unknown", rssi, recorded_at)
+        - If presence_info is None (IoT reachable but device not reporting) -> ("OFFLINE", "Disconnected", None, None)
+        """
+        if not iot_reachable:
+            return "UNKNOWN", "Unknown", None, None
+
+        if presence_info:
+            raw = str(presence_info.get("status", "")).upper()
+            device_state = presence_info.get("device_state") or {}
+            rssi = device_state.get("networkRssi")
+            recorded_at = presence_info.get("recorded_at")
+
+            if raw == "ONLINE":
+                return "ONLINE", "Connected", rssi, recorded_at
+            if raw in ("OFFLINE", "STALE"):
+                return "OFFLINE", "Disconnected", rssi, recorded_at
+            return "UNKNOWN", "Unknown", rssi, recorded_at
+
+        return "OFFLINE", "Disconnected", None, None
+
     def resolve_device_presence(self, device_id: str) -> dict[str, Any]:
         """
         Queries IoT Service canonical endpoint:

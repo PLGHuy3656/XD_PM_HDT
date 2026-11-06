@@ -272,3 +272,132 @@ def test_iot_service_adapter_distinguishes_confirmed_offline_from_unknown_unavai
         "unknown": 2,
     }
 
+
+def test_technician_dashboard_when_iot_service_down_counts_unknown_not_offline():
+    def failing_http_get(url: str, timeout: float) -> tuple[int, Any]:
+        raise ConnectionError("IoT Service unreachable")
+
+    adapter = IoTServiceAdapter(base_url="http://127.0.0.1:8002", http_get=failing_http_get)
+    tech_repo = TechnicianRepository(iot_adapter=adapter)
+
+    mock_conn = MagicMock()
+    mock_cur = MagicMock()
+    mock_conn.__enter__.return_value = mock_conn
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+
+    with patch("app.repositories.technician_repository.get_connection", return_value=mock_conn):
+        mock_cur.fetchone.return_value = (
+            2,
+            4,
+            3,
+            ["uuid-dev-1", "uuid-dev-2", "uuid-dev-3"],
+            ["ESP32-NODE-01", "ESP32-NODE-02", "ESP32-NODE-03"],
+        )
+        summary = tech_repo.get_dashboard_summary("tech-001")
+        assert summary["device_count"] == 3
+        assert summary["online_device_count"] == 0
+        assert summary["offline_device_count"] == 0
+        assert summary["unknown_device_count"] == 3
+
+
+def test_technician_devices_when_iot_service_down_returns_unknown():
+    def failing_http_get(url: str, timeout: float) -> tuple[int, Any]:
+        raise ConnectionError("IoT Service unreachable")
+
+    adapter = IoTServiceAdapter(base_url="http://127.0.0.1:8002", http_get=failing_http_get)
+    tech_repo = TechnicianRepository(iot_adapter=adapter)
+
+    fake_device_rows = [
+        (
+            "uuid-dev-1",
+            "ESP32-NODE-01",
+            "Controller 1",
+            "CONTROLLER",
+            "uuid-farm-1",
+            "uuid-zone-1",
+            "Zone A",
+            "192.168.1.101",
+            "v1.0.0",
+        ),
+        (
+            "uuid-dev-2",
+            "ESP32-NODE-02",
+            "Sensor 2",
+            "SENSOR",
+            "uuid-farm-1",
+            "uuid-zone-1",
+            "Zone A",
+            "192.168.1.102",
+            "v1.0.0",
+        ),
+    ]
+
+    mock_conn = MagicMock()
+    mock_cur = MagicMock()
+    mock_conn.__enter__.return_value = mock_conn
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+
+    with patch("app.repositories.technician_repository.get_connection", return_value=mock_conn):
+        mock_cur.fetchall.return_value = fake_device_rows
+        devices = tech_repo.get_assigned_farm_devices("tech-001", "uuid-farm-1")
+        assert len(devices) == 2
+        for dev in devices:
+            assert dev["status"] == "UNKNOWN"
+            assert dev["mqtt_status"] == "Unknown"
+            assert dev["rssi"] is None
+            assert dev["last_seen"] is None
+
+        detail = tech_repo.get_assigned_farm_device_detail("tech-001", "uuid-farm-1", "uuid-dev-1")
+        assert detail is not None
+        assert detail["status"] == "UNKNOWN"
+        assert detail["mqtt_status"] == "Unknown"
+
+
+def test_technician_dashboard_and_devices_when_iot_service_up_mixed():
+    def fake_http_get(url: str, timeout: float) -> tuple[int, Any]:
+        if url.endswith("/api/iot/devices/presence"):
+            return 200, [
+                {
+                    "deviceId": "ESP32-NODE-01",
+                    "status": "ONLINE",
+                    "rssi": -65,
+                    "lastSeen": "2026-11-04T12:00:00Z",
+                },
+                {
+                    "deviceId": "ESP32-NODE-02",
+                    "status": "OFFLINE",
+                    "rssi": None,
+                    "lastSeen": "2026-11-04T11:00:00Z",
+                },
+                {
+                    "deviceId": "ESP32-NODE-03",
+                    "status": "STALE",
+                    "rssi": -80,
+                    "lastSeen": "2026-11-04T10:00:00Z",
+                },
+            ]
+        return 404, None
+
+    adapter = IoTServiceAdapter(base_url="http://127.0.0.1:8002", http_get=fake_http_get)
+    tech_repo = TechnicianRepository(iot_adapter=adapter)
+
+    mock_conn = MagicMock()
+    mock_cur = MagicMock()
+    mock_conn.__enter__.return_value = mock_conn
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+
+    with patch("app.repositories.technician_repository.get_connection", return_value=mock_conn):
+        mock_cur.fetchone.return_value = (
+            2,
+            4,
+            4,
+            ["uuid-dev-1", "uuid-dev-2", "uuid-dev-3", "uuid-dev-4"],
+            ["ESP32-NODE-01", "ESP32-NODE-02", "ESP32-NODE-03", "ESP32-NODE-04"],
+        )
+        summary = tech_repo.get_dashboard_summary("tech-001")
+        assert summary["device_count"] == 4
+        assert summary["online_device_count"] == 1
+        assert summary["offline_device_count"] == 3
+        assert summary["unknown_device_count"] == 0
+
+

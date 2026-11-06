@@ -147,13 +147,15 @@ def seeded_multitenant_env():
                 ),
             )
 
-            # 8. Insert Inactive Technician Assignment on Farm B
+            # 8. Insert Active Assignment on Farm A, Inactive Assignment on Farm B
             cur.execute(
                 """
                 INSERT INTO technician_assignments (technician_id, farm_id, is_primary, is_active)
-                VALUES (%s, %s, TRUE, FALSE);
+                VALUES
+                    (%s, %s, TRUE, TRUE),
+                    (%s, %s, TRUE, FALSE);
                 """,
-                (tech_id, farm_b_id),
+                (tech_id, farm_a_id, tech_id, farm_b_id),
             )
             conn.commit()
 
@@ -340,3 +342,62 @@ def test_m1_m3_device_detail_single_presence_and_status_distinction(seeded_multi
     # 2. Owner A attempts to read Device B -> 403 Forbidden
     resp_dev_b_attack = client.get(f"/api/devices/{dev_b_id}", headers=headers_a)
     assert resp_dev_b_attack.status_code == 403
+
+
+def test_m3_technician_dashboard_and_devices_e2e(seeded_multitenant_env):
+    """
+    M-3 Verification:
+    - Technician dashboard does not count UNKNOWN as OFFLINE when IoT service is unreachable.
+    - Technician device list & detail return UNKNOWN status when IoT presence is unavailable.
+    - Tenant isolation & RBAC are preserved:
+      * Technician can access actively assigned Farm A devices.
+      * Technician cannot access inactive Farm B devices (403 Forbidden).
+      * Other users (Owner A) cannot access Technician's dashboard (403 Forbidden).
+    """
+    client = seeded_multitenant_env["client"]
+    headers_a = seeded_multitenant_env["headers_a"]
+    headers_tech = seeded_multitenant_env["headers_tech"]
+    tech_id = seeded_multitenant_env["tech_id"]
+    farm_a_id = seeded_multitenant_env["farm_a_id"]
+    farm_b_id = seeded_multitenant_env["farm_b_id"]
+    dev_a_id = seeded_multitenant_env["dev_a_id"]
+
+    # 1. Technician dashboard when IoT service is down -> unknown_device_count > 0, offline == 0
+    resp_dash = client.get(f"/api/technicians/{tech_id}/dashboard", headers=headers_tech)
+    assert resp_dash.status_code == 200
+    dash_data = resp_dash.json()
+    assert dash_data["technician_id"] == tech_id
+    assert dash_data["assigned_farm_count"] == 1
+    assert dash_data["device_count"] == 1
+    assert dash_data["online_device_count"] == 0
+    assert dash_data["offline_device_count"] == 0  # Crucial M-3: must NOT misreport as offline
+    assert dash_data["unknown_device_count"] == 1
+
+    # 2. Technician accesses assigned Farm A devices
+    resp_devices = client.get(f"/api/technicians/{tech_id}/farms/{farm_a_id}/devices", headers=headers_tech)
+    assert resp_devices.status_code == 200
+    devices = resp_devices.json()
+    assert len(devices) == 1
+    assert devices[0]["device_id"] == dev_a_id
+    assert devices[0]["status"] == "UNKNOWN"
+    assert devices[0]["mqtt_status"] == "Unknown"
+
+    # 3. Technician accesses assigned Farm A device detail
+    resp_dev_detail = client.get(
+        f"/api/technicians/{tech_id}/farms/{farm_a_id}/devices/{dev_a_id}",
+        headers=headers_tech,
+    )
+    assert resp_dev_detail.status_code == 200
+    dev_data = resp_dev_detail.json()
+    assert dev_data["device_id"] == dev_a_id
+    assert dev_data["status"] == "UNKNOWN"
+    assert dev_data["mqtt_status"] == "Unknown"
+
+    # 4. RBAC & Tenant Isolation: Technician accesses unassigned/inactive Farm B devices -> 403 Forbidden
+    resp_dev_b = client.get(f"/api/technicians/{tech_id}/farms/{farm_b_id}/devices", headers=headers_tech)
+    assert resp_dev_b.status_code == 403
+
+    # 5. RBAC: Non-technician / other user (Owner A) cannot access technician's dashboard -> 403 Forbidden
+    resp_owner_attack = client.get(f"/api/technicians/{tech_id}/dashboard", headers=headers_a)
+    assert resp_owner_attack.status_code == 403
+

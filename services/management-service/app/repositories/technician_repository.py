@@ -220,26 +220,24 @@ class TechnicianRepository:
 
                 rows = cur.fetchall()
 
-        identifiers: list[str] = []
-        for row in rows:
-            identifiers.append(str(row[0]))
-            if row[1]:
-                identifiers.append(str(row[1]))
-
-        runtime_states = self._iot_adapter.get_devices_runtime_state(identifiers)
+        all_presence = self._iot_adapter.list_devices_presence()
+        iot_reachable = all_presence is not None
 
         devices = []
 
         for row in rows:
             dev_id = str(row[0])
             node_id = str(row[1]) if row[1] else None
-            state_info = (
-                runtime_states.get(node_id) if node_id and node_id in runtime_states else runtime_states.get(dev_id)
+            presence_info = (
+                all_presence.get(node_id)
+                if (all_presence and node_id and node_id in all_presence)
+                else (all_presence.get(dev_id) if all_presence else None)
             )
-            is_online = state_info is not None
-            recorded_at = state_info["recorded_at"] if state_info else None
-            device_state = state_info["device_state"] if state_info else {}
-            rssi = device_state.get("networkRssi")
+
+            status_val, mqtt_val, rssi, recorded_at = self._iot_adapter.resolve_status(
+                presence_info,
+                iot_reachable,
+            )
 
             devices.append(
                 {
@@ -255,17 +253,9 @@ class TechnicianRepository:
                         else None
                     ),
                     "zone_name": row[6],
-                    "status": (
-                        "ONLINE"
-                        if is_online
-                        else "OFFLINE"
-                    ),
+                    "status": status_val,
                     "rssi": rssi,
-                    "mqtt_status": (
-                        "Connected"
-                        if is_online
-                        else "Disconnected"
-                    ),
+                    "mqtt_status": mqtt_val,
                     "ip_address": row[7],
                     "firmware_version": row[8],
                     "last_seen": (
@@ -342,12 +332,31 @@ class TechnicianRepository:
         device_uuids = [str(did) for did in (row[3] or [])]
         node_ids = [str(nid) for nid in (row[4] or [])] if len(row) > 4 else []
         lookup_ids = node_ids if node_ids else device_uuids
-
-        online_count, _ = self._iot_adapter.get_devices_presence_counts(
-            lookup_ids
-        )
         total_devices = int(row[2] or 0)
-        offline_count = max(0, total_devices - online_count)
+
+        all_presence = self._iot_adapter.list_devices_presence()
+        if all_presence is None:
+            # IoT Service is down / unreachable: all devices are UNKNOWN; never count UNKNOWN as OFFLINE
+            online_count = 0
+            offline_count = 0
+            unknown_count = total_devices
+        else:
+            online_count = 0
+            offline_count = 0
+            unknown_count = 0
+            for did in lookup_ids:
+                p_info = all_presence.get(did)
+                status_val, _, _, _ = self._iot_adapter.resolve_status(p_info, iot_reachable=True)
+                if status_val == "ONLINE":
+                    online_count += 1
+                elif status_val == "OFFLINE":
+                    offline_count += 1
+                else:
+                    unknown_count += 1
+
+            accounted = online_count + offline_count + unknown_count
+            if accounted < total_devices:
+                offline_count += (total_devices - accounted)
 
         return {
             "technician_id": technician_id,
@@ -356,6 +365,7 @@ class TechnicianRepository:
             "device_count": total_devices,
             "online_device_count": online_count,
             "offline_device_count": offline_count,
+            "unknown_device_count": unknown_count,
         }
 
     def assign_technician(self, technician_id: str, farm_id: str, is_primary: bool = True):
