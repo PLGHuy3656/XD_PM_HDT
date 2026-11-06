@@ -18,12 +18,32 @@ router = APIRouter(
 )
 def list_devices(
     farm_id: str | None = Query(None, description="Filter by Farm / House ID"),
+    farmId: str | None = Query(None, description="Filter by Farm / House ID (alias)"),
     zone_id: str | None = Query(None, description="Filter by Zone ID"),
     current_user: dict = Depends(get_current_user),
 ):
-    if farm_id:
-        verify_farm_resource_access(current_user, farm_id)
-    return device_controller.list_devices(farm_id=farm_id, zone_id=zone_id)
+    # Parameter normalization & conflict check
+    effective_farm_id = None
+    if farm_id and farmId and farm_id.strip() != farmId.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ambiguous or conflicting farm_id/farmId parameters",
+        )
+    effective_farm_id = (farm_id or farmId)
+    if effective_farm_id:
+        effective_farm_id = effective_farm_id.strip()
+
+    roles = current_user.get("roles") or []
+    if not effective_farm_id and "ADMIN" not in roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: 'farm_id' parameter is required for non-admin users",
+        )
+
+    if effective_farm_id:
+        verify_farm_resource_access(current_user, effective_farm_id)
+
+    return device_controller.list_devices(farm_id=effective_farm_id, zone_id=zone_id)
 
 
 @router.get(

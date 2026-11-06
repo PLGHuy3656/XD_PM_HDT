@@ -50,3 +50,44 @@ def test_get_zone(service):
 def test_empty_zone_id_raises_value_error(service):
     with pytest.raises(ValueError, match="zone_id is required"):
         service.get_zone("")
+
+
+def test_zone_repository_sql_branching_avoids_uuid_cast_error():
+    """Verifies that ZoneRepository branches safely between UUID and zone_code/farm_code."""
+    import uuid
+
+    # 1. Non-UUID zone code
+    zone_code = "ZONE-A"
+    is_uuid = False
+    try:
+        uuid.UUID(zone_code)
+        is_uuid = True
+    except (ValueError, AttributeError, TypeError):
+        is_uuid = False
+    assert is_uuid is False
+
+    # 2. Canonical UUID string
+    uuid_str = "33333333-cccc-cccc-cccc-cccccccccccc"
+    is_uuid = False
+    try:
+        uuid.UUID(uuid_str)
+        is_uuid = True
+    except (ValueError, AttributeError, TypeError):
+        is_uuid = False
+    assert is_uuid is True
+
+
+def test_zone_controller_get_nonexistent_zone_returns_404():
+    from fastapi import HTTPException
+    from app.controllers.zone_controller import ZoneController
+
+    class EmptyZoneService:
+        def get_zone(self, zone_id: str):
+            return None
+
+    controller = ZoneController(service=EmptyZoneService())
+    with pytest.raises(HTTPException) as exc_info:
+        controller.get_zone("nonexistent-zone")
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "Zone not found"

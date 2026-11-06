@@ -29,6 +29,8 @@ class AuthController:
             id=str(current_user["id"]),
             email=current_user["email"],
             full_name=current_user["full_name"],
+            phone=current_user.get("phone"),
+            status=current_user["status"],
             roles=current_user.get("roles") or [],
         )
 

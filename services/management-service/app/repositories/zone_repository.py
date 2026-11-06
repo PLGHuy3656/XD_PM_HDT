@@ -1,12 +1,28 @@
+import uuid
+
 from app.database import get_connection
 
 
 class ZoneRepository:
     def list_zones_by_farm(self, farm_id: str):
+        if not farm_id or not str(farm_id).strip():
+            return []
+
+        farm_id_str = str(farm_id).strip()
+        is_uuid = False
+        try:
+            uuid.UUID(farm_id_str)
+            is_uuid = True
+        except (ValueError, AttributeError, TypeError):
+            is_uuid = False
+
+        where_clause = "WHERE z.farm_id = %s OR f.farm_code = %s" if is_uuid else "WHERE f.farm_code = %s"
+        params = (farm_id_str, farm_id_str) if is_uuid else (farm_id_str,)
+
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """
+                    f"""
                     SELECT
                         z.id,
                         z.farm_id,
@@ -20,7 +36,7 @@ class ZoneRepository:
                     LEFT JOIN devices d
                         ON d.zone_id = z.id
                        AND d.is_active = TRUE
-                    WHERE z.farm_id = %s OR f.farm_code = %s
+                    {where_clause}
                     GROUP BY
                         z.id,
                         z.farm_id,
@@ -29,7 +45,7 @@ class ZoneRepository:
                         z.created_at
                     ORDER BY z.zone_code
                     """,
-                    (farm_id, farm_id),
+                    params,
                 )
                 rows = cur.fetchall()
 
@@ -46,10 +62,24 @@ class ZoneRepository:
         ]
 
     def get_zone_by_id(self, zone_id: str):
+        if not zone_id or not str(zone_id).strip():
+            return None
+
+        zone_id_str = str(zone_id).strip()
+        is_uuid = False
+        try:
+            uuid.UUID(zone_id_str)
+            is_uuid = True
+        except (ValueError, AttributeError, TypeError):
+            is_uuid = False
+
+        where_clause = "WHERE z.id = %s OR z.zone_code = %s" if is_uuid else "WHERE z.zone_code = %s"
+        params = (zone_id_str, zone_id_str) if is_uuid else (zone_id_str,)
+
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """
+                    f"""
                     SELECT
                         z.id,
                         z.farm_id,
@@ -61,7 +91,7 @@ class ZoneRepository:
                     LEFT JOIN devices d
                         ON d.zone_id = z.id
                        AND d.is_active = TRUE
-                    WHERE z.id = %s OR z.zone_code = %s
+                    {where_clause}
                     GROUP BY
                         z.id,
                         z.farm_id,
@@ -69,7 +99,7 @@ class ZoneRepository:
                         z.name,
                         z.created_at
                     """,
-                    (zone_id, zone_id),
+                    params,
                 )
                 row = cur.fetchone()
 

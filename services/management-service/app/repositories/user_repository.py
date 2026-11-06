@@ -152,18 +152,66 @@ class UserRepository:
 
     def get_farm_id_for_device(self, device_id: str) -> str | None:
         """Resolves the parent farm_id for a device."""
+        import uuid
+        dev_id_str = str(device_id).strip()
+        is_uuid = False
+        try:
+            uuid.UUID(dev_id_str)
+            is_uuid = True
+        except (ValueError, AttributeError, TypeError):
+            is_uuid = False
+
         with get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT farm_id
-                    FROM devices
-                    WHERE id::text = %s OR node_id = %s;
-                    """,
-                    (device_id, device_id),
-                )
+                if is_uuid:
+                    cur.execute(
+                        """
+                        SELECT farm_id
+                        FROM devices
+                        WHERE id = %s OR node_id = %s;
+                        """,
+                        (dev_id_str, dev_id_str),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT farm_id
+                        FROM devices
+                        WHERE node_id = %s;
+                        """,
+                        (dev_id_str,),
+                    )
                 row = cur.fetchone()
                 return str(row[0]) if row else None
+
+
+    def farm_exists(self, farm_id: str) -> bool:
+        """Checks if a farm exists by id (UUID) or farm_code."""
+        if not farm_id or not str(farm_id).strip():
+            return False
+
+        import uuid
+        farm_id_str = str(farm_id).strip()
+        is_uuid = False
+        try:
+            uuid.UUID(farm_id_str)
+            is_uuid = True
+        except (ValueError, AttributeError, TypeError):
+            is_uuid = False
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                if is_uuid:
+                    cur.execute(
+                        "SELECT 1 FROM farms WHERE id = %s OR farm_code = %s LIMIT 1;",
+                        (farm_id_str, farm_id_str),
+                    )
+                else:
+                    cur.execute(
+                        "SELECT 1 FROM farms WHERE farm_code = %s LIMIT 1;",
+                        (farm_id_str,),
+                    )
+                return cur.fetchone() is not None
 
 
 user_repository = UserRepository()

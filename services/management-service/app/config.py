@@ -12,9 +12,10 @@ class Settings(BaseSettings):
     )
 
     database_url: str = ""
-    # TODO(MICROSERVICE-BOUNDARY):
-    # Temporary fallback connection to legacy database for runtime IoT telemetry/presence state
-    # until IoT Service (iot-service) is operational and provides REST / event APIs.
+    # IoT Service HTTP boundary contract (CP8.0 / CP8.1)
+    iot_service_base_url: str = "http://127.0.0.1:8002"
+    iot_service_timeout_seconds: float = 3.0
+    # Deprecated legacy migration setting (only used by one-off database/migrate_from_legacy.py script)
     legacy_iot_database_url: str = ""
     service_host: str = "127.0.0.1"
     service_port: int = 8001

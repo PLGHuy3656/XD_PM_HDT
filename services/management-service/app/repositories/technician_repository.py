@@ -1,8 +1,10 @@
-from app.adapters.legacy_iot_adapter import legacy_iot_adapter
+from app.adapters.iot_service_adapter import IoTServiceAdapter, iot_service_adapter
 from app.database import get_connection
 
 
 class TechnicianRepository:
+    def __init__(self, iot_adapter: IoTServiceAdapter | None = None):
+        self._iot_adapter = iot_adapter or iot_service_adapter
     def list_technicians(self):
         with get_connection() as conn:
             with conn.cursor() as cur:
@@ -111,10 +113,22 @@ class TechnicianRepository:
         technician_id: str,
         farm_id: str,
     ):
+        import uuid
+        farm_id_str = str(farm_id).strip()
+        is_farm_uuid = False
+        try:
+            uuid.UUID(farm_id_str)
+            is_farm_uuid = True
+        except (ValueError, AttributeError, TypeError):
+            is_farm_uuid = False
+
+        where_farm = "(ta.farm_id = %s OR f.farm_code = %s)" if is_farm_uuid else "f.farm_code = %s"
+        farm_params = (farm_id_str, farm_id_str) if is_farm_uuid else (farm_id_str,)
+
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """
+                    f"""
                     SELECT
                         f.id,
                         f.farm_code,
@@ -130,14 +144,14 @@ class TechnicianRepository:
                         ON d.farm_id = f.id
                        AND d.is_active = TRUE
                     WHERE ta.technician_id = %s
-                      AND (ta.farm_id = %s OR f.farm_code = %s)
+                      AND {where_farm}
                       AND ta.is_active = TRUE
                     GROUP BY
                         f.id,
                         f.farm_code,
                         f.name
                     """,
-                    (technician_id, farm_id, farm_id),
+                    (technician_id, *farm_params),
                 )
 
                 row = cur.fetchone()
@@ -162,10 +176,22 @@ class TechnicianRepository:
         technician_id: str,
         farm_id: str,
     ):
+        import uuid
+        farm_id_str = str(farm_id).strip()
+        is_farm_uuid = False
+        try:
+            uuid.UUID(farm_id_str)
+            is_farm_uuid = True
+        except (ValueError, AttributeError, TypeError):
+            is_farm_uuid = False
+
+        where_farm = "(ta.farm_id = %s OR f.farm_code = %s)" if is_farm_uuid else "f.farm_code = %s"
+        farm_params = (farm_id_str, farm_id_str) if is_farm_uuid else (farm_id_str,)
+
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """
+                    f"""
                     SELECT
                         d.id,
                         d.node_id,
@@ -184,29 +210,32 @@ class TechnicianRepository:
                     LEFT JOIN zones z
                         ON z.id = d.zone_id
                     WHERE ta.technician_id = %s
-                      AND (ta.farm_id = %s OR f.farm_code = %s)
+                      AND {where_farm}
                       AND ta.is_active = TRUE
                       AND d.is_active = TRUE
                     ORDER BY d.node_id
                     """,
-                    (technician_id, farm_id, farm_id),
+                    (technician_id, *farm_params),
                 )
 
                 rows = cur.fetchall()
 
-        device_ids = [str(row[0]) for row in rows]
+        identifiers: list[str] = []
+        for row in rows:
+            identifiers.append(str(row[0]))
+            if row[1]:
+                identifiers.append(str(row[1]))
 
-        # TODO(MICROSERVICE-BOUNDARY):
-        # - Boundary Crossover: Reading runtime state (recorded_at, device_state JSONB) via legacy_iot_adapter.
-        # - Future Service Owner: IoT Service owns runtime state, telemetry, and device online/offline status.
-        # - Eventual Replacement: Replace with IoT Service REST API call or local read model updated via RabbitMQ telemetry events.
-        runtime_states = legacy_iot_adapter.get_devices_runtime_state(device_ids)
+        runtime_states = self._iot_adapter.get_devices_runtime_state(identifiers)
 
         devices = []
 
         for row in rows:
             dev_id = str(row[0])
-            state_info = runtime_states.get(dev_id)
+            node_id = str(row[1]) if row[1] else None
+            state_info = (
+                runtime_states.get(node_id) if node_id and node_id in runtime_states else runtime_states.get(dev_id)
+            )
             is_online = state_info is not None
             recorded_at = state_info["recorded_at"] if state_info else None
             device_state = state_info["device_state"] if state_info else {}
@@ -288,7 +317,10 @@ class TechnicianRepository:
                             AS device_count,
 
                         ARRAY_AGG(DISTINCT d.id) FILTER (WHERE d.id IS NOT NULL)
-                            AS device_ids
+                            AS device_ids,
+
+                        ARRAY_AGG(DISTINCT d.node_id) FILTER (WHERE d.node_id IS NOT NULL)
+                            AS node_ids
 
                     FROM technician_assignments ta
 
@@ -308,20 +340,20 @@ class TechnicianRepository:
                 row = cur.fetchone()
 
         device_uuids = [str(did) for did in (row[3] or [])]
+        node_ids = [str(nid) for nid in (row[4] or [])] if len(row) > 4 else []
+        lookup_ids = node_ids if node_ids else device_uuids
 
-        # TODO(MICROSERVICE-BOUNDARY):
-        # - Boundary Crossover: Reading runtime presence counts via legacy_iot_adapter.
-        # - Future Service Owner: IoT Service owns device presence and telemetry state.
-        # - Eventual Replacement: Query IoT Service metrics endpoint or read cached state projection.
-        online_count, offline_count = legacy_iot_adapter.get_devices_presence_counts(
-            device_uuids
+        online_count, _ = self._iot_adapter.get_devices_presence_counts(
+            lookup_ids
         )
+        total_devices = int(row[2] or 0)
+        offline_count = max(0, total_devices - online_count)
 
         return {
             "technician_id": technician_id,
             "assigned_farm_count": row[0] or 0,
             "zone_count": row[1] or 0,
-            "device_count": row[2] or 0,
+            "device_count": total_devices,
             "online_device_count": online_count,
             "offline_device_count": offline_count,
         }
