@@ -2,6 +2,10 @@ import logging
 from datetime import datetime, timezone
 
 from app.config import settings
+from app.domain_events.evaluator import (
+    IoTConditionEvaluator,
+    default_condition_evaluator,
+)
 from app.realtime.publisher import RealtimePublisher, ws_manager
 from app.repositories.presence_repository import (
     DevicePresenceRepository,
@@ -21,6 +25,7 @@ class DevicePresenceService:
         repository: DevicePresenceRepository | None = None,
         stale_timeout_seconds: int | None = None,
         realtime_publisher: RealtimePublisher | None = None,
+        condition_evaluator: IoTConditionEvaluator | None = None,
     ):
         self.repository = repository or default_presence_repository
         self.stale_timeout_seconds = (
@@ -30,6 +35,9 @@ class DevicePresenceService:
         )
         self.realtime_publisher: RealtimePublisher = (
             realtime_publisher or ws_manager
+        )
+        self.condition_evaluator: IoTConditionEvaluator = (
+            condition_evaluator or default_condition_evaluator
         )
 
     def _emit_presence_updated(
@@ -80,6 +88,10 @@ class DevicePresenceService:
 
         self.repository.save(updated)
         logger.info("[PRESENCE] Device '%s' marked ONLINE via status", device_id)
+        try:
+            self.condition_evaluator.evaluate_presence_transition(device_id, "ONLINE", now)
+        except Exception as exc:
+            logger.warning("[PRESENCE DOMAIN EVENT WARNING] %s", exc)
         self._emit_presence_updated(updated, now)
         return updated
 
@@ -108,6 +120,10 @@ class DevicePresenceService:
 
         self.repository.save(updated)
         logger.info("[PRESENCE] Device '%s' marked OFFLINE via status/LWT", device_id)
+        try:
+            self.condition_evaluator.evaluate_presence_transition(device_id, "OFFLINE", now)
+        except Exception as exc:
+            logger.warning("[PRESENCE DOMAIN EVENT WARNING] %s", exc)
         self._emit_presence_updated(updated, now)
         return updated
 
@@ -146,6 +162,10 @@ class DevicePresenceService:
             heartbeat.uptime,
             heartbeat.ip,
         )
+        try:
+            self.condition_evaluator.evaluate_presence_transition(device_id, "ONLINE", now)
+        except Exception as exc:
+            logger.warning("[PRESENCE DOMAIN EVENT WARNING] %s", exc)
         self._emit_presence_updated(updated, now)
         return updated
 
@@ -182,6 +202,10 @@ class DevicePresenceService:
                     presence.device_id,
                     timeout,
                 )
+                try:
+                    self.condition_evaluator.evaluate_presence_transition(presence.device_id, "STALE", current_time)
+                except Exception as exc:
+                    logger.warning("[PRESENCE DOMAIN EVENT WARNING] %s", exc)
                 self._emit_presence_updated(stale_presence, current_time)
 
         return stale_devices

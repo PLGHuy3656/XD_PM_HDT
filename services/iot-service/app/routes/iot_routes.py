@@ -13,7 +13,18 @@ from app.schemas.api import (
     RelayCommandRequest,
     TelemetryResponse,
 )
+from app.schemas.diagnostics import (
+    AdminDeviceRegistryItem,
+    DeviceDiagnosticDetail,
+    DiagnosticSummary,
+    InstallationChecklistResponse,
+    ProvisionDeviceRequest,
+)
 from app.services.command_service import DeviceCommandService
+from app.services.diagnostics_service import (
+    DiagnosticsService,
+    default_diagnostics_service,
+)
 from app.services.presence_service import DevicePresenceService
 from app.services.telemetry_service import TelemetryService
 
@@ -149,3 +160,58 @@ def get_command_state(
             detail=f"Command '{command_id}' not found",
         )
     return CommandResponse.from_domain(cmd)
+
+
+# --- Provisioning, Installation & Diagnostics Routes ---
+
+@router.get(
+    "/devices/registry-summary",
+    response_model=list[AdminDeviceRegistryItem],
+    summary="Get overview of all registered devices with provisioning status for Administrator",
+)
+def get_registry_summary() -> list[AdminDeviceRegistryItem]:
+    return default_diagnostics_service.get_admin_registry_summary()
+
+
+@router.get(
+    "/diagnostics/summary",
+    response_model=DiagnosticSummary,
+    summary="Get aggregate health and diagnostic counts for Technician Dashboard",
+)
+def get_diagnostics_summary() -> DiagnosticSummary:
+    return default_diagnostics_service.get_diagnostic_summary()
+
+
+@router.get(
+    "/devices/{device_id}/diagnostics",
+    response_model=DeviceDiagnosticDetail,
+    summary="Get detailed technical diagnostic signals for a device (Technician)",
+)
+def get_device_diagnostics(device_id: str) -> DeviceDiagnosticDetail:
+    diag = default_diagnostics_service.get_device_diagnostics(device_id)
+    if diag is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Device '{device_id}' not found",
+        )
+    return diag
+
+
+@router.get(
+    "/devices/{device_id}/installation-checklist",
+    response_model=InstallationChecklistResponse,
+    summary="Check installation and readiness checklist for a device (Technician)",
+)
+def get_installation_checklist(device_id: str) -> InstallationChecklistResponse:
+    return default_diagnostics_service.get_installation_checklist(device_id)
+
+
+@router.post(
+    "/devices/{device_id}/provision",
+    status_code=status.HTTP_200_OK,
+    summary="Provision and assign a device to a farm and zone (Technician)",
+)
+def provision_device(device_id: str, body: ProvisionDeviceRequest):
+    return default_diagnostics_service.provision_device(device_id, body)
+
+

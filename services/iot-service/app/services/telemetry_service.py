@@ -5,6 +5,10 @@ from datetime import datetime, timezone
 
 from pydantic import ValidationError
 
+from app.domain_events.evaluator import (
+    IoTConditionEvaluator,
+    default_condition_evaluator,
+)
 from app.realtime.publisher import RealtimePublisher, ws_manager
 from app.repositories.telemetry_repository import (
     TelemetryRepository,
@@ -34,12 +38,16 @@ class TelemetryService:
         self,
         repository: TelemetryRepository | None = None,
         realtime_publisher: RealtimePublisher | None = None,
+        condition_evaluator: IoTConditionEvaluator | None = None,
     ):
         self.repository: TelemetryRepository = (
             repository or default_telemetry_repository
         )
         self.realtime_publisher: RealtimePublisher = (
             realtime_publisher or ws_manager
+        )
+        self.condition_evaluator: IoTConditionEvaluator = (
+            condition_evaluator or default_condition_evaluator
         )
 
     def get_latest(self, device_id: str) -> AcceptedTelemetry | None:
@@ -130,7 +138,17 @@ class TelemetryService:
             accepted.received_at.isoformat(),
         )
 
-        # Step 8: Publish realtime event (isolated from domain success)
+        # Step 8: Evaluate domain alert events (Hysteresis & condition state machine)
+        try:
+            self.condition_evaluator.evaluate_telemetry(accepted)
+        except Exception as exc:
+            logger.warning(
+                "[TELEMETRY CONDITION EVALUATION WARNING] Failed to evaluate conditions for '%s': %s",
+                accepted.device_id,
+                exc,
+            )
+
+        # Step 9: Publish realtime event (isolated from domain success)
         try:
             event = RealtimeEvent(
                 type="telemetry.updated",
