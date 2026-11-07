@@ -1,0 +1,50 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: swiftletcare-rabbitmq
+    hostname: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "${RABBITMQ_BIND_IP:-127.0.0.1}:${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "${RABBITMQ_BIND_IP:-127.0.0.1}:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-swiftlet}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-swiftlet123}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - swiftletcare-net
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: swiftletcare-redis
+    hostname: redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_BIND_IP:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - swiftletcare-net
+
+volumes:
+  rabbitmq_data:
+    name: swiftletcare_rabbitmq_data
+  redis_data:
+    name: swiftletcare_redis_data
+
+networks:
+  swiftletcare-net:
+    external: true
+    name: swiftletcare-network
