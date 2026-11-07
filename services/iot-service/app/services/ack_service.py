@@ -5,6 +5,10 @@ from datetime import datetime, timezone
 
 from pydantic import ValidationError
 
+from app.domain_events.evaluator import (
+    IoTConditionEvaluator,
+    default_condition_evaluator,
+)
 from app.realtime.publisher import RealtimePublisher, ws_manager
 from app.repositories.command_repository import (
     CommandRepository,
@@ -34,10 +38,14 @@ class AckService:
         self,
         repository: CommandRepository | None = None,
         realtime_publisher: RealtimePublisher | None = None,
+        condition_evaluator: IoTConditionEvaluator | None = None,
     ):
         self.repository = repository or default_command_repository
         self.realtime_publisher: RealtimePublisher = (
             realtime_publisher or ws_manager
+        )
+        self.condition_evaluator: IoTConditionEvaluator = (
+            condition_evaluator or default_condition_evaluator
         )
 
     def process_message(
@@ -134,7 +142,21 @@ class AckService:
             updated.ack_mode,
         )
 
-        # Step 9: Publish realtime command.updated event (isolated from domain success)
+        # Step 9: Evaluate command failure domain event on terminal FAILED/ERROR
+        if updated.status in ("FAILED", "ERROR"):
+            try:
+                self.condition_evaluator.evaluate_command_failure(
+                    device_id=updated.device_id,
+                    command_id=updated.command_id,
+                    action=str(updated.action),
+                    target=updated.payload.get("target"),
+                    reason=updated.ack_message or f"Edge node reported execution failure: {updated.status}",
+                    timestamp=now,
+                )
+            except Exception as exc:
+                logger.warning("[ACK COMMAND FAILURE DOMAIN EVENT WARNING] %s", exc)
+
+        # Step 10: Publish realtime command.updated event (isolated from domain success)
         try:
             event = RealtimeEvent(
                 type="command.updated",

@@ -4,6 +4,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Protocol
 
+from app.domain_events.evaluator import (
+    IoTConditionEvaluator,
+    default_condition_evaluator,
+)
 from app.mqtt.topics import build_topic
 from app.repositories.command_repository import (
     CommandRepository,
@@ -39,9 +43,13 @@ class DeviceCommandService:
         self,
         repository: CommandRepository | None = None,
         publisher: CommandPublisher | None = None,
+        condition_evaluator: IoTConditionEvaluator | None = None,
     ):
         self.repository = repository or default_command_repository
         self._publisher = publisher
+        self.condition_evaluator: IoTConditionEvaluator = (
+            condition_evaluator or default_condition_evaluator
+        )
 
     @property
     def publisher(self) -> CommandPublisher:
@@ -164,6 +172,17 @@ class DeviceCommandService:
                 command_id,
                 topic,
             )
+            try:
+                self.condition_evaluator.evaluate_command_failure(
+                    device_id=device_id,
+                    command_id=command_id,
+                    action=action,
+                    target=payload_dict.get("target"),
+                    reason="MQTT publish failed or broker unavailable",
+                    timestamp=now,
+                )
+            except Exception as exc:
+                logger.warning("[COMMAND FAILURE DOMAIN EVENT WARNING] %s", exc)
             return updated
 
     def get_command(self, command_id: str) -> DeviceCommand | None:

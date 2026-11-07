@@ -85,6 +85,23 @@ class DeviceRepository:
                 iot_reachable,
             )
 
+            # Map provisioning status for Administrator
+            if status_val in ("OFFLINE", "STALE"):
+                prov_status = "DISCONNECTED"
+            elif status_val == "WARNING":
+                prov_status = "ATTENTION"
+            elif status_val == "ONLINE":
+                prov_status = "PROVISIONED"
+            else:
+                prov_status = "DISCONNECTED"
+
+            health_meta = {
+                "uptime": presence_info.get("uptime") if presence_info else None,
+                "ip": presence_info.get("ip") or row[7],
+                "freeHeap": presence_info.get("free_heap") if presence_info else None,
+                "lastSeen": presence_info.get("last_seen") if presence_info else None,
+            }
+
             devices.append(
                 {
                     "device_id": dev_id,
@@ -99,6 +116,8 @@ class DeviceRepository:
                     "is_active": row[9],
                     "status": status_val,
                     "presence_status": status_val,
+                    "provisioning_status": prov_status,
+                    "health_metadata": health_meta,
                     "created_at": row[10].isoformat() if row[10] else None,
                 }
             )
@@ -181,6 +200,22 @@ class DeviceRepository:
             iot_reachable,
         )
 
+        if status_val in ("OFFLINE", "STALE"):
+            prov_status = "DISCONNECTED"
+        elif status_val == "WARNING":
+            prov_status = "ATTENTION"
+        elif status_val == "ONLINE":
+            prov_status = "PROVISIONED"
+        else:
+            prov_status = "DISCONNECTED"
+
+        health_meta = {
+            "uptime": presence_info.get("uptime") if presence_info else None,
+            "ip": presence_info.get("ip") or row[7],
+            "freeHeap": presence_info.get("free_heap") if presence_info else None,
+            "lastSeen": presence_info.get("last_seen") if presence_info else None,
+        }
+
         return {
             "device_id": dev_uuid,
             "node_id": row[1],
@@ -194,6 +229,8 @@ class DeviceRepository:
             "is_active": row[9],
             "status": status_val,
             "presence_status": status_val,
+            "provisioning_status": prov_status,
+            "health_metadata": health_meta,
             "created_at": row[10].isoformat() if row[10] else None,
         }
 
