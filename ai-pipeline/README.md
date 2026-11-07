@@ -81,6 +81,16 @@ python scripts/benchmark_latency.py  --source data/samples/entrance.mp4         
 | AI-NFR-006 | chỉ gửi counts + snapshot (`publish_detections: false`) |
 | AI-NFR-007 | `Base*` interface cho detector/tracker/publisher |
 
+## Video / camera flow
+```bash
+python scripts/calibrate_line.py --source data/samples/nest.mp4 --frame 100      # click the counting line
+python scripts/track_video.py --source data/samples/nest.mp4 --line 0.1 0.5 0.9 0.5 --inside positive --save-video outputs/track.mp4
+python scripts/track_video.py --source data/samples/predators --repeat 3 --cooldown 0   # rat/snake images
+python scripts/track_video.py --source rtsp://user:pass@ip/stream                       # IP camera (later)
+```
+Output: `outputs/track_events.jsonl` (counts + predator events), snapshots, annotated video.
+If entry/exit look swapped, use `--inside negative`.
+
 ## Lưu ý / giới hạn
 - Model **YOLO26**, train ở **640x640**: giữ `model.imgsz: 640` khi infer/evaluate (detector cảnh báo nếu lệch). Frame không vuông được letterbox, bbox trả về vẫn theo toạ độ frame gốc.
 - Audio AI chưa triển khai (Open Question 7.4: chưa có dataset/model/metric).
