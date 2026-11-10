@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  SwiftletCare CP9 — Apache NiFi Pipeline Flow Template [EXPERIMENTAL / UNVERIFIED]
+  Status: Structural skeleton provisioned for SRS CON-07. Pending live Docker verification.
+  Process Groups:
+    PG-01: Management Metadata Sync (farms, zones, devices -> dim_*)
+    PG-02: IoT Telemetry Ingestion (telemetry_records -> fact_telemetry_hourly)
+    PG-03: AI Count Updates (ai_count_updates -> stg_count_updates -> fact_bird_activity_hourly)
+    PG-04: Operational Alerts Rollup (alerts -> fact_alerts_hourly)
+-->
+<template encoding-version="1.3">
+  <description>[EXPERIMENTAL / UNVERIFIED] SwiftletCare OLAP Analytical Data Synchronization Pipeline - Structural Skeleton</description>
+  <groupId>swiftletcare-analytics-root</groupId>
+  <name>SwiftletCare_Analytics_ETL_Template</name>
+  <snippet>
+    <processGroups>
+      <!-- PG-01: Management Dimension Sync -->
+      <id>pg-01-management-sync</id>
+      <name>PG-01 Management Dimension Sync</name>
+      <comments>Periodic polling of farms, zones, devices with overlapping 2-min lookback buffer</comments>
+    </processGroups>
+    <processGroups>
+      <!-- PG-02: IoT Telemetry Sync -->
+      <id>pg-02-iot-telemetry-sync</id>
+      <name>PG-02 IoT Telemetry Sync</name>
+      <comments>Hourly sample-weighted rollup of microclimate sensors into fact_telemetry_hourly</comments>
+    </processGroups>
+    <processGroups>
+      <!-- PG-03: AI Counts Sync -->
+      <id>pg-03-ai-counts-sync</id>
+      <name>PG-03 AI Counts Sync</name>
+      <comments>Atomic deduplication ledger and deterministic snapshot materialization</comments>
+    </processGroups>
+    <processGroups>
+      <!-- PG-04: Notification Alerts Sync -->
+      <id>pg-04-notification-alerts-sync</id>
+      <name>PG-04 Notification Alerts Sync</name>
+      <comments>Hourly aggregation of alert severities into fact_alerts_hourly</comments>
+    </processGroups>
+  </snippet>
+</template>
