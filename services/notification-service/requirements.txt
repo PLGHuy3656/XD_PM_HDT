@@ -5,3 +5,4 @@ python-dotenv
 httpx
 aio-pika
 pywebpush
+firebase-admin

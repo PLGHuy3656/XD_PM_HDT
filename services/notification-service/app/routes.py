@@ -16,7 +16,11 @@ from app import repositories
 from app.auth import authenticate_websocket, get_user_from_authorization
 from app.config import settings
 from app.realtime import notification_connections
-from app.schemas import PushSubscriptionRequest
+from app.schemas import (
+    FcmTokenDeleteRequest,
+    FcmTokenRequest,
+    PushSubscriptionRequest,
+)
 
 router = APIRouter(prefix="/api/notifications", tags=["Notifications"])
 websocket_router = APIRouter()
@@ -90,6 +94,33 @@ async def save_subscription(
         str(subscription.endpoint),
         subscription.keys.p256dh,
         subscription.keys.auth,
+    )
+
+
+@router.post("/fcm-tokens", status_code=status.HTTP_204_NO_CONTENT)
+async def register_fcm_token(
+    token: FcmTokenRequest,
+    authorization: str | None = Header(default=None),
+):
+    user = await get_user_from_authorization(authorization)
+    await asyncio.to_thread(
+        repositories.save_fcm_token,
+        user["id"],
+        token.token,
+        token.platform,
+    )
+
+
+@router.delete("/fcm-tokens", status_code=status.HTTP_204_NO_CONTENT)
+async def unregister_fcm_token(
+    token: FcmTokenDeleteRequest,
+    authorization: str | None = Header(default=None),
+):
+    user = await get_user_from_authorization(authorization)
+    await asyncio.to_thread(
+        repositories.delete_fcm_token,
+        user["id"],
+        token.token,
     )
 
 

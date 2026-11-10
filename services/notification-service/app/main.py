@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import settings
-from app.consumer import consume_events
+from app.consumer import consume_events, deliver_pending_notifications
 from app.routes import router, websocket_router
 
 logger = logging.getLogger(__name__)
@@ -13,27 +13,39 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    consumer_task = None
-    if settings.rabbitmq_url:
-        consumer_task = asyncio.create_task(
+    background_tasks = []
+    if settings.rabbitmq_url and settings.database_url:
+        background_tasks.append(asyncio.create_task(
             consume_events(
                 settings.rabbitmq_url,
                 settings.event_exchange,
                 settings.notification_queue,
             )
-        )
+        ))
+    else:
+        if not settings.rabbitmq_url:
+            logger.warning(
+                "RabbitMQ is not configured; notification consumer is disabled"
+            )
+        if not settings.database_url:
+            logger.warning(
+                "DATABASE_URL is not configured; notification consumer is disabled"
+            )
+    if settings.database_url:
+        background_tasks.append(asyncio.create_task(deliver_pending_notifications()))
     else:
         logger.warning(
-            "RabbitMQ is not configured; notification consumer is disabled"
+            "DATABASE_URL is not configured; notification delivery worker is disabled"
         )
 
     try:
         yield
     finally:
-        if consumer_task:
-            consumer_task.cancel()
+        for task in background_tasks:
+            task.cancel()
+        for task in background_tasks:
             try:
-                await consumer_task
+                await task
             except asyncio.CancelledError:
                 pass
 
