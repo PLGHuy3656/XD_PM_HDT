@@ -18,8 +18,8 @@ from __future__ import annotations
 
 import logging
 import urllib.parse
-from typing import Any, Dict
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from typing import Any, Dict, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
 from app.auth import (
     get_current_gateway_user,
@@ -213,6 +213,99 @@ async def proxy_technician_farm_assignment(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Cannot access another technician's assignment",
+        )
+
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path=f"/api/technicians/{subpath}",
+        timeout=settings.management_timeout_seconds,
+    )
+
+
+@router.get(
+    "/api/technicians/{technician_id}/farms",
+    tags=["Management - Technicians"],
+    summary="Get farms assigned to technician",
+)
+async def proxy_technician_farms(
+    request: Request,
+    technician_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_gateway_user),
+) -> Response:
+    """Access technician assigned farms. Requires ADMIN or technician self."""
+    subpath = f"{technician_id}/farms"
+    _check_path_security(request, subpath)
+
+    roles = current_user.get("roles") or []
+    caller_id = str(current_user.get("id") or current_user.get("sub", ""))
+    if "ADMIN" not in roles and caller_id != technician_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Cannot access another technician's farms",
+        )
+
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path=f"/api/technicians/{subpath}",
+        timeout=settings.management_timeout_seconds,
+    )
+
+
+@router.get(
+    "/api/technicians/{technician_id}/farms/{farm_id}/devices",
+    tags=["Management - Technicians"],
+    summary="Get devices in an assigned farm for technician",
+)
+async def proxy_technician_farm_devices(
+    request: Request,
+    technician_id: str,
+    farm_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_gateway_user),
+) -> Response:
+    """Access devices in an assigned farm. Requires ADMIN or technician self."""
+    subpath = f"{technician_id}/farms/{farm_id}/devices"
+    _check_path_security(request, subpath)
+
+    roles = current_user.get("roles") or []
+    caller_id = str(current_user.get("id") or current_user.get("sub", ""))
+    if "ADMIN" not in roles and caller_id != technician_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Cannot access another technician's farm devices",
+        )
+
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path=f"/api/technicians/{subpath}",
+        timeout=settings.management_timeout_seconds,
+    )
+
+
+@router.get(
+    "/api/technicians/{technician_id}/farms/{farm_id}/devices/{device_id}",
+    tags=["Management - Technicians"],
+    summary="Get device detail in an assigned farm for technician",
+)
+async def proxy_technician_farm_device_detail(
+    request: Request,
+    technician_id: str,
+    farm_id: str,
+    device_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_gateway_user),
+) -> Response:
+    """Access device detail in an assigned farm. Requires ADMIN or technician self."""
+    subpath = f"{technician_id}/farms/{farm_id}/devices/{device_id}"
+    _check_path_security(request, subpath)
+
+    roles = current_user.get("roles") or []
+    caller_id = str(current_user.get("id") or current_user.get("sub", ""))
+    if "ADMIN" not in roles and caller_id != technician_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Cannot access another technician's device detail",
         )
 
     return await proxy_handler.forward(
@@ -476,6 +569,60 @@ async def proxy_iot_config_put(
 
 
 @router.get(
+    "/api/iot/devices/{device_id}/commands",
+    tags=["IoT - Commands"],
+    summary="List command history for a specific device",
+)
+async def proxy_iot_device_commands(
+    request: Request,
+    device_id: str,
+    limit: Optional[int] = Query(None, ge=1, le=500),
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "TECHNICIAN", "FARM_OWNER")),
+) -> Response:
+    """Command history strictly requires device ownership/assignment."""
+    path = f"devices/{device_id}/commands"
+    _check_path_security(request, path)
+    await resolve_device_access(device_id, request)
+
+    canonical_qs = f"limit={limit}" if limit is not None else ""
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.iot_service_url,
+        upstream_path=f"/api/iot/{path}",
+        timeout=settings.iot_timeout_seconds,
+        canonical_query=canonical_qs,
+    )
+
+
+@router.get(
+    "/api/iot/commands/{command_id}",
+    tags=["IoT - Commands (Locked for non-admin)"],
+    summary="Query command lifecycle status (Locked for non-admin pending command resolver)",
+)
+async def proxy_iot_command_status(
+    request: Request,
+    command_id: str,
+    current_user: Dict[str, Any] = Depends(require_any_authenticated),
+) -> Response:
+    """Command lifecycle state. Locked for non-admins pending command-to-device resolver."""
+    path = f"commands/{command_id}"
+    _check_path_security(request, path)
+    roles = current_user.get("roles") or []
+    if "ADMIN" not in roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Command status query is restricted to ADMIN pending command-to-device resolver",
+        )
+
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.iot_service_url,
+        upstream_path=f"/api/iot/{path}",
+        timeout=settings.iot_timeout_seconds,
+    )
+
+
+@router.get(
     "/api/iot/devices/{device_id}/telemetry",
     tags=["IoT - Telemetry"],
     summary="Get device telemetry",
@@ -676,7 +823,7 @@ async def proxy_ai_cameras(
             detail="Forbidden: AI camera listing is temporarily locked for non-admins pending TV2 farm-scoped camera filtering",
         )
 
-    canonical_qs = f"farm_id={farm_id}" if farm_id else None
+    canonical_qs = f"farm_id={farm_id}" if farm_id else ""
 
     return await proxy_handler.forward(
         request=request,
@@ -744,6 +891,101 @@ async def proxy_ai_camera_status(
 
 
 @router.get(
+    "/api/v1/ai/cameras/{camera_id}/counts/latest",
+    tags=["AI Service - Cameras (Locked)"],
+    summary="Get latest canonical bird count for camera (Locked for non-admin)",
+)
+async def proxy_ai_camera_count_latest(
+    request: Request,
+    camera_id: str,
+    current_user: Dict[str, Any] = Depends(require_any_authenticated),
+) -> Response:
+    """Latest bird count for camera. Locked for non-admins pending camera-to-farm resolver."""
+    _check_path_security(request, f"cameras/{camera_id}/counts/latest")
+    roles = current_user.get("roles") or []
+    if "ADMIN" not in roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: AI camera counts are restricted to ADMIN pending camera-to-farm resolver",
+        )
+
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.ai_service_url,
+        upstream_path=f"/api/v1/ai/cameras/{camera_id}/counts/latest",
+        timeout=settings.ai_timeout_seconds,
+    )
+
+
+@router.get(
+    "/api/v1/ai/cameras/{camera_id}/counts",
+    tags=["AI Service - Cameras (Locked)"],
+    summary="List historical bird count updates for camera (Locked for non-admin)",
+)
+async def proxy_ai_camera_counts(
+    request: Request,
+    camera_id: str,
+    limit: Optional[int] = Query(None, ge=1, le=500),
+    startTime: Optional[str] = Query(None),
+    endTime: Optional[str] = Query(None),
+    current_user: Dict[str, Any] = Depends(require_any_authenticated),
+) -> Response:
+    """Historical count updates for camera. Locked for non-admins pending camera-to-farm resolver."""
+    _check_path_security(request, f"cameras/{camera_id}/counts")
+    roles = current_user.get("roles") or []
+    if "ADMIN" not in roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: AI camera counts are restricted to ADMIN pending camera-to-farm resolver",
+        )
+
+    # Strictly allowlist parameters and apply standard URL encoding to prevent parameter injection / malformed timestamps
+    query_dict: dict[str, str] = {}
+    if limit is not None:
+        query_dict["limit"] = str(limit)
+    if startTime:
+        query_dict["startTime"] = startTime
+    if endTime:
+        query_dict["endTime"] = endTime
+    canonical_qs = urllib.parse.urlencode(query_dict)
+
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.ai_service_url,
+        upstream_path=f"/api/v1/ai/cameras/{camera_id}/counts",
+        timeout=settings.ai_timeout_seconds,
+        canonical_query=canonical_qs,
+    )
+
+
+@router.get(
+    "/api/v1/ai/cameras/{camera_id}/detections/latest",
+    tags=["AI Service - Cameras (Locked)"],
+    summary="Get latest canonical detection result for camera (Locked for non-admin)",
+)
+async def proxy_ai_camera_detection_latest(
+    request: Request,
+    camera_id: str,
+    current_user: Dict[str, Any] = Depends(require_any_authenticated),
+) -> Response:
+    """Latest detection result for camera. Locked for non-admins pending camera-to-farm resolver."""
+    _check_path_security(request, f"cameras/{camera_id}/detections/latest")
+    roles = current_user.get("roles") or []
+    if "ADMIN" not in roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: AI camera detections are restricted to ADMIN pending camera-to-farm resolver",
+        )
+
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.ai_service_url,
+        upstream_path=f"/api/v1/ai/cameras/{camera_id}/detections/latest",
+        timeout=settings.ai_timeout_seconds,
+    )
+
+
+@router.get(
     "/api/v1/ai/events",
     tags=["AI Service - Events (Locked)"],
     summary="Get AI detection events (Locked for non-admin)",
@@ -774,6 +1016,33 @@ async def proxy_ai_events(
         request=request,
         upstream_base_url=settings.ai_service_url,
         upstream_path="/api/v1/ai/events",
+        timeout=settings.ai_timeout_seconds,
+    )
+
+
+@router.get(
+    "/api/v1/ai/events/{event_id}",
+    tags=["AI Service - Events (Locked)"],
+    summary="Get single AI detection event by ID (Locked for non-admin)",
+)
+async def proxy_ai_event_detail(
+    request: Request,
+    event_id: str,
+    current_user: Dict[str, Any] = Depends(require_any_authenticated),
+) -> Response:
+    """AI event detail by ID. Locked for non-admins pending event-to-farm resolver."""
+    _check_path_security(request, f"events/{event_id}")
+    roles = current_user.get("roles") or []
+    if "ADMIN" not in roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: AI detection event detail is locked pending event-to-farm resolver",
+        )
+
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.ai_service_url,
+        upstream_path=f"/api/v1/ai/events/{event_id}",
         timeout=settings.ai_timeout_seconds,
     )
 
