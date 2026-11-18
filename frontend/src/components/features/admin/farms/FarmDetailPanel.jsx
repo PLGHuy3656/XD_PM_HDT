@@ -107,10 +107,10 @@ function FarmDetailPanel({
             </div>
 
             <div>
-              <strong>{farm.owner.name}</strong>
-              <span>{farm.owner.email}</span>
-              <span>{farm.owner.phone}</span>
-              <small>{farm.owner.id}</small>
+              <strong>{farm.owner?.name || 'Chưa gán chủ trại'}</strong>
+              <span>{farm.owner?.email || '--'}</span>
+              <span>{farm.owner?.phone || '--'}</span>
+              <small>{farm.owner?.id || '--'}</small>
             </div>
           </div>
         </section>

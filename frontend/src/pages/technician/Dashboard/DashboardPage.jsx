@@ -5,7 +5,11 @@ import DeviceStatusPanel from '../../../components/features/technician/dashboard
 import SensorHealthPanel from '../../../components/features/technician/dashboard/SensorHealthPanel'
 import ConnectivityPanel from '../../../components/features/technician/dashboard/ConnectivityPanel'
 import AlertsPanel from '../../../components/features/technician/dashboard/AlertsPanel'
-import { systemStats } from '../../../components/features/technician/dashboard/dashboardMockData'
+import { LoadingSpinner, ErrorMessage } from '../../../components/common/feedback/index.js'
+import EnvironmentSelect from '../../../components/ui/Select'
+
+import { useAuth } from '../../../context/AuthContext'
+import { useTechnicianData } from '../../../features/technicians/hooks/useTechnicianData'
 
 import './DashboardPage.css'
 
@@ -96,6 +100,20 @@ function SystemStatCard({ item }) {
 }
 
 function DashboardPage() {
+  const { user } = useAuth()
+  const {
+    systemStats,
+    farms,
+    selectedFarm,
+    selectedFarmId,
+    setSelectedFarmId,
+    devices,
+    alerts,
+    loading,
+    error,
+    refetch,
+  } = useTechnicianData()
+
   const [collapsedSections, setCollapsedSections] = useState({
     system: false,
     devices: false,
@@ -109,6 +127,8 @@ function DashboardPage() {
     }))
   }
 
+  const techName = user?.fullName || user?.name || 'Kỹ thuật viên'
+
   return (
     <AppLayout>
       <div className="technician-dashboard">
@@ -118,11 +138,13 @@ function DashboardPage() {
               NESTMATE TECHNICAL OVERVIEW
             </span>
 
-            <h1>Tổng quan kỹ thuật</h1>
+            <h1>
+              Chào buổi sáng, <strong>{techName}</strong>
+            </h1>
 
             <p>
-              Theo dõi trạng thái thiết bị, kết nối và sức khỏe
-              hệ thống nhà yến.
+              Theo dõi trạng thái thiết bị, kết nối và sức khỏe hạ tầng nhà yến
+              được phân công.
             </p>
 
             <div className="technician-welcome__system">
@@ -138,76 +160,103 @@ function DashboardPage() {
           <div className="technician-welcome__farm">
             <span>NHÀ YẾN ĐANG GIÁM SÁT</span>
 
-            <button type="button">
-              <div>
-                <StatusDot status="healthy" />
-                <strong>Nhà yến Bình An</strong>
+            {farms.length > 1 ? (
+              <div style={{ marginTop: '0.25rem' }}>
+                <EnvironmentSelect
+                  value={selectedFarmId || ''}
+                  onChange={setSelectedFarmId}
+                  options={farms.map((f) => ({
+                    value: f.id,
+                    label: f.name,
+                  }))}
+                />
               </div>
+            ) : (
+              <button type="button">
+                <div>
+                  <StatusDot status="healthy" />
+                  <strong>{selectedFarm?.name || 'Chưa phân công'}</strong>
+                </div>
+                <span>›</span>
+              </button>
+            )}
 
-              <span>›</span>
-            </button>
-
-            <p>Cập nhật dữ liệu gần nhất: vài giây trước</p>
+            <p>
+              Mã trại: <strong>{selectedFarm?.code || '---'}</strong> · Cập nhật vừa xong
+            </p>
           </div>
         </section>
 
-        <section className="technician-dashboard-section">
-          <SectionTitle
-            eyebrow="SYSTEM HEALTH"
-            title="Tình trạng hệ thống"
-            description="Tổng quan nhanh trạng thái hạ tầng kỹ thuật"
-            collapsed={collapsedSections.system}
-            onToggle={() => toggleSection('system')}
+        {error && (
+          <ErrorMessage
+            title="Lỗi tải dữ liệu kỹ thuật viên"
+            message={error}
+            onRetry={refetch}
           />
+        )}
 
-          {!collapsedSections.system && (
-            <div className="technician-stats-grid">
-              {systemStats.map((item) => (
-                <SystemStatCard
-                  key={item.id}
-                  item={item}
-                />
-              ))}
-            </div>
-          )}
-        </section>
+        {loading && !selectedFarm ? (
+          <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}>
+            <LoadingSpinner size="lg" text="Đang tải dữ liệu kỹ thuật..." />
+          </div>
+        ) : (
+          <>
+            <section className="technician-dashboard-section">
+              <SectionTitle
+                eyebrow="SYSTEM HEALTH"
+                title="Tình trạng hệ thống"
+                description="Tổng quan nhanh trạng thái hạ tầng kỹ thuật"
+                collapsed={collapsedSections.system}
+                onToggle={() => toggleSection('system')}
+              />
 
-        <section className="technician-dashboard-section">
-          <SectionTitle
-            eyebrow="DEVICE & DIAGNOSTICS"
-            title="Thiết bị & trạng thái"
-            description="Theo dõi node, sensor và kết nối hệ thống"
-            collapsed={collapsedSections.devices}
-            onToggle={() => toggleSection('devices')}
-          />
-
-          {!collapsedSections.devices && (
-            <div className="technician-main-grid">
-              <DeviceStatusPanel />
-
-              <div className="technician-side-column">
-                <SensorHealthPanel />
-                <ConnectivityPanel />
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section className="technician-dashboard-section">
-          <SectionTitle
-            eyebrow="TECHNICAL ALERTS"
-            title="Cảnh báo gần đây"
-            description="Các sự kiện kỹ thuật cần Technician chú ý"
-            collapsed={collapsedSections.alerts}
-            onToggle={() => toggleSection('alerts')}
-          />
-
-          {!collapsedSections.alerts && (
-            <section className="technician-card technician-alerts-panel">
-              <AlertsPanel />
+              {!collapsedSections.system && (
+                <div className="technician-stats-grid">
+                  {systemStats.map((item) => (
+                    <SystemStatCard key={item.id} item={item} />
+                  ))}
+                </div>
+              )}
             </section>
-          )}
-        </section>
+
+            <section className="technician-dashboard-section">
+              <SectionTitle
+                eyebrow="DEVICE & DIAGNOSTICS"
+                title="Thiết bị & trạng thái"
+                description="Theo dõi node, sensor và kết nối hệ thống"
+                collapsed={collapsedSections.devices}
+                onToggle={() => toggleSection('devices')}
+              />
+
+              {!collapsedSections.devices && (
+                <div className="technician-main-grid">
+                  <DeviceStatusPanel devices={devices} />
+
+                  <div className="technician-side-column">
+                    <SensorHealthPanel />
+                    <ConnectivityPanel />
+                  </div>
+                </div>
+              )}
+            </section>
+
+            <section className="technician-dashboard-section">
+              <SectionTitle
+                eyebrow="TECHNICAL ALERTS"
+                title="Cảnh báo gần đây"
+                description="Các sự kiện kỹ thuật cần Technician chú ý"
+                collapsed={collapsedSections.alerts}
+                onToggle={() => toggleSection('alerts')}
+              />
+
+              {!collapsedSections.alerts && (
+                <section className="technician-card technician-alerts-panel">
+                  <AlertsPanel alerts={alerts} />
+                </section>
+              )}
+            </section>
+          </>
+        )}
       </div>
     </AppLayout>
   )

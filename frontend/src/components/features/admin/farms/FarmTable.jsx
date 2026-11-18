@@ -42,21 +42,21 @@ function FarmTable({ farms, onViewFarm }) {
 
               <td>
                 <div className="admin-farm-person">
-                  <strong>{farm.owner.name}</strong>
-                  <span>{farm.owner.email}</span>
+                  <strong>{farm.owner?.name || 'Chưa gán chủ trại'}</strong>
+                  <span>{farm.owner?.email || '--'}</span>
                 </div>
               </td>
 
               <td>
                 <div className="admin-farm-person">
-                  <strong>{farm.technician.name}</strong>
-                  <span>{farm.technician.email}</span>
+                  <strong>{farm.technician?.name || 'Chưa gán kỹ thuật'}</strong>
+                  <span>{farm.technician?.email || '--'}</span>
                 </div>
               </td>
 
               <td>
                 <strong className="admin-farm-count">
-                  {farm.zones.length}
+                  {farm.zoneCount || farm.zones?.length || 0}
                 </strong>
               </td>
 

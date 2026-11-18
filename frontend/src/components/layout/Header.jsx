@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import NotificationPopover from '../common/NotificationPopover'
 import { useAuth } from '../../context/AuthContext'
+import { useTelemetryWebSocket } from '../../features/telemetry/hooks/useTelemetryWebSocket'
+import { formatHeaderEnvironment } from '../../features/telemetry/adapters/telemetryAdapter'
 import './Header.css'
 
 function SearchIcon() {
@@ -51,7 +53,8 @@ const environmentData = [
 
 function Header() {
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user, logout, isMockMode } = useAuth()
+  const { latestTelemetry } = useTelemetryWebSocket()
 
   const [profileOpen, setProfileOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -60,6 +63,7 @@ function Header() {
 
   const displayName = user?.name || 'NestMate User'
   const roleLabel = roleLabels[user?.role] || 'Người dùng'
+  const displayEnvironment = formatHeaderEnvironment(latestTelemetry, isMockMode)
 
   const initials = displayName
     .split(' ')
@@ -133,7 +137,7 @@ function Header() {
       </div>
 
       <div className="header-environment">
-        {environmentData.map((item) => (
+        {displayEnvironment.map((item) => (
           <div
             className="header-environment-item"
             key={item.id}

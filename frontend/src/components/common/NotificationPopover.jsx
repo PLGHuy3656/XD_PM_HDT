@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../../context/AuthContext'
+import { alertsApi } from '../../api/modules/alertsApi'
+import { USE_MOCK } from '../../api/config'
 
 import './NotificationPopover.css'
 
@@ -154,7 +156,7 @@ function NotificationPopover() {
 
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState(() =>
-    getNotificationsByRole(user?.role),
+    USE_MOCK ? getNotificationsByRole(user?.role) : [],
   )
 
   const viewAllConfig = getViewAllConfig(user?.role)
@@ -168,9 +170,46 @@ function NotificationPopover() {
   )
 
   useEffect(() => {
-    setNotifications(getNotificationsByRole(user?.role))
+    let cancelled = false
+
+    if (!USE_MOCK) {
+      if (!user) {
+        setNotifications([])
+        return
+      }
+
+      alertsApi
+        .getNotifications()
+        .then((res) => {
+          if (cancelled) return
+          const raw = Array.isArray(res) ? res : res?.items || []
+          setNotifications(
+            raw.map((item) => ({
+              id: item.id || String(Math.random()),
+              type: item.severity?.toLowerCase() || item.type || 'info',
+              title: item.title || 'Thông báo',
+              message: item.message || item.detail || '',
+              time: item.time || item.created_at || 'Vừa xong',
+              unread: !item.read,
+            })),
+          )
+        })
+        .catch(() => {
+          if (!cancelled) {
+            // In real mode on error, do NOT show fake mock notifications
+            setNotifications([])
+          }
+        })
+    } else {
+      setNotifications(getNotificationsByRole(user?.role))
+    }
+
     setOpen(false)
-  }, [user?.role])
+
+    return () => {
+      cancelled = true
+    }
+  }, [user])
 
   useEffect(() => {
     if (!open) {
@@ -298,46 +337,60 @@ function NotificationPopover() {
           </div>
 
           <div className="notification-list">
-            {notifications.map((notification) => (
-              <button
-                type="button"
-                key={notification.id}
-                className={`notification-item ${
-                  notification.unread
-                    ? 'notification-item--unread'
-                    : ''
-                }`}
-                onClick={() =>
-                  handleNotificationClick(
-                    notification.id,
-                  )
-                }
+            {notifications.length === 0 ? (
+              <div
+                className="notification-empty"
+                style={{
+                  padding: '24px 16px',
+                  textAlign: 'center',
+                  color: 'var(--text-secondary, #64748b)',
+                  fontSize: '13px',
+                }}
               >
-                <span
-                  className={`notification-item__status notification-item__status--${notification.type}`}
-                />
+                Không có thông báo mới.
+              </div>
+            ) : (
+              notifications.map((notification) => (
+                <button
+                  type="button"
+                  key={notification.id}
+                  className={`notification-item ${
+                    notification.unread
+                      ? 'notification-item--unread'
+                      : ''
+                  }`}
+                  onClick={() =>
+                    handleNotificationClick(
+                      notification.id,
+                    )
+                  }
+                >
+                  <span
+                    className={`notification-item__status notification-item__status--${notification.type}`}
+                  />
 
-                <span className="notification-item__content">
-                  <span className="notification-item__title-row">
-                    <strong>
-                      {notification.title}
-                    </strong>
+                  <span className="notification-item__content">
+                    <span className="notification-item__title-row">
+                      <strong>
+                        {notification.title}
+                      </strong>
 
-                    {notification.unread && (
-                      <span className="notification-item__unread" />
-                    )}
+                      {notification.unread && (
+                        <span className="notification-item__unread" />
+                      )}
+                    </span>
+
+                    <span className="notification-item__message">
+                      {notification.message}
+                    </span>
+
+                    <span className="notification-item__time">
+                      {notification.time}
+                    </span>
                   </span>
-
-                  <span className="notification-item__message">
-                    {notification.message}
-                  </span>
-
-                  <span className="notification-item__time">
-                    {notification.time}
-                  </span>
-                </span>
-              </button>
-            ))}
+                </button>
+              ))
+            )}
           </div>
 
           {viewAllConfig && (

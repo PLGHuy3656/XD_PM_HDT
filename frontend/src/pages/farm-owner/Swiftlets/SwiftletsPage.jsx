@@ -8,100 +8,83 @@ import BirdStatsCards from '../../../components/features/farm-owner/swiftlets/Bi
 import BirdTrendChart from '../../../components/features/farm-owner/swiftlets/BirdTrendChart'
 import LiveCameraCard from '../../../components/features/farm-owner/swiftlets/LiveCameraCard'
 import AIEventsTable from '../../../components/features/farm-owner/swiftlets/AIEventsTable'
+import { LoadingSpinner, ErrorMessage } from '../../../components/common/feedback/index.js'
 
 import {
-  farms,
-  cameras,
-  birdStats,
-  trendData,
-  aiEvents,
+  birdStats as defaultMockStats,
+  trendData as defaultMockTrend,
 } from '../../../components/features/farm-owner/swiftlets/swiftletsMockData'
 
+import { useFarms } from '../../../features/farms/hooks/useFarms'
+import { useCameras } from '../../../features/cameras/hooks/useCameras'
+
 import './SwiftletsPage.css'
+
+const FALLBACK_CAMERA = {
+  id: 'CAM-NONE',
+  name: 'Chưa có camera AI',
+  node: 'Camera Node',
+  status: 'OFFLINE',
+  detections: [],
+}
 
 function SwiftletsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const cameraFromUrl = searchParams.get('camera')
+  const {
+    farms,
+    selectedFarm,
+    selectedFarmId,
+    setSelectedFarmId,
+    zones,
+    error: farmsError,
+  } = useFarms()
 
-  const initialCameraId = cameras.some(
-    (camera) => camera.id === cameraFromUrl,
-  )
-    ? cameraFromUrl
-    : cameras[0].id
+  const [zoneId, setZoneId] = useState('ALL')
+  const [selectedCameraId, setSelectedCameraId] = useState(() => searchParams.get('camera') || null)
 
-  const initialCamera =
-    cameras.find((camera) => camera.id === initialCameraId) ??
-    cameras[0]
+  const {
+    cameras,
+    birdStats,
+    events,
+    loading: camerasLoading,
+    error: camerasError,
+    refetch: refetchCameras,
+  } = useCameras(selectedFarmId, selectedCameraId)
 
-  const [farmId, setFarmId] = useState(farms[0].id)
-  const [zoneId, setZoneId] = useState(initialCamera.zoneId)
-  const [selectedCameraId, setSelectedCameraId] =
-    useState(initialCameraId)
+  const effectiveZones = zones.length > 0 ? zones : selectedFarm?.zones || []
 
-  const selectedFarm =
-    farms.find((farm) => farm.id === farmId) ?? farms[0]
-
-  const selectedZone =
-    selectedFarm.zones.find((zone) => zone.id === zoneId) ??
-    selectedFarm.zones[0]
-
-  const availableCameras = cameras.filter(
-    (camera) => camera.zoneId === selectedZone.id,
-  )
-
-  const cameraOptions =
-    availableCameras.length > 0 ? availableCameras : cameras
+  const availableCameras =
+    zoneId && zoneId !== 'ALL'
+      ? cameras.filter((camera) => camera.zoneId === zoneId)
+      : cameras
 
   const selectedCamera =
-    cameras.find(
-      (camera) => camera.id === selectedCameraId,
-    ) ?? cameras[0]
+    cameras.find((c) => c.id === selectedCameraId) ||
+    availableCameras[0] ||
+    cameras[0] ||
+    FALLBACK_CAMERA
+
+  const effectiveBirdStats = birdStats || defaultMockStats
 
   function updateCamera(nextCameraId) {
-    const nextCamera = cameras.find(
-      (camera) => camera.id === nextCameraId,
-    )
-
-    if (!nextCamera) {
-      return
-    }
-
-    setSelectedCameraId(nextCamera.id)
-    setZoneId(nextCamera.zoneId)
-
-    setSearchParams({
-      camera: nextCamera.id,
-    })
+    setSelectedCameraId(nextCameraId)
+    setSearchParams({ camera: nextCameraId })
   }
 
   function handleFarmChange(nextFarmId) {
-    const nextFarm =
-      farms.find((farm) => farm.id === nextFarmId) ?? farms[0]
-
-    const nextZone = nextFarm.zones[0]
-
-    setFarmId(nextFarm.id)
-    setZoneId(nextZone.id)
-
-    const nextCamera = cameras.find(
-      (camera) => camera.zoneId === nextZone.id,
-    )
-
-    if (nextCamera) {
-      updateCamera(nextCamera.id)
-    }
+    setSelectedFarmId(nextFarmId)
+    setZoneId('ALL')
+    setSelectedCameraId(null)
   }
 
   function handleZoneChange(nextZoneId) {
     setZoneId(nextZoneId)
-
-    const nextCamera = cameras.find(
-      (camera) => camera.zoneId === nextZoneId,
+    const matchingCamera = cameras.find(
+      (camera) => nextZoneId === 'ALL' || camera.zoneId === nextZoneId,
     )
-
-    if (nextCamera) {
-      updateCamera(nextCamera.id)
+    if (matchingCamera) {
+      updateCamera(matchingCamera.id)
     }
   }
 
@@ -110,15 +93,13 @@ function SwiftletsPage() {
       <div className="swiftlets-page">
         <header className="swiftlets-page-heading">
           <div>
-            <span className="swiftlets-eyebrow">
-              AI VISION & AUDIO
-            </span>
+            <span className="swiftlets-eyebrow">AI VISION & AUDIO</span>
 
             <h1>Giám sát chim yến</h1>
 
             <p>
-              Theo dõi hoạt động ra vào, camera AI và các sự kiện
-              bất thường được phát hiện tại nhà yến.
+              Theo dõi hoạt động ra vào, camera AI và các sự kiện bất thường được
+              phát hiện tại nhà yến.
             </p>
           </div>
 
@@ -127,70 +108,83 @@ function SwiftletsPage() {
               <i />
               {selectedCamera.status === 'ONLINE'
                 ? 'Edge AI đang hoạt động'
-                : 'Camera mất kết nối'}
+                : 'Camera ngoại tuyến'}
             </span>
-
-            <small>
-              {selectedCamera.id} ·{' '}
-              {selectedCamera.status === 'ONLINE'
-                ? 'cập nhật theo thời gian thực'
-                : 'không có dữ liệu trực tiếp'}
-            </small>
           </div>
         </header>
 
-        <section className="swiftlets-context">
-          <div>
-            <label>
-              <span>Nhà yến</span>
+        {farmsError && (
+          <ErrorMessage title="Lỗi danh sách nhà yến" message={farmsError} />
+        )}
+        {camerasError && (
+          <ErrorMessage
+            title="Lỗi tải dữ liệu camera"
+            message={camerasError}
+            onRetry={refetchCameras}
+          />
+        )}
 
-              <EnvironmentSelect
-                value={farmId}
-                onChange={handleFarmChange}
-                options={farms.map((farm) => ({
-                  value: farm.id,
-                  label: farm.name,
-                }))}
-              />
-            </label>
+        <div className="swiftlets-selectors">
+          <label>
+            <span>Nhà yến</span>
+            <EnvironmentSelect
+              value={selectedFarmId || ''}
+              onChange={handleFarmChange}
+              options={farms.map((farm) => ({
+                value: farm.id,
+                label: farm.name,
+              }))}
+            />
+          </label>
 
-            <label>
-              <span>Khu vực / Camera</span>
-
-              <EnvironmentSelect
-                value={zoneId}
-                onChange={handleZoneChange}
-                options={selectedFarm.zones.map((zone) => ({
+          <label>
+            <span>Khu vực</span>
+            <EnvironmentSelect
+              value={zoneId}
+              onChange={handleZoneChange}
+              options={[
+                { value: 'ALL', label: 'Tất cả khu vực' },
+                ...effectiveZones.map((zone) => ({
                   value: zone.id,
                   label: zone.name,
-                }))}
-              />
-            </label>
+                })),
+              ]}
+            />
+          </label>
+
+          <label>
+            <span>Camera</span>
+            <EnvironmentSelect
+              value={selectedCamera.id}
+              onChange={updateCamera}
+              options={
+                cameras.length > 0
+                  ? cameras.map((camera) => ({
+                      value: camera.id,
+                      label: `${camera.code || camera.id} · ${camera.name}`,
+                    }))
+                  : [{ value: 'CAM-NONE', label: 'Không có camera' }]
+              }
+            />
+          </label>
+        </div>
+
+        {camerasLoading && cameras.length === 0 ? (
+          <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}>
+            <LoadingSpinner size="lg" text="Đang kết nối camera AI..." />
           </div>
+        ) : (
+          <>
+            <BirdStatsCards stats={effectiveBirdStats} />
 
-          <div className="swiftlets-node">
-            <span>Nguồn AI</span>
+            <div className="swiftlets-media-grid">
+              <LiveCameraCard camera={selectedCamera} />
+              <BirdTrendChart data={defaultMockTrend} />
+            </div>
 
-            <strong>
-              <i />
-              {selectedCamera.node} / Camera Node
-            </strong>
-          </div>
-        </section>
-
-        <BirdStatsCards stats={birdStats} />
-
-        <section className="swiftlets-main-grid">
-          <LiveCameraCard
-            cameras={cameraOptions}
-            selectedCameraId={selectedCameraId}
-            onCameraChange={updateCamera}
-          />
-
-          <BirdTrendChart data={trendData} />
-        </section>
-
-        <AIEventsTable events={aiEvents} />
+            <AIEventsTable events={events} />
+          </>
+        )}
       </div>
     </AppLayout>
   )

@@ -1,0 +1,74 @@
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-subtle, rgba(0, 0, 0, 0.05)) 25%,
+    var(--surface-active, rgba(0, 0, 0, 0.09)) 37%,
+    var(--surface-subtle, rgba(0, 0, 0, 0.05)) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+  border-radius: var(--radius-sm, 6px);
+}
+
+.skeleton--text {
+  height: 14px;
+  margin-bottom: var(--space-2, 8px);
+}
+
+.skeleton--heading {
+  height: 22px;
+  margin-bottom: var(--space-3, 12px);
+  border-radius: var(--radius-md, 8px);
+}
+
+.skeleton--card {
+  height: 120px;
+  border-radius: var(--radius-lg, 12px);
+}
+
+.skeleton--circle {
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+}
+
+.skeleton-card {
+  background: var(--surface-primary, #ffffff);
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+  border-radius: var(--radius-lg, 12px);
+  padding: var(--space-5, 20px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+.skeleton-table {
+  background: var(--surface-primary, #ffffff);
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+}
+
+.skeleton-table-header {
+  display: flex;
+  gap: var(--space-4, 16px);
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  background: var(--surface-subtle, rgba(0, 0, 0, 0.03));
+  border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+}
+
+.skeleton-table-row {
+  display: flex;
+  gap: var(--space-4, 16px);
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.05));
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}

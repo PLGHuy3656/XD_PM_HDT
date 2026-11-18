@@ -6,103 +6,73 @@ import EnvironmentSelect from '../../../components/ui/Select'
 import AlertFilters from '../../../components/features/farm-owner/alerts/AlertFilters'
 import AlertList from '../../../components/features/farm-owner/alerts/AlertList'
 import AlertDetailPanel from '../../../components/features/farm-owner/alerts/AlertDetailPanel'
+import { LoadingSpinner, ErrorMessage, EmptyState } from '../../../components/common/feedback/index.js'
 
 import {
-  alertFarms,
-  alerts as initialAlerts,
   alertStatusOptions,
   alertSeverityOptions,
 } from '../../../components/features/farm-owner/alerts/alertsMockData'
 
+import { useFarms } from '../../../features/farms/hooks/useFarms'
+import { useAlerts } from '../../../features/alerts/hooks/useAlerts'
+
 import './AlertsPage.css'
 
 function AlertsPage() {
-  const [farmId, setFarmId] = useState(alertFarms[0].id)
+  const {
+    farms,
+    selectedFarm,
+    selectedFarmId,
+    setSelectedFarmId,
+    zones,
+    error: farmsError,
+  } = useFarms()
+
   const [zoneId, setZoneId] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [severityFilter, setSeverityFilter] = useState('ALL')
+  const [selectedAlertId, setSelectedAlertId] = useState(null)
 
-  const [statusFilter, setStatusFilter] =
-    useState('ALL')
+  const {
+    alerts,
+    loading: alertsLoading,
+    error: alertsError,
+    refetch: refetchAlerts,
+    acknowledgeAlert,
+    resolveAlert,
+  } = useAlerts(selectedFarmId)
 
-  const [severityFilter, setSeverityFilter] =
-    useState('ALL')
-
-  const [alerts, setAlerts] = useState(initialAlerts)
-  const [selectedAlertId, setSelectedAlertId] =
-    useState(null)
-
-  const selectedFarm =
-    alertFarms.find((farm) => farm.id === farmId) ??
-    alertFarms[0]
+  const effectiveZones = zones.length > 0 ? zones : selectedFarm?.zones || []
 
   const selectedAlert =
-    alerts.find(
-      (alert) => alert.id === selectedAlertId,
-    ) ?? null
+    alerts.find((alert) => alert.id === selectedAlertId) ?? null
 
   const filteredAlerts = useMemo(() => {
     return alerts.filter((alert) => {
-      const matchesFarm = alert.farmId === farmId
-
-      const matchesZone =
-        zoneId === 'all' || alert.zoneId === zoneId
+      const matchesZone = zoneId === 'all' || alert.zoneId === zoneId
 
       const matchesStatus =
-        statusFilter === 'ALL' ||
-        alert.status === statusFilter
+        statusFilter === 'ALL' || alert.status === statusFilter
 
       const matchesSeverity =
-        severityFilter === 'ALL' ||
-        alert.severity === severityFilter
+        severityFilter === 'ALL' || alert.severity === severityFilter
 
-      return (
-        matchesFarm &&
-        matchesZone &&
-        matchesStatus &&
-        matchesSeverity
-      )
+      return matchesZone && matchesStatus && matchesSeverity
     })
-  }, [
-    alerts,
-    farmId,
-    zoneId,
-    statusFilter,
-    severityFilter,
-  ])
+  }, [alerts, zoneId, statusFilter, severityFilter])
 
   function handleFarmChange(nextFarmId) {
-    const nextFarm =
-      alertFarms.find(
-        (farm) => farm.id === nextFarmId,
-      ) ?? alertFarms[0]
-
-    setFarmId(nextFarm.id)
+    setSelectedFarmId(nextFarmId)
     setZoneId('all')
+    setSelectedAlertId(null)
   }
 
   function handleAcknowledge(alertId) {
-    setAlerts((currentAlerts) =>
-      currentAlerts.map((alert) =>
-        alert.id === alertId
-          ? {
-              ...alert,
-              status: 'ACKNOWLEDGED',
-            }
-          : alert,
-      ),
-    )
+    acknowledgeAlert(alertId, 'Farm owner acknowledged')
   }
 
   function handleResolve(alertId) {
-    setAlerts((currentAlerts) =>
-      currentAlerts.map((alert) =>
-        alert.id === alertId
-          ? {
-              ...alert,
-              status: 'RESOLVED',
-            }
-          : alert,
-      ),
-    )
+    resolveAlert(alertId, 'Farm owner resolved')
   }
 
   return (
@@ -110,15 +80,13 @@ function AlertsPage() {
       <div className="alerts-page">
         <header className="alerts-page-heading">
           <div>
-            <span className="alerts-eyebrow">
-              MONITORING & ALERTS
-            </span>
+            <span className="alerts-eyebrow">MONITORING & ALERTS</span>
 
             <h1>Cảnh báo</h1>
 
             <p>
-              Theo dõi và xử lý các bất thường về môi
-              trường, thiết bị và AI tại nhà yến.
+              Theo dõi và xử lý các bất thường về môi trường, thiết bị và AI tại
+              nhà yến.
             </p>
           </div>
 
@@ -127,9 +95,9 @@ function AlertsPage() {
               <span>Nhà yến</span>
 
               <EnvironmentSelect
-                value={farmId}
+                value={selectedFarmId || ''}
                 onChange={handleFarmChange}
-                options={alertFarms.map((farm) => ({
+                options={farms.map((farm) => ({
                   value: farm.id,
                   label: farm.name,
                 }))}
@@ -142,55 +110,84 @@ function AlertsPage() {
               <EnvironmentSelect
                 value={zoneId}
                 onChange={setZoneId}
-                options={selectedFarm.zones.map(
-                  (zone) => ({
+                options={[
+                  { value: 'all', label: 'Tất cả khu vực' },
+                  ...effectiveZones.map((zone) => ({
                     value: zone.id,
                     label: zone.name,
-                  }),
-                )}
+                  })),
+                ]}
               />
             </label>
           </div>
         </header>
 
+        {farmsError && (
+          <ErrorMessage title="Lỗi danh sách nhà yến" message={farmsError} />
+        )}
+        {alertsError && (
+          <ErrorMessage
+            title="Lỗi tải cảnh báo"
+            message={alertsError}
+            onRetry={refetchAlerts}
+          />
+        )}
+
         <AlertFilters
-          status={statusFilter}
-          severity={severityFilter}
           statusOptions={alertStatusOptions}
           severityOptions={alertSeverityOptions}
+          activeStatus={statusFilter}
+          activeSeverity={severityFilter}
           onStatusChange={setStatusFilter}
           onSeverityChange={setSeverityFilter}
         />
 
-        <section className="alerts-results">
-          <div className="alerts-results-heading">
-            <div>
-              <strong>Cảnh báo gần đây</strong>
+        <div className="alerts-content-grid">
+          <section className="alerts-stream-section">
+            <div className="alerts-stream-header">
+              <h2>
+                Danh sách cảnh báo
+                <span>({filteredAlerts.length})</span>
+              </h2>
 
-              <span>
-                {filteredAlerts.length} cảnh báo phù hợp
+              <span className="alerts-status-indicator">
+                {alertsLoading ? 'Đang cập nhật...' : 'Hệ thống đang giám sát'}
               </span>
             </div>
 
-            <small>
-              Dữ liệu hiện tại là mock frontend
-            </small>
-          </div>
+            {alertsLoading && alerts.length === 0 ? (
+              <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}>
+                <LoadingSpinner size="lg" text="Đang tải cảnh báo..." />
+              </div>
+            ) : filteredAlerts.length === 0 ? (
+              <EmptyState
+                title="Không có cảnh báo nào"
+                description={
+                  alerts.length === 0
+                    ? 'Hiện tại không có sự kiện bất thường nào trong nhà yến.'
+                    : 'Không tìm thấy cảnh báo phù hợp với bộ lọc đã chọn.'
+                }
+              />
+            ) : (
+              <AlertList
+                alerts={filteredAlerts}
+                selectedAlertId={selectedAlertId}
+                onSelectAlert={(alert) => setSelectedAlertId(alert.id)}
+                onAcknowledge={handleAcknowledge}
+                onResolve={handleResolve}
+              />
+            )}
+          </section>
 
-          <AlertList
-            alerts={filteredAlerts}
-            onViewDetail={(alert) =>
-              setSelectedAlertId(alert.id)
-            }
-          />
-        </section>
-
-        <AlertDetailPanel
-          alert={selectedAlert}
-          onClose={() => setSelectedAlertId(null)}
-          onAcknowledge={handleAcknowledge}
-          onResolve={handleResolve}
-        />
+          <aside className="alerts-sidebar-panel">
+            <AlertDetailPanel
+              alert={selectedAlert}
+              onClose={() => setSelectedAlertId(null)}
+              onAcknowledge={handleAcknowledge}
+              onResolve={handleResolve}
+            />
+          </aside>
+        </div>
       </div>
     </AppLayout>
   )

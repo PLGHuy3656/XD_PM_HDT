@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import AppLayout from '../../../components/layout/AppLayout'
 import './EnvironmentPage.css'
@@ -11,11 +11,18 @@ import MetricCard, {
 } from '../../../components/features/farm-owner/environment/MetricCard'
 
 import EnvironmentChart from '../../../components/features/farm-owner/environment/EnvironmentChart'
-
 import ZoneComparisonChart from '../../../components/features/farm-owner/environment/ZoneComparisonChart'
-
 import EnvironmentSelect from '../../../components/ui/Select'
-import { MAX_COMPARE_ZONES, monitoringFarms as farms, comparisonColors } from '../../../components/features/farm-owner/environment/environmentMockData'
+import { ErrorMessage } from '../../../components/common/feedback/index.js'
+
+import {
+  MAX_COMPARE_ZONES,
+  monitoringFarms as defaultMockFarms,
+  comparisonColors,
+} from '../../../components/features/farm-owner/environment/environmentMockData'
+
+import { useFarms } from '../../../features/farms/hooks/useFarms'
+import { useTelemetry } from '../../../features/telemetry/hooks/useTelemetry'
 
 function RefreshIcon() {
   return (
@@ -43,91 +50,110 @@ function CloseIcon() {
 }
 
 function EnvironmentPage() {
-  const [farmId, setFarmId] = useState(
-    farms[0].id
+  const {
+    farms,
+    selectedFarm,
+    selectedFarmId,
+    setSelectedFarmId,
+    zones,
+    error: farmsError,
+  } = useFarms()
+
+  const {
+    telemetry,
+    hasData,
+    loading: telemetryLoading,
+    error: telemetryError,
+    refetch: refetchTelemetry,
+  } = useTelemetry(selectedFarmId)
+
+  const effectiveZones = useMemo(() => {
+    if (zones.length > 0) {
+      const baseMetrics = defaultMockFarms[0]?.zones[0]?.metrics || {}
+      return zones.map((z, idx) => {
+        const zMetrics = JSON.parse(JSON.stringify(baseMetrics))
+        if (telemetry && telemetry.temperature != null) {
+          zMetrics.temperature.value = telemetry.temperature
+          zMetrics.temperature.displayValue = `${telemetry.temperature.toFixed(1)}°C`
+        } else if (!hasData) {
+          zMetrics.temperature.displayValue = '--°C'
+        }
+        if (telemetry && telemetry.humidity != null) {
+          zMetrics.humidity.value = telemetry.humidity
+          zMetrics.humidity.displayValue = `${Math.round(telemetry.humidity)}%`
+        } else if (!hasData) {
+          zMetrics.humidity.displayValue = '--%'
+        }
+        if (telemetry && telemetry.co2 != null) {
+          zMetrics.co2.value = telemetry.co2
+          zMetrics.co2.displayValue = `${Math.round(telemetry.co2)} ppm`
+        } else if (!hasData) {
+          zMetrics.co2.displayValue = '-- ppm'
+        }
+        if (telemetry && telemetry.light != null) {
+          zMetrics.light.value = telemetry.light
+          zMetrics.light.displayValue = `${Math.round(telemetry.light)} lux`
+        } else if (!hasData) {
+          zMetrics.light.displayValue = '-- lux'
+        }
+        return {
+          id: z.id,
+          name: z.name,
+          node: `ENV-${String(idx + 1).padStart(2, '0')}`,
+          lastSeen: telemetry?.timestamp ? 'Vừa xong' : 'Chưa có dữ liệu',
+          status: hasData ? 'live' : 'offline',
+          metrics: zMetrics,
+        }
+      })
+    }
+    return defaultMockFarms[0]?.zones || []
+  }, [zones, telemetry, hasData])
+
+  const [zoneId, setZoneId] = useState(effectiveZones[0]?.id || '')
+  const [selectedMetric, setSelectedMetric] = useState('temperature')
+  const [period, setPeriod] = useState('24h')
+  const [comparisonMetric, setComparisonMetric] = useState('temperature')
+  const [comparisonPeriod, setComparisonPeriod] = useState('24h')
+  const [comparisonZoneIds, setComparisonZoneIds] = useState(() =>
+    effectiveZones.slice(0, 2).map((z) => z.id),
   )
-
-  const [zoneId, setZoneId] = useState(
-    farms[0].zones[0].id
-  )
-
-  const [selectedMetric, setSelectedMetric] =
-    useState('temperature')
-
-  const [period, setPeriod] =
-    useState('24h')
-
-  const [
-    comparisonMetric,
-    setComparisonMetric,
-  ] = useState('temperature')
-
-  const [
-    comparisonPeriod,
-    setComparisonPeriod,
-  ] = useState('24h')
-
-  const [
-    comparisonZoneIds,
-    setComparisonZoneIds,
-  ] = useState([
-    farms[0].zones[0].id,
-    farms[0].zones[1].id,
-  ])
-
-  const [showZonePicker, setShowZonePicker] =
-    useState(false)
-
-  const selectedFarm =
-    farms.find(
-      (farm) => farm.id === farmId
-    ) ?? farms[0]
+  const [showZonePicker, setShowZonePicker] = useState(false)
 
   const selectedZone =
-    selectedFarm.zones.find(
-      (zone) => zone.id === zoneId
-    ) ?? selectedFarm.zones[0]
+    effectiveZones.find((zone) => zone.id === zoneId) ?? effectiveZones[0] ?? {
+      id: 'default',
+      name: 'Khu vực 1',
+      node: 'ENV-01',
+      lastSeen: '---',
+      metrics: defaultMockFarms[0]?.zones[0]?.metrics,
+    }
 
   const selectedMetricData =
-    selectedZone.metrics[selectedMetric]
+    selectedZone.metrics?.[selectedMetric] ||
+    defaultMockFarms[0]?.zones[0]?.metrics?.[selectedMetric]
 
-  const selectedMetricState =
-    getMetricState(selectedMetricData)
+  const selectedMetricState = getMetricState(selectedMetricData)
 
-  const comparisonZones =
-    selectedFarm.zones.filter((zone) =>
-      comparisonZoneIds.includes(zone.id)
-    )
+  const comparisonZones = effectiveZones.filter((zone) =>
+    comparisonZoneIds.includes(zone.id),
+  )
 
-  const availableComparisonZones =
-    selectedFarm.zones.filter(
-      (zone) =>
-        !comparisonZoneIds.includes(zone.id)
-    )
+  const availableComparisonZones = effectiveZones.filter(
+    (zone) => !comparisonZoneIds.includes(zone.id),
+  )
 
   const addComparisonZone = (zoneIdToAdd) => {
-    if (
-      comparisonZoneIds.length >=
-      MAX_COMPARE_ZONES
-    ) {
+    if (comparisonZoneIds.length >= MAX_COMPARE_ZONES) {
       return
     }
 
-    setComparisonZoneIds((current) => [
-      ...current,
-      zoneIdToAdd,
-    ])
-
+    setComparisonZoneIds((current) => [...current, zoneIdToAdd])
     setShowZonePicker(false)
   }
 
-  const removeComparisonZone = (
-    zoneIdToRemove
-  ) => {
+  const removeComparisonZone = (zoneIdToRemove) => {
     setComparisonZoneIds((current) =>
-      current.filter(
-        (id) => id !== zoneIdToRemove
-      )
+      current.filter((id) => id !== zoneIdToRemove),
     )
   }
 
@@ -136,596 +162,258 @@ function EnvironmentPage() {
       <div className="environment-page">
         <section className="environment-page-heading">
           <div>
-            <span className="environment-eyebrow">
-              ENVIRONMENT MONITORING
-            </span>
+            <span className="environment-eyebrow">ENVIRONMENT MONITORING</span>
 
             <h1>Môi trường nhà yến</h1>
 
             <p>
-              Theo dõi điều kiện vi khí hậu và
-              ngưỡng an toàn theo từng khu vực.
+              Theo dõi điều kiện vi khí hậu và ngưỡng an toàn theo từng khu vực.
             </p>
           </div>
 
           <div className="environment-live-status">
             <span className="live-indicator">
               <i />
-              Dữ liệu trực tiếp
+              {hasData ? 'Dữ liệu trực tiếp' : 'Chưa có telemetry'}
             </span>
 
-            <small>
-              Cập nhật {selectedZone.lastSeen}
-            </small>
+            <small>Cập nhật {selectedZone.lastSeen}</small>
           </div>
         </section>
+
+        {farmsError && (
+          <ErrorMessage title="Lỗi danh sách nhà yến" message={farmsError} />
+        )}
+        {telemetryError && (
+          <ErrorMessage
+            title="Lỗi tải dữ liệu cảm biến"
+            message={telemetryError}
+            onRetry={refetchTelemetry}
+          />
+        )}
 
         <EnvironmentTabs />
 
         <section className="environment-context-bar">
           <div className="context-select-group">
             <EnvironmentSelect
-                label="Nhà yến"
-                value={farmId}
-                options={farms.map((farm) => ({
+              label="Nhà yến"
+              value={selectedFarmId || ''}
+              options={farms.map((farm) => ({
                 value: farm.id,
                 label: farm.name,
-                }))}
-                onChange={(nextFarmId) => {
-                const nextFarm =
-                    farms.find(
-                    (farm) => farm.id === nextFarmId
-                    ) ?? farms[0]
-
-                setFarmId(nextFarmId)
-                setZoneId(nextFarm.zones[0].id)
-
-                setComparisonZoneIds(
-                    nextFarm.zones
-                    .slice(0, 2)
-                    .map((zone) => zone.id)
-                )
-
+              }))}
+              onChange={(nextFarmId) => {
+                setSelectedFarmId(nextFarmId)
                 setShowZonePicker(false)
-                }}
+              }}
             />
 
             <EnvironmentSelect
-                label="Khu vực"
-                value={zoneId}
-                options={selectedFarm.zones.map((zone) => ({
+              label="Khu vực"
+              value={zoneId}
+              options={effectiveZones.map((zone) => ({
                 value: zone.id,
                 label: zone.name,
-                }))}
-                onChange={(nextZoneId) => {
+              }))}
+              onChange={(nextZoneId) => {
                 setZoneId(nextZoneId)
-                }}
+              }}
             />
-            </div>
+          </div>
         </section>
 
         <section className="environment-section">
           <div className="environment-section-heading">
             <div>
-              <span className="section-number">
-                01
-              </span>
+              <span className="section-number">01</span>
 
               <div>
                 <h2>Điều kiện hiện tại</h2>
-                <p>
-                  Dữ liệu mới nhất từ{' '}
-                  {selectedZone.node}
-                </p>
+                <p>Dữ liệu mới nhất từ {selectedZone.node}</p>
               </div>
             </div>
-
-            <button
-              type="button"
-              className="refresh-button"
-            >
-              <RefreshIcon />
-              <span>Làm mới</span>
-            </button>
           </div>
 
-          <div className="environment-metric-grid">
-            {Object.entries(
-              selectedZone.metrics
-            ).map(([key, metric]) => (
+          <div className="metrics-grid">
+            {Object.entries(selectedZone.metrics || {}).map(([key, metric]) => (
               <MetricCard
                 key={key}
                 metricKey={key}
                 metric={metric}
-                active={
-                  selectedMetric === key
-                }
-                onClick={() =>
-                  setSelectedMetric(key)
-                }
+                isSelected={selectedMetric === key}
+                onSelect={setSelectedMetric}
               />
             ))}
           </div>
         </section>
 
-        <section className="environment-detail-grid">
-          <article className="environment-chart-card">
-            <div className="chart-card-heading">
-              <div>
-                <span className="section-number">
-                  02
-                </span>
-
-                <div>
-                  <h2>
-                    Biến động môi trường
-                  </h2>
-
-                  <p>
-                    {selectedMetricData.label}
-                    {' · '}
-                    {selectedZone.name}
-                  </p>
-                </div>
-              </div>
-
-              <div className="period-switcher">
-                {['24h', '7d', '30d'].map(
-                  (item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      className={
-                        period === item
-                          ? 'active'
-                          : ''
-                      }
-                      onClick={() =>
-                        setPeriod(item)
-                      }
-                    >
-                      {item === '24h'
-                        ? '24 giờ'
-                        : item === '7d'
-                          ? '7 ngày'
-                          : '30 ngày'}
-                    </button>
-                  )
-                )}
-              </div>
-            </div>
-
-            <div className="chart-summary">
-              <div>
-                <span>Hiện tại</span>
-
-                <strong>
-                  {
-                    selectedMetricData.displayValue
-                  }
-                </strong>
-              </div>
-
-              <span
-                className={`chart-summary-status ${selectedMetricState.className}`}
-              >
-                <i />
-                {selectedMetricState.label}
-              </span>
-            </div>
-
-            <EnvironmentChart
-              metric={selectedMetricData}
-            />
-
-            <div className="chart-legend">
-              <span>
-                <i className="legend-current" />
-                Dữ liệu cảm biến
-              </span>
-
-              <span>
-                <i className="legend-safe" />
-                Khoảng an toàn
-              </span>
-            </div>
-          </article>
-
-          <aside className="environment-threshold-card">
-            <div className="threshold-heading">
-              <span className="section-number">
-                03
-              </span>
-
-              <div>
-                <h2>Ngưỡng môi trường</h2>
-                <p>Cấu hình đang áp dụng</p>
-              </div>
-            </div>
-
-            <div className="threshold-list">
-              {Object.entries(
-                selectedZone.metrics
-              ).map(([key, metric]) => {
-                const state =
-                  getMetricState(metric)
-
-                return (
-                  <div
-                    className="threshold-row"
-                    key={key}
-                  >
-                    <div className="threshold-metric">
-                      <span className="threshold-icon">
-                        <MetricIcon
-                          type={key}
-                        />
-                      </span>
-
-                      <div>
-                        <strong>
-                          {metric.label}
-                        </strong>
-
-                        <small>
-                          {metric.safeMin}–
-                          {metric.safeMax}
-                          {metric.unit}
-                        </small>
-                      </div>
-                    </div>
-
-                    <span
-                      className={`threshold-state ${state.className}`}
-                    >
-                      <i />
-                      {state.shortLabel}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-
-            <div className="threshold-note">
-              <span>i</span>
-
-              <p>
-                Ngưỡng được dùng để đánh giá
-                môi trường và tạo cảnh báo khi
-                dữ liệu vượt giới hạn cấu hình.
-              </p>
-            </div>
-          </aside>
-        </section>
-
-        <section className="zone-comparison-card">
-          <div className="comparison-heading">
+        <section className="environment-section">
+          <div className="environment-section-heading">
             <div>
-              <span className="section-number">
-                04
-              </span>
+              <span className="section-number">02</span>
 
               <div>
-                <h2>So sánh khu vực</h2>
-
+                <h2>Biểu đồ chi tiết theo thời gian</h2>
                 <p>
-                  Chọn tối đa 4 khu vực để đối
-                  chiếu điều kiện vi khí hậu.
+                  Theo dõi xu hướng biến động và đối chiếu với ngưỡng an toàn
+                  khuyến nghị.
                 </p>
               </div>
             </div>
 
-            <div className="comparison-period">
-              {['24h', '7d', '30d'].map(
-                (item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    className={
-                      comparisonPeriod === item
-                        ? 'active'
-                        : ''
-                    }
-                    onClick={() =>
-                      setComparisonPeriod(item)
-                    }
-                  >
-                    {item === '24h'
-                      ? '24 giờ'
-                      : item === '7d'
-                        ? '7 ngày'
-                        : '30 ngày'}
-                  </button>
-                )
-              )}
+            <div className="period-toggle">
+              {['6h', '24h', '7d'].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  className={`period-btn ${period === p ? 'active' : ''}`}
+                  onClick={() => setPeriod(p)}
+                >
+                  {p}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="comparison-metric-tabs">
-            {Object.entries(
-              selectedZone.metrics
-            ).map(([key, metric]) => (
-              <button
-                key={key}
-                type="button"
-                className={
-                  comparisonMetric === key
-                    ? 'active'
-                    : ''
-                }
-                onClick={() =>
-                  setComparisonMetric(key)
-                }
-              >
-                {metric.label}
-              </button>
-            ))}
-          </div>
-
-          {selectedFarm.zones.length < 2 ? (
-            <div className="comparison-empty-state">
-              <strong>
-                Chưa thể so sánh khu vực
-              </strong>
-
-              <p>
-                Nhà yến cần ít nhất 2 khu vực
-                để sử dụng chức năng này.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="comparison-selection">
-                <div className="comparison-selection-heading">
-                  <div>
-                    <span>Khu vực so sánh</span>
-
-                    <small>
-                      Chọn ít nhất 2 và tối đa{' '}
-                      {MAX_COMPARE_ZONES} khu vực
-                    </small>
-                  </div>
-
-                  <strong>
-                    {comparisonZoneIds.length}/
-                    {MAX_COMPARE_ZONES}
-                  </strong>
-                </div>
-
-                <div className="comparison-zone-chips">
-                  {comparisonZones.map(
-                    (zone, index) => (
-                      <div
-                        className="comparison-zone-chip"
-                        key={zone.id}
-                      >
-                        <span
-                          className="comparison-zone-dot"
-                          style={{
-                            background:
-                              comparisonColors[
-                                index
-                              ],
-                          }}
-                        />
-
-                        <div>
-                          <strong>
-                            {zone.name}
-                          </strong>
-
-                          <small>
-                            {zone.node}
-                          </small>
-                        </div>
-
-                        <button
-                          type="button"
-                          aria-label={`Bỏ ${zone.name} khỏi so sánh`}
-                          onClick={() =>
-                            removeComparisonZone(
-                              zone.id
-                            )
-                          }
-                        >
-                          <CloseIcon />
-                        </button>
-                      </div>
-                    )
-                  )}
-
-                  {comparisonZoneIds.length <
-                    MAX_COMPARE_ZONES &&
-                    availableComparisonZones.length >
-                      0 && (
-                      <div className="comparison-add-wrapper">
-                        <button
-                          type="button"
-                          className="comparison-add-button"
-                          onClick={() =>
-                            setShowZonePicker(
-                              (current) =>
-                                !current
-                            )
-                          }
-                        >
-                          <PlusIcon />
-                          Thêm khu vực
-                        </button>
-
-                        {showZonePicker && (
-                          <div className="comparison-zone-picker">
-                            <span>
-                              Chọn khu vực
-                            </span>
-
-                            {availableComparisonZones.map(
-                              (zone) => (
-                                <button
-                                  key={
-                                    zone.id
-                                  }
-                                  type="button"
-                                  onClick={() =>
-                                    addComparisonZone(
-                                      zone.id
-                                    )
-                                  }
-                                >
-                                  <div>
-                                    <strong>
-                                      {
-                                        zone.name
-                                      }
-                                    </strong>
-
-                                    <small>
-                                      {
-                                        zone.node
-                                      }
-                                    </small>
-                                  </div>
-
-                                  <PlusIcon />
-                                </button>
-                              )
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                </div>
-              </div>
-
-              {comparisonZones.length >= 2 ? (
-                <>
-                  <div className="comparison-current-values">
-                    {comparisonZones.map(
-                      (zone, index) => {
-                        const metric =
-                          zone.metrics[
-                            comparisonMetric
-                          ]
-
-                        const state =
-                          getMetricState(
-                            metric
-                          )
-
-                        return (
-                          <div
-                            key={zone.id}
-                            className="comparison-current-zone"
-                          >
-                            <span
-                              style={{
-                                background:
-                                  comparisonColors[
-                                    index
-                                  ],
-                              }}
-                            />
-
-                            <div>
-                              <small>
-                                {zone.name}
-                              </small>
-
-                              <strong>
-                                {
-                                  metric.displayValue
-                                }
-                              </strong>
-                            </div>
-
-                            <em
-                              className={
-                                state.className
-                              }
-                            >
-                              {
-                                state.shortLabel
-                              }
-                            </em>
-                          </div>
-                        )
-                      }
-                    )}
-                  </div>
-
-                  <ZoneComparisonChart
-                    zones={comparisonZones}
-                    metricKey={
-                      comparisonMetric
-                    }
-                  />
-
-                  <div className="comparison-axis">
-                    <span>00:00</span>
-                    <span>04:00</span>
-                    <span>08:00</span>
-                    <span>12:00</span>
-                    <span>16:00</span>
-                    <span>20:00</span>
-                    <span>Hiện tại</span>
-                  </div>
-                </>
-              ) : (
-                <div className="comparison-empty-state compact">
-                  <strong>
-                    Chọn thêm một khu vực
-                  </strong>
-
-                  <p>
-                    Cần ít nhất 2 khu vực để
-                    hiển thị biểu đồ so sánh.
-                  </p>
-                </div>
-              )}
-            </>
-          )}
+          <EnvironmentChart
+            metric={selectedMetricData}
+            period={period}
+            state={selectedMetricState}
+          />
         </section>
 
-        <footer className="environment-source-bar">
-          <div className="source-status">
-            <span className="source-icon">
-              <i />
-            </span>
-
+        <section className="environment-section">
+          <div className="environment-section-heading">
             <div>
-              <strong>
-                {selectedZone.node}
-              </strong>
+              <span className="section-number">03</span>
 
-              <span>
-                Sensor môi trường ·{' '}
-                {selectedZone.name}
-              </span>
+              <div>
+                <h2>So sánh giữa các khu vực</h2>
+                <p>
+                  Đối chiếu điều kiện vi khí hậu giữa các tầng và phòng trong nhà
+                  yến.
+                </p>
+              </div>
+            </div>
+
+            <div className="comparison-controls">
+              <div className="comparison-metric-toggle">
+                {['temperature', 'humidity', 'co2', 'light'].map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`comp-metric-btn ${
+                      comparisonMetric === key ? 'active' : ''
+                    }`}
+                    onClick={() => setComparisonMetric(key)}
+                  >
+                    <MetricIcon metricKey={key} />
+                    <span>
+                      {key === 'temperature'
+                        ? 'Nhiệt độ'
+                        : key === 'humidity'
+                          ? 'Độ ẩm'
+                          : key === 'co2'
+                            ? 'CO₂'
+                            : 'Ánh sáng'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="period-toggle">
+                {['6h', '24h', '7d'].map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    className={`period-btn ${comparisonPeriod === p ? 'active' : ''}`}
+                    onClick={() => setComparisonPeriod(p)}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="source-meta">
-            <span>
-              Trạng thái
-
-              <strong className="online">
-                <i />
-                Online
-              </strong>
+          <div className="comparison-chip-bar">
+            <span className="comparison-chip-label">
+              Khu vực đang so sánh ({comparisonZones.length}/{MAX_COMPARE_ZONES}
+              ):
             </span>
 
-            <span>
-              Bản ghi cuối
+            <div className="comparison-chips">
+              {comparisonZones.map((zone, idx) => (
+                <span
+                  key={zone.id}
+                  className="zone-chip"
+                  style={{
+                    borderColor:
+                      comparisonColors[idx % comparisonColors.length],
+                  }}
+                >
+                  <span
+                    className="zone-chip-dot"
+                    style={{
+                      background:
+                        comparisonColors[idx % comparisonColors.length],
+                    }}
+                  />
+                  {zone.name}
+                  {comparisonZones.length > 1 && (
+                    <button
+                      type="button"
+                      className="zone-chip-remove"
+                      onClick={() => removeComparisonZone(zone.id)}
+                      aria-label={`Xoá ${zone.name} khỏi so sánh`}
+                    >
+                      <CloseIcon />
+                    </button>
+                  )}
+                </span>
+              ))}
 
-              <strong>
-                {selectedZone.lastSeen}
-              </strong>
-            </span>
+              {comparisonZones.length < MAX_COMPARE_ZONES &&
+                availableComparisonZones.length > 0 && (
+                  <div className="zone-picker-wrap">
+                    <button
+                      type="button"
+                      className="zone-chip-add"
+                      onClick={() => setShowZonePicker((current) => !current)}
+                    >
+                      <PlusIcon />
+                      Thêm khu vực
+                    </button>
+
+                    {showZonePicker && (
+                      <div className="zone-picker-dropdown">
+                        {availableComparisonZones.map((zone) => (
+                          <button
+                            key={zone.id}
+                            type="button"
+                            className="zone-picker-item"
+                            onClick={() => addComparisonZone(zone.id)}
+                          >
+                            {zone.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+            </div>
           </div>
-        </footer>
+
+          <ZoneComparisonChart
+            zones={comparisonZones}
+            metricKey={comparisonMetric}
+            period={comparisonPeriod}
+            colors={comparisonColors}
+          />
+        </section>
       </div>
     </AppLayout>
-    
   )
 }
 

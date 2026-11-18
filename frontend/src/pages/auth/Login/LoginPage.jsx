@@ -6,39 +6,48 @@ import './LoginPage.css'
 
 function LoginPage() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, authError } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
 
-    const result = login(email, password)
+    try {
+      setLoading(true)
+      const result = await login(email, password)
 
-    if (!result.success) {
-      setError(result.message)
-      return
-    }
+      if (!result.success) {
+        setError(result.message)
+        setLoading(false)
+        return
+      }
 
-    setError('')
+      setError('')
 
-    switch (result.user.role) {
-      case 'FARM_OWNER':
-        navigate('/owner/dashboard')
-        break
+      switch (result.user.role) {
+        case 'FARM_OWNER':
+          navigate('/owner/dashboard')
+          break
 
-      case 'TECHNICIAN':
-        navigate('/technician/dashboard')
-        break
+        case 'TECHNICIAN':
+          navigate('/technician/dashboard')
+          break
 
-      case 'ADMIN':
-        navigate('/admin/dashboard')
-        break
+        case 'ADMIN':
+          navigate('/admin/dashboard')
+          break
 
-      default:
-        navigate('/login')
+        default:
+          navigate('/login')
+      }
+    } catch (err) {
+      setError(err?.message || 'Đăng nhập không thành công.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -163,19 +172,20 @@ function LoginPage() {
               </button>
             </div>
 
-              {error && (
+              {(error || authError) && (
                 <div className="login-alert" role="alert">
                   <span className="login-alert-icon">!</span>
 
-                  <span>{error}</span>
+                  <span>{error || authError}</span>
                 </div>
               )}
               
             <button
               type="submit"
               className="login-submit"
+              disabled={loading}
             >
-              Đăng nhập
+              {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
               <span>→</span>
             </button>
           </form>

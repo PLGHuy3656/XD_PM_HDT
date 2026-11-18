@@ -1,4 +1,4 @@
-﻿import {
+import {
   roles,
   recentAccounts,
 } from './dashboardMockData'
@@ -19,7 +19,10 @@ function ArrowIcon() {
   )
 }
 
-function UserAccessPanel({ onOpen }) {
+function UserAccessPanel({ onOpen, roles: propRoles, recentAccounts: propAccounts }) {
+  const currentRoles = propRoles || roles
+  const currentAccounts = propAccounts || recentAccounts
+
   return (
     <section className="admin-panel">
       <div className="admin-panel-heading">
@@ -41,7 +44,7 @@ function UserAccessPanel({ onOpen }) {
       </div>
 
       <div className="admin-role-grid">
-        {roles.map((role) => (
+        {currentRoles.map((role) => (
           <article className="admin-role-card" key={role.id}>
             <span className="admin-role-card__icon">
               {role.icon}
@@ -66,17 +69,17 @@ function UserAccessPanel({ onOpen }) {
             <strong>Tài khoản gần đây</strong>
           </div>
 
-          <span>3 tài khoản mới nhất</span>
+          <span>{currentAccounts.length} tài khoản mới nhất</span>
         </div>
 
         <div className="admin-account-list">
-          {recentAccounts.map((account) => (
+          {currentAccounts.map((account) => (
             <article
               className="admin-account-row"
               key={account.id}
             >
               <span className="admin-account-avatar">
-                {account.name
+                {(account.name || 'U')
                   .split(' ')
                   .slice(-2)
                   .map((word) => word[0])
@@ -100,5 +103,6 @@ function UserAccessPanel({ onOpen }) {
     </section>
   )
 }
+
 
 export default UserAccessPanel

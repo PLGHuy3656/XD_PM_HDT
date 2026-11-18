@@ -38,11 +38,24 @@ function ArrowIcon({ direction }) {
 }
 
 function LiveCameraCard({
-  cameras,
+  cameras = [],
   selectedCameraId,
   onCameraChange,
 }) {
   const [showBoxes, setShowBoxes] = useState(true)
+
+  if (!cameras || cameras.length === 0) {
+    return (
+      <section className="swiftlet-card swiftlet-camera-card">
+        <div className="swiftlet-card-heading swiftlet-camera-heading">
+          <div>
+            <h2>Camera AI trực tiếp</h2>
+            <p>Chưa có camera khả dụng cho nhà yến này.</p>
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   const selectedCamera =
     cameras.find((camera) => camera.id === selectedCameraId) ??

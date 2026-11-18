@@ -10,6 +10,8 @@ function DeviceAssignmentModal({
   onClose,
   onConfirm,
 }) {
+  if (!device) return null
+
   const handleBackdropMouseDown = (event) => {
     if (event.target === event.currentTarget) {
       onClose()

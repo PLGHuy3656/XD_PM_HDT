@@ -7,53 +7,43 @@ import AnalyticsTabs from '../../../components/features/farm-owner/analytics/Ana
 import AnalyticsOverview from '../../../components/features/farm-owner/analytics/AnalyticsOverview'
 import AnalyticsDetail from '../../../components/features/farm-owner/analytics/AnalyticsDetail'
 import AnalyticsYield from '../../../components/features/farm-owner/analytics/AnalyticsYield'
+import { LoadingSpinner, ErrorMessage } from '../../../components/common/feedback/index.js'
 
-import {
-  analyticsFarms,
-  birdPerformance,
-  hourlyBirdActivity,
-  zoneDensity,
-  microClimateScores,
-  alertDistribution,
-  environmentMetrics,
-  analyticsPeriods,
-  environmentComparison,
-  birdTrendAnalytics,
-  returnRateCorrelation,
-  alertTrend,
-  yieldSummary,
-  yieldTrend,
-  zoneYield,
-  harvestHistory,
-} from '../../../components/features/farm-owner/analytics/analyticsMockData'
+import { useFarms } from '../../../features/farms/hooks/useFarms'
+import { useAnalytics } from '../../../features/analytics/hooks/useAnalytics'
 
 import './AnalyticsPage.css'
 
 function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState('overview')
-  const [farmId, setFarmId] = useState(
-    analyticsFarms[0].id,
-  )
 
-  const selectedFarm =
-    analyticsFarms.find(
-      (farm) => farm.id === farmId,
-    ) ?? analyticsFarms[0]
+  const {
+    farms,
+    selectedFarm,
+    selectedFarmId,
+    setSelectedFarmId,
+    error: farmsError,
+  } = useFarms()
+
+  const {
+    analyticsData,
+    loading: analyticsLoading,
+    error: analyticsError,
+    refetch: refetchAnalytics,
+  } = useAnalytics(selectedFarmId)
 
   return (
     <AppLayout>
       <div className="analytics-page">
         <header className="analytics-page-heading">
           <div>
-            <span className="analytics-eyebrow">
-              INSIGHTS & PERFORMANCE
-            </span>
+            <span className="analytics-eyebrow">INSIGHTS & PERFORMANCE</span>
 
             <h1>Phân tích</h1>
 
             <p>
-              Phân tích môi trường, hoạt động đàn chim,
-              cảnh báo và hiệu quả vận hành nhà yến.
+              Phân tích môi trường, hoạt động đàn chim, cảnh báo và hiệu quả vận
+              hành nhà yến.
             </p>
           </div>
 
@@ -61,9 +51,9 @@ function AnalyticsPage() {
             <span>Nhà yến</span>
 
             <EnvironmentSelect
-              value={farmId}
-              onChange={setFarmId}
-              options={analyticsFarms.map((farm) => ({
+              value={selectedFarmId || ''}
+              onChange={setSelectedFarmId}
+              options={farms.map((farm) => ({
                 value: farm.id,
                 label: farm.name,
               }))}
@@ -71,43 +61,62 @@ function AnalyticsPage() {
           </div>
         </header>
 
-        <AnalyticsTabs
-          activeTab={activeTab}
-          onChange={setActiveTab}
-        />
-
-        {activeTab === 'overview' && (
-          <AnalyticsOverview
-            performance={birdPerformance}
-            birdActivity={hourlyBirdActivity}
-            density={zoneDensity}
-            climate={microClimateScores}
-            alerts={alertDistribution}
+        {farmsError && (
+          <ErrorMessage title="Lỗi danh sách nhà yến" message={farmsError} />
+        )}
+        {analyticsError && (
+          <ErrorMessage
+            title="Lỗi tải số liệu phân tích"
+            message={analyticsError}
+            onRetry={refetchAnalytics}
           />
         )}
 
-        {activeTab === 'detail' && (
-          <AnalyticsDetail
-            metrics={environmentMetrics}
-            periods={analyticsPeriods}
-            comparison={environmentComparison}
-            birdTrend={birdTrendAnalytics}
-            correlation={returnRateCorrelation}
-            alerts={alertTrend}
-          />
-        )}
+        <AnalyticsTabs activeTab={activeTab} onChange={setActiveTab} />
 
-        {activeTab === 'yield' && (
-          <AnalyticsYield
-            summary={yieldSummary}
-            trend={yieldTrend}
-            zones={zoneYield}
-            history={harvestHistory}
-          />
+        {analyticsLoading && !analyticsData ? (
+          <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}>
+            <LoadingSpinner size="lg" text="Đang xử lý phân tích dữ liệu..." />
+          </div>
+        ) : (
+          <>
+            {activeTab === 'overview' && (
+              <AnalyticsOverview
+                performance={analyticsData.birdPerformance}
+                birdActivity={analyticsData.hourlyBirdActivity}
+                density={analyticsData.zoneDensity}
+                climate={analyticsData.microClimateScores}
+                alerts={analyticsData.alertDistribution}
+              />
+            )}
+
+            {activeTab === 'detail' && (
+              <AnalyticsDetail
+                metrics={analyticsData.environmentMetrics}
+                periods={analyticsData.analyticsPeriods}
+                comparison={analyticsData.environmentComparison}
+                birdTrend={analyticsData.birdTrendAnalytics}
+                correlation={analyticsData.returnRateCorrelation}
+                alerts={analyticsData.alertTrend}
+              />
+            )}
+
+            {activeTab === 'yield' && (
+              <AnalyticsYield
+                summary={analyticsData.yieldSummary}
+                trend={analyticsData.yieldTrend}
+                zones={analyticsData.zoneYield}
+                history={analyticsData.harvestHistory}
+              />
+            )}
+          </>
         )}
 
         <span className="analytics-selected-farm">
-          Dữ liệu minh họa · {selectedFarm.name}
+          {analyticsData.hasDataGaps
+            ? 'Dữ liệu thời gian thực (đang đồng bộ ETL NiFi)'
+            : 'Dữ liệu phân tích trực tiếp'}{' '}
+          · {selectedFarm?.name || 'Nhà yến'}
         </span>
       </div>
     </AppLayout>

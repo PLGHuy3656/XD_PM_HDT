@@ -3,6 +3,7 @@ import AppLayout from '../../../components/layout/AppLayout'
 import SystemOverview from '../../../components/features/admin/system/SystemOverview'
 import SystemSettings from '../../../components/features/admin/system/SystemSettings'
 import SystemAuditLog from '../../../components/features/admin/system/SystemAuditLog'
+import { useAdminData } from '../../../features/admin'
 import './SystemPage.css'
 
 const tabs = [
@@ -23,6 +24,7 @@ const tabs = [
 function SystemPage() {
   const [activeTab, setActiveTab] =
     useState('overview')
+  const { systemHealth, alerts, loading, error } = useAdminData()
 
   return (
     <AppLayout>
@@ -40,7 +42,7 @@ function SystemPage() {
 
           <span className="admin-system-overall-status">
             <i />
-            Operational
+            {error ? 'Degraded' : 'Operational'}
           </span>
         </section>
 
@@ -64,7 +66,7 @@ function SystemPage() {
         </nav>
 
         {activeTab === 'overview' && (
-          <SystemOverview />
+          <SystemOverview services={systemHealth} alerts={alerts} />
         )}
 
         {activeTab === 'settings' && (
@@ -78,5 +80,6 @@ function SystemPage() {
     </AppLayout>
   )
 }
+
 
 export default SystemPage

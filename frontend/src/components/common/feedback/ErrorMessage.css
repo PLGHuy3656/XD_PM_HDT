@@ -1,0 +1,57 @@
+.error-message-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4, 16px);
+  padding: var(--space-4, 16px) var(--space-5, 20px);
+  background: var(--danger-subtle, #fef2f2);
+  border: 1px solid var(--danger-border, #fecaca);
+  border-radius: var(--radius-md, 8px);
+  margin: var(--space-3, 12px) 0;
+}
+
+.error-message-content {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3, 12px);
+}
+
+.error-message-icon {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.error-message-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.error-message-title {
+  font-size: var(--font-sm, 14px);
+  font-weight: 600;
+  color: var(--danger-text, #991b1b);
+}
+
+.error-message-desc {
+  font-size: var(--font-xs, 13px);
+  color: var(--danger-text, #b91c1c);
+  margin: 0;
+}
+
+.error-retry-btn {
+  background: var(--danger-btn-bg, #ffffff);
+  border: 1px solid var(--danger-border, #fecaca);
+  color: var(--danger-text, #991b1b);
+  padding: var(--space-2, 6px) var(--space-3, 14px);
+  border-radius: var(--radius-sm, 6px);
+  font-size: var(--font-xs, 12px);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.error-retry-btn:hover {
+  background: var(--danger-btn-hover, #fee2e2);
+}

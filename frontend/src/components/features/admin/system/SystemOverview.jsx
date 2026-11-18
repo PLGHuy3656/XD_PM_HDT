@@ -4,18 +4,21 @@ import {
   systemStatusLabels,
 } from './systemMockData'
 
-function SystemOverview() {
-  const operationalServices = systemServices.filter(
-    (service) => service.tier === 'CURRENT',
+function SystemOverview({ services: propServices, alerts: propAlerts }) {
+  const currentServices = propServices || systemServices
+
+  const operationalServices = currentServices.filter(
+    (service) => service.tier === 'CURRENT' || !service.tier,
   )
 
-  const plannedServices = systemServices.filter(
+  const plannedServices = currentServices.filter(
     (service) => service.tier === 'PLANNED',
   )
 
   const healthyCount = operationalServices.filter(
-    (service) => service.status === 'HEALTHY',
+    (service) => service.status === 'HEALTHY' || service.status === 'healthy',
   ).length
+
 
   return (
     <div className="admin-system-overview">
@@ -64,7 +67,7 @@ function SystemOverview() {
         </div>
 
         <div className="admin-system-services">
-          {systemServices.map((service) => (
+          {currentServices.map((service) => (
             <article
               key={service.id}
               className="admin-system-service"
@@ -81,7 +84,7 @@ function SystemOverview() {
               <div className="admin-system-service__latency">
                 <span>
                   {service.latency
-                    ? 'Latency (Mock)'
+                    ? 'Độ trễ'
                     : 'Tích hợp'}
                 </span>
                 <strong>
@@ -93,11 +96,12 @@ function SystemOverview() {
                 className={`admin-system-service__status admin-system-service__status--${service.status.toLowerCase()}`}
               >
                 <i />
-                {systemStatusLabels[service.status]}
+                {systemStatusLabels[service.status] || service.status}
               </span>
             </article>
           ))}
         </div>
+
       </section>
 
       <section className="admin-system-card">

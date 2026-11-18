@@ -8,6 +8,7 @@ import DeviceDetailPanel from '../../../components/features/admin/devices/Device
 import {
   getAdminDevices,
 } from '../../../components/features/admin/devices/adminDevicesData'
+import { useAdminData } from '../../../features/admin'
 
 import './DevicesPage.css'
 
@@ -19,12 +20,15 @@ const statusFilterOptions = [
 ]
 
 function DevicesPage() {
-  const devices = useMemo(
-    () => getAdminDevices(),
-    [],
-  )
+  const { devices: realDevices, loading, error } = useAdminData()
+  const defaultDevices = useMemo(() => getAdminDevices(), [])
+
+  const devices = useMemo(() => {
+    return (realDevices && realDevices.length > 0) ? realDevices : defaultDevices
+  }, [realDevices, defaultDevices])
 
   const [searchTerm, setSearchTerm] = useState('')
+
   const [statusFilter, setStatusFilter] =
     useState('ALL')
   const [typeFilter, setTypeFilter] =

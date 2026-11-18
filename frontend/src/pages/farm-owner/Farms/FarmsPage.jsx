@@ -1,26 +1,26 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import AppLayout from '../../../components/layout/AppLayout'
 import FarmCard from '../../../components/features/farm-owner/farms/FarmCard'
 import FarmDetailPanel from '../../../components/features/farm-owner/farms/FarmDetailPanel'
 import FarmRequestModal from '../../../components/features/farm-owner/farms/FarmRequestModal'
-import {
-  farmsMockData,
-  initialFarmRequests,
-} from '../../../components/features/farm-owner/farms/farmsMockData'
+import { initialFarmRequests } from '../../../components/features/farm-owner/farms/farmsMockData'
+import { useFarms } from '../../../features/farms/hooks/useFarms'
+import { LoadingSpinner, ErrorMessage } from '../../../components/common/feedback/index.js'
 import './FarmsPage.css'
 
 function FarmsPage() {
-  const [selectedFarmId, setSelectedFarmId] = useState(
-    farmsMockData[0]?.id ?? null,
-  )
+  const {
+    farms,
+    selectedFarm,
+    selectedFarmId,
+    setSelectedFarmId,
+    loading,
+    error,
+    refetch,
+  } = useFarms()
+
   const [requests, setRequests] = useState(initialFarmRequests)
   const [requestModalOpen, setRequestModalOpen] = useState(false)
-
-  const selectedFarm = useMemo(
-    () =>
-      farmsMockData.find((farm) => farm.id === selectedFarmId) ?? null,
-    [selectedFarmId],
-  )
 
   const handleSubmitRequest = (form) => {
     const nextNumber = String(requests.length + 15).padStart(3, '0')
@@ -37,6 +37,21 @@ function FarmsPage() {
     setRequests((current) => [newRequest, ...current])
     setRequestModalOpen(false)
   }
+
+  const totalZones = farms.reduce(
+    (total, farm) => total + (farm.zoneCount || farm.zones?.length || 0),
+    0,
+  )
+
+  const totalDevices = farms.reduce(
+    (total, farm) => total + (farm.totalDevices || 0),
+    0,
+  )
+
+  const onlineDevices = farms.reduce(
+    (total, farm) => total + (farm.onlineDevices || 0),
+    0,
+  )
 
   return (
     <AppLayout>
@@ -65,80 +80,79 @@ function FarmsPage() {
           </button>
         </header>
 
-        <section className="farms-overview">
-          <article>
-            <span>Nhà yến đang quản lý</span>
-            <strong>{farmsMockData.length}</strong>
-            <small>Đang hoạt động</small>
-          </article>
+        {error && (
+          <ErrorMessage
+            title="Lỗi tải danh sách nhà yến"
+            message={error}
+            onRetry={refetch}
+          />
+        )}
 
-          <article>
-            <span>Tổng khu vực</span>
-            <strong>
-              {farmsMockData.reduce(
-                (total, farm) => total + farm.zones.length,
-                0,
-              )}
-            </strong>
-            <small>Được giám sát</small>
-          </article>
+        {loading && farms.length === 0 ? (
+          <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}>
+            <LoadingSpinner size="lg" text="Đang tải dữ liệu nhà yến..." />
+          </div>
+        ) : (
+          <>
+            <section className="farms-overview">
+              <article>
+                <span>Nhà yến đang quản lý</span>
+                <strong>{farms.length}</strong>
+                <small>Đang hoạt động</small>
+              </article>
 
-          <article>
-            <span>Thiết bị trực tuyến</span>
-            <strong>
-              {farmsMockData.reduce(
-                (total, farm) => total + farm.onlineDevices,
-                0,
-              )}
-            </strong>
-            <small>
-              /{' '}
-              {farmsMockData.reduce(
-                (total, farm) => total + farm.totalDevices,
-                0,
-              )}{' '}
-              thiết bị
-            </small>
-          </article>
+              <article>
+                <span>Tổng khu vực</span>
+                <strong>{totalZones}</strong>
+                <small>Được giám sát</small>
+              </article>
 
-          <article>
-            <span>Yêu cầu chờ duyệt</span>
-            <strong>
-              {
-                requests.filter(
-                  (request) => request.status === 'PENDING',
-                ).length
-              }
-            </strong>
-            <small>Chờ Administrator xử lý</small>
-          </article>
-        </section>
+              <article>
+                <span>Thiết bị trực tuyến</span>
+                <strong>{onlineDevices}</strong>
+                <small>/ {totalDevices} thiết bị</small>
+              </article>
 
-        <div className="farms-workspace">
-          <section className="farms-list-panel">
-            <div className="farms-section-title">
-              <div>
-                <h2>Nhà yến của tôi</h2>
-                <p>{farmsMockData.length} nhà yến đang hoạt động</p>
-              </div>
-            </div>
-
-            <div className="farms-list">
-              {farmsMockData.map((farm) => (
-                <FarmCard
-                  key={farm.id}
-                  farm={farm}
-                  selected={farm.id === selectedFarmId}
-                  onSelect={(nextFarm) =>
-                    setSelectedFarmId(nextFarm.id)
+              <article>
+                <span>Yêu cầu chờ duyệt</span>
+                <strong>
+                  {
+                    requests.filter(
+                      (request) => request.status === 'PENDING',
+                    ).length
                   }
-                />
-              ))}
-            </div>
-          </section>
+                </strong>
+                <small>Chờ Administrator xử lý</small>
+              </article>
+            </section>
 
-          <FarmDetailPanel farm={selectedFarm} />
-        </div>
+            <div className="farms-workspace">
+              <section className="farms-list-panel">
+                <div className="farms-section-title">
+                  <div>
+                    <h2>Nhà yến của tôi</h2>
+                    <p>{farms.length} nhà yến đang hoạt động</p>
+                  </div>
+                </div>
+
+                <div className="farms-list">
+                  {farms.map((farm) => (
+                    <FarmCard
+                      key={farm.id}
+                      farm={farm}
+                      selected={farm.id === selectedFarmId}
+                      onSelect={(nextFarm) =>
+                        setSelectedFarmId(nextFarm.id)
+                      }
+                    />
+                  ))}
+                </div>
+              </section>
+
+              <FarmDetailPanel farm={selectedFarm} />
+            </div>
+          </>
+        )}
 
         <section className="farm-requests">
           <div className="farms-section-title">

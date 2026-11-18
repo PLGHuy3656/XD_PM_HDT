@@ -3,8 +3,6 @@ import { useMemo, useState } from 'react'
 import AppLayout from '../../../components/layout/AppLayout'
 import EnvironmentSelect from '../../../components/ui/Select'
 import {
-  farms,
-  devices,
   statusMeta,
   typeFilters,
   statusFilters,
@@ -12,6 +10,10 @@ import {
 
 import DeviceDetailPanel from '../../../components/features/farm-owner/devices/DeviceDetailPanel'
 import DeviceTable from '../../../components/features/farm-owner/devices/DeviceTable'
+import { LoadingSpinner, ErrorMessage, EmptyState } from '../../../components/common/feedback/index.js'
+
+import { useFarms } from '../../../features/farms/hooks/useFarms'
+import { useDevices } from '../../../features/devices/hooks/useDevices'
 
 import './DevicesPage.css'
 
@@ -34,7 +36,23 @@ function RefreshIcon() {
 }
 
 function DevicesPage() {
-  const [farmId, setFarmId] = useState(farms[0].id)
+  const {
+    farms,
+    selectedFarm,
+    selectedFarmId,
+    setSelectedFarmId,
+    zones,
+    loading: farmsLoading,
+    error: farmsError,
+  } = useFarms()
+
+  const {
+    devices,
+    loading: devicesLoading,
+    error: devicesError,
+    refetch: refetchDevices,
+  } = useDevices(selectedFarmId)
+
   const [zoneId, setZoneId] = useState('ALL')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
@@ -42,12 +60,11 @@ function DevicesPage() {
   const [selectedDeviceId, setSelectedDeviceId] = useState(null)
   const [refreshLabel, setRefreshLabel] = useState('Vừa xong')
 
-  const selectedFarm =
-    farms.find((farm) => farm.id === farmId) ?? farms[0]
+  const effectiveZones = zones.length > 0 ? zones : selectedFarm?.zones || []
 
   const zoneOptions = [
     { value: 'ALL', label: 'Tất cả khu vực' },
-    ...selectedFarm.zones.map((zone) => ({
+    ...effectiveZones.map((zone) => ({
       value: zone.id,
       label: zone.name,
     })),
@@ -57,77 +74,41 @@ function DevicesPage() {
     const keyword = search.trim().toLowerCase()
 
     return devices.filter((device) => {
-      const matchesFarm = device.farmId === farmId
-
-      const matchesZone =
-        zoneId === 'ALL' || device.zoneId === zoneId
+      const matchesZone = zoneId === 'ALL' || device.zoneId === zoneId
 
       const matchesStatus =
-        statusFilter === 'ALL' ||
-        device.status === statusFilter
+        statusFilter === 'ALL' || device.status === statusFilter
 
       const matchesType =
-        typeFilter === 'ALL' ||
-        device.type === typeFilter
+        typeFilter === 'ALL' || device.type === typeFilter
 
       const matchesSearch =
         !keyword ||
         device.id.toLowerCase().includes(keyword) ||
         device.name.toLowerCase().includes(keyword) ||
-        device.typeLabel.toLowerCase().includes(keyword)
+        (device.typeLabel && device.typeLabel.toLowerCase().includes(keyword))
 
-      return (
-        matchesFarm &&
-        matchesZone &&
-        matchesStatus &&
-        matchesType &&
-        matchesSearch
-      )
+      return matchesZone && matchesStatus && matchesType && matchesSearch
     })
-  }, [
-    farmId,
-    zoneId,
-    search,
-    statusFilter,
-    typeFilter,
-  ])
+  }, [devices, zoneId, search, statusFilter, typeFilter])
 
   const selectedDevice =
-    devices.find(
-      (device) => device.id === selectedDeviceId
-    ) ?? null
+    devices.find((device) => device.id === selectedDeviceId) ?? null
 
-  const onlineCount = devices.filter(
-    (device) =>
-      device.farmId === farmId &&
-      device.status === 'ONLINE'
-  ).length
-
-  const warningCount = devices.filter(
-    (device) =>
-      device.farmId === farmId &&
-      device.status === 'WARNING'
-  ).length
-
-  const offlineCount = devices.filter(
-    (device) =>
-      device.farmId === farmId &&
-      device.status === 'OFFLINE'
-  ).length
-
-  const farmDeviceCount = devices.filter(
-    (device) => device.farmId === farmId
-  ).length
+  const onlineCount = devices.filter((device) => device.status === 'ONLINE').length
+  const warningCount = devices.filter((device) => device.status === 'WARNING').length
+  const offlineCount = devices.filter((device) => device.status === 'OFFLINE').length
+  const farmDeviceCount = devices.length
 
   const getZoneName = (device) => {
     return (
-      selectedFarm.zones.find(
-        (zone) => zone.id === device.zoneId
-      )?.name ?? 'Chưa gán'
+      effectiveZones.find((zone) => zone.id === device.zoneId)?.name ?? 'Chưa gán'
     )
   }
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
+    setRefreshLabel('Đang làm mới...')
+    await refetchDevices()
     setRefreshLabel('Vừa xong')
   }
 
@@ -136,184 +117,147 @@ function DevicesPage() {
       <div className="devices-page">
         <header className="devices-hero">
           <div>
-            <span className="devices-eyebrow">
-              DEVICE MANAGEMENT
-            </span>
+            <span className="devices-eyebrow">DEVICE MANAGEMENT</span>
 
-            <h1>Thiết bị nhà yến</h1>
+            <h1>Thiết bị</h1>
 
             <p>
-              Theo dõi trạng thái kết nối và sức khỏe các
-              thiết bị đang hoạt động trong nhà yến.
+              Giám sát tình trạng kết nối, phiên bản firmware và vị trí lắp đặt
+              của toàn bộ thiết bị theo từng nhà yến.
             </p>
           </div>
 
-          <div className="devices-live-status">
-            <span className="devices-live-dot" />
+          <div className="devices-farm-picker">
+            <span>Nhà yến</span>
 
-            <div>
-              <strong>Hệ thống thiết bị trực tuyến</strong>
-              <span>Cập nhật {refreshLabel}</span>
-            </div>
-          </div>
-        </header>
-
-        <section className="device-summary-grid">
-          <article className="device-summary-card">
-            <span className="device-summary-label">
-              Tổng thiết bị
-            </span>
-
-            <strong>{farmDeviceCount}</strong>
-
-            <small>Trong nhà yến đang chọn</small>
-          </article>
-
-          <article className="device-summary-card positive">
-            <span className="device-summary-label">
-              Online
-            </span>
-
-            <strong>{onlineCount}</strong>
-
-            <small>Hoạt động bình thường</small>
-          </article>
-
-          <article className="device-summary-card warning">
-            <span className="device-summary-label">
-              Cần chú ý
-            </span>
-
-            <strong>{warningCount}</strong>
-
-            <small>Cần kiểm tra tín hiệu</small>
-          </article>
-
-          <article className="device-summary-card danger">
-            <span className="device-summary-label">
-              Offline
-            </span>
-
-            <strong>{offlineCount}</strong>
-
-            <small>Mất kết nối</small>
-          </article>
-        </section>
-
-        <section className="device-context-card">
-          <div className="device-context-copy">
-            <span className="devices-section-label">
-              PHẠM VI THIẾT BỊ
-            </span>
-
-            <h2>Chọn khu vực theo dõi</h2>
-
-            <p>
-              Danh sách bên dưới được lọc theo nhà yến và
-              khu vực đang chọn.
-            </p>
-          </div>
-
-          <div className="device-context-fields">
             <EnvironmentSelect
-              label="Nhà yến"
-              value={farmId}
+              value={selectedFarmId || ''}
+              onChange={(nextId) => {
+                setSelectedFarmId(nextId)
+                setSelectedDeviceId(null)
+                setZoneId('ALL')
+              }}
               options={farms.map((farm) => ({
                 value: farm.id,
                 label: farm.name,
               }))}
-              onChange={(nextFarmId) => {
-                setFarmId(nextFarmId)
-                setZoneId('ALL')
-                setSelectedDeviceId(null)
-              }}
-            />
-
-            <EnvironmentSelect
-              label="Khu vực"
-              value={zoneId}
-              options={zoneOptions}
-              onChange={(nextZoneId) => {
-                setZoneId(nextZoneId)
-                setSelectedDeviceId(null)
-              }}
             />
           </div>
+        </header>
+
+        {farmsError && (
+          <ErrorMessage title="Lỗi danh sách nhà yến" message={farmsError} />
+        )}
+        {devicesError && (
+          <ErrorMessage
+            title="Lỗi tải thiết bị"
+            message={devicesError}
+            onRetry={refetchDevices}
+          />
+        )}
+
+        <section className="devices-overview-grid">
+          <article className="device-metric-card">
+            <span className="metric-title">Tổng thiết bị</span>
+            <strong className="metric-number">{farmDeviceCount}</strong>
+            <small className="metric-caption">Được định danh trong nhà yến</small>
+          </article>
+
+          <article className="device-metric-card">
+            <span className="metric-title">Trực tuyến</span>
+            <strong className="metric-number metric-online">{onlineCount}</strong>
+            <small className="metric-caption">Đang kết nối bình thường</small>
+          </article>
+
+          <article className="device-metric-card">
+            <span className="metric-title">Cần kiểm tra</span>
+            <strong className="metric-number metric-warning">{warningCount}</strong>
+            <small className="metric-caption">Tín hiệu yếu hoặc chập chờn</small>
+          </article>
+
+          <article className="device-metric-card">
+            <span className="metric-title">Ngoại tuyến</span>
+            <strong className="metric-number metric-offline">{offlineCount}</strong>
+            <small className="metric-caption">Mất tín hiệu trên 10 phút</small>
+          </article>
         </section>
 
-        <section className="device-list-section">
-          <div className="device-list-heading">
-            <div>
-              <span className="devices-section-index">
-                01
-              </span>
+        <section className="devices-controls">
+          <div className="devices-filter-row">
+            <div className="devices-search">
+              <SearchIcon />
+              <input
+                type="text"
+                placeholder="Tìm theo mã, tên hoặc loại thiết bị..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
 
-              <div>
-                <h2>Danh sách thiết bị</h2>
+            <div className="devices-selects">
+              <EnvironmentSelect
+                value={zoneId}
+                onChange={setZoneId}
+                options={zoneOptions}
+              />
 
-                <p>
-                  {filteredDevices.length} thiết bị phù hợp
-                  với bộ lọc hiện tại
-                </p>
-              </div>
+              <EnvironmentSelect
+                value={typeFilter}
+                onChange={setTypeFilter}
+                options={typeFilters}
+              />
+
+              <EnvironmentSelect
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={statusFilters}
+              />
             </div>
 
             <button
               type="button"
-              className="device-refresh-button"
+              className="devices-refresh-btn"
               onClick={handleRefresh}
             >
               <RefreshIcon />
-              Làm mới
+              {refreshLabel}
             </button>
           </div>
-
-          <div className="device-toolbar">
-            <label className="device-search">
-              <SearchIcon />
-
-              <input
-                type="text"
-                value={search}
-                onChange={(event) =>
-                  setSearch(event.target.value)
-                }
-                placeholder="Tìm theo tên hoặc Device ID..."
-              />
-            </label>
-
-            <div className="device-filter-group">
-              <EnvironmentSelect
-                label="Trạng thái"
-                value={statusFilter}
-                options={statusFilters}
-                onChange={setStatusFilter}
-              />
-
-              <EnvironmentSelect
-                label="Loại thiết bị"
-                value={typeFilter}
-                options={typeFilters}
-                onChange={setTypeFilter}
-              />
-            </div>
-          </div>
-
-          <DeviceTable
-            devices={filteredDevices}
-            selectedDeviceId={selectedDeviceId}
-            getZoneName={getZoneName}
-            onSelectDevice={setSelectedDeviceId}
-          />
         </section>
 
-        {selectedDevice && (
-          <DeviceDetailPanel
-            device={selectedDevice}
-            zoneName={getZoneName(selectedDevice)}
-            onClose={() => setSelectedDeviceId(null)}
-          />
-        )}
+        <section className="devices-layout">
+          <div className="devices-table-area">
+            {devicesLoading && devices.length === 0 ? (
+              <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}>
+                <LoadingSpinner size="lg" text="Đang tải thiết bị..." />
+              </div>
+            ) : filteredDevices.length === 0 ? (
+              <EmptyState
+                title="Không tìm thấy thiết bị"
+                description={
+                  farmDeviceCount === 0
+                    ? 'Nhà yến này chưa có thiết bị nào được cấu hình.'
+                    : 'Không có thiết bị phù hợp với bộ lọc hiện tại.'
+                }
+              />
+            ) : (
+              <DeviceTable
+                devices={filteredDevices}
+                selectedDeviceId={selectedDeviceId}
+                onSelectDevice={(device) => setSelectedDeviceId(device.id)}
+                getZoneName={getZoneName}
+              />
+            )}
+          </div>
+
+          <aside className="devices-side-panel">
+            <DeviceDetailPanel
+              device={selectedDevice}
+              getZoneName={getZoneName}
+              onClose={() => setSelectedDeviceId(null)}
+            />
+          </aside>
+        </section>
       </div>
     </AppLayout>
   )

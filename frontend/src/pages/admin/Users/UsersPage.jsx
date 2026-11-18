@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AppLayout from '../../../components/layout/AppLayout'
 import Select from '../../../components/ui/Select'
 import UserTable from '../../../components/features/admin/users/UserTable'
@@ -10,6 +10,9 @@ import {
   initialAdminUsers,
   userRoleLabels,
 } from '../../../components/features/admin/users/usersMockData'
+import { usersApi } from '../../../api'
+import { USE_MOCK } from '../../../api/config'
+import { useAdminData } from '../../../features/admin'
 
 import './UsersPage.css'
 
@@ -63,11 +66,20 @@ function getToday() {
 }
 
 function UsersPage() {
-  const [users, setUsers] = useState(initialAdminUsers)
+  const { users: realUsers, loading, error } = useAdminData()
+  const [users, setUsers] = useState(() => (USE_MOCK ? initialAdminUsers : []))
+
+  // Sync real users from authoritative APIs (Management Service GET /api/users)
+  useEffect(() => {
+    if (realUsers && realUsers.length > 0) {
+      setUsers(realUsers)
+    }
+  }, [realUsers])
 
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
+
 
   const [selectedUserId, setSelectedUserId] =
     useState(null)
@@ -127,81 +139,156 @@ function UsersPage() {
     (user) => user.role === 'FARM_OWNER',
   ).length
 
-  function handleCreateUser(data) {
-    const emailExists = users.some(
-      (user) =>
-        user.email.toLowerCase() ===
-        data.email.toLowerCase(),
-    )
-
-    if (emailExists) {
-      setCreateError(
-        'Email này đã được sử dụng bởi một tài khoản khác.',
+  async function handleCreateUser(data) {
+    if (USE_MOCK) {
+      const emailExists = users.some(
+        (user) =>
+          user.email.toLowerCase() ===
+          data.email.toLowerCase(),
       )
+
+      if (emailExists) {
+        setCreateError(
+          'Email này đã được sử dụng bởi một tài khoản khác.',
+        )
+        return
+      }
+
+      const highestId = users.reduce((highest, user) => {
+        const number = Number(user.id.replace('USR-', ''))
+
+        return Number.isNaN(number)
+          ? highest
+          : Math.max(highest, number)
+      }, 0)
+
+      const newUser = {
+        id: `USR-${String(highestId + 1).padStart(3, '0')}`,
+        ...data,
+        status: 'ACTIVE',
+        joinedAt: getToday(),
+        lastActive: 'Chưa đăng nhập',
+      }
+
+      setUsers((current) => [...current, newUser])
+
+      setCreateOpen(false)
+      setCreateError('')
+      setSelectedUserId(newUser.id)
       return
     }
 
-    const highestId = users.reduce((highest, user) => {
-      const number = Number(user.id.replace('USR-', ''))
+    // Real API Gateway Call (FR-UAM-05)
+    try {
+      const created = await usersApi.createUser({
+        email: data.email,
+        password: data.password || 'swiftlet_demo_pass_2026',
+        full_name: data.name,
+        phone: data.phone || null,
+        role: data.role || 'FARM_OWNER',
+        status: 'ACTIVE',
+      })
 
-      return Number.isNaN(number)
-        ? highest
-        : Math.max(highest, number)
-    }, 0)
+      const mapped = {
+        id: created.id,
+        name: created.full_name,
+        email: created.email,
+        phone: created.phone || '--',
+        role: (created.roles && created.roles[0]) || data.role,
+        roles: created.roles || [data.role],
+        status: created.status,
+        joinedAt: getToday(),
+        lastActive: 'Chưa đăng nhập',
+      }
 
-    const newUser = {
-      id: `USR-${String(highestId + 1).padStart(3, '0')}`,
-      ...data,
-      status: 'ACTIVE',
-      joinedAt: getToday(),
-      lastActive: 'Chưa đăng nhập',
+      setUsers((current) => [mapped, ...current])
+      setCreateOpen(false)
+      setCreateError('')
+      setSelectedUserId(mapped.id)
+    } catch (err) {
+      setCreateError(err.message || 'Không thể tạo người dùng.')
     }
-
-    setUsers((current) => [...current, newUser])
-
-    setCreateOpen(false)
-    setCreateError('')
-    setSelectedUserId(newUser.id)
   }
 
-  function handleSaveUser(updatedUser) {
-    const duplicateEmail = users.some(
-      (user) =>
-        user.id !== updatedUser.id &&
-        user.email.toLowerCase() ===
-          updatedUser.email.toLowerCase(),
-    )
+  async function handleSaveUser(updatedUser) {
+    if (USE_MOCK) {
+      const duplicateEmail = users.some(
+        (user) =>
+          user.id !== updatedUser.id &&
+          user.email.toLowerCase() ===
+            updatedUser.email.toLowerCase(),
+      )
 
-    if (duplicateEmail) {
+      if (duplicateEmail) {
+        return
+      }
+
+      setUsers((current) =>
+        current.map((user) =>
+          user.id === updatedUser.id ? updatedUser : user,
+        ),
+      )
+
+      setEditingUserId(null)
+      setSelectedUserId(updatedUser.id)
       return
     }
 
-    setUsers((current) =>
-      current.map((user) =>
-        user.id === updatedUser.id ? updatedUser : user,
-      ),
-    )
-
-    setEditingUserId(null)
-    setSelectedUserId(updatedUser.id)
+    // Real API Gateway Call (FR-UAM-05)
+    try {
+      await usersApi.updateUser(updatedUser.id, {
+        full_name: updatedUser.name,
+        phone: updatedUser.phone,
+        role: updatedUser.role,
+      })
+      setUsers((current) =>
+        current.map((user) =>
+          user.id === updatedUser.id ? updatedUser : user,
+        ),
+      )
+      setEditingUserId(null)
+      setSelectedUserId(updatedUser.id)
+    } catch (err) {
+      console.error('Update user failed:', err)
+    }
   }
 
-  function handleConfirmStatus(user) {
-    setUsers((current) =>
-      current.map((item) =>
-        item.id === user.id
-          ? {
-              ...item,
-              status:
-                item.status === 'ACTIVE'
-                  ? 'LOCKED'
-                  : 'ACTIVE',
-            }
-          : item,
-      ),
-    )
+  async function handleConfirmStatus(user) {
+    const nextStatus = user.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE'
 
-    setStatusUserId(null)
+    if (USE_MOCK) {
+      setUsers((current) =>
+        current.map((item) =>
+          item.id === user.id
+            ? {
+                ...item,
+                status: nextStatus,
+              }
+            : item,
+        ),
+      )
+      setStatusUserId(null)
+      return
+    }
+
+    // Real API Gateway Call (FR-UAM-05)
+    try {
+      await usersApi.updateUserStatus(user.id, nextStatus)
+      setUsers((current) =>
+        current.map((item) =>
+          item.id === user.id
+            ? {
+                ...item,
+                status: nextStatus,
+                lastActive: nextStatus === 'ACTIVE' ? 'Đang hoạt động' : 'Đã khóa',
+              }
+            : item,
+        ),
+      )
+      setStatusUserId(null)
+    } catch (err) {
+      console.error('Update status failed:', err)
+    }
   }
 
   return (

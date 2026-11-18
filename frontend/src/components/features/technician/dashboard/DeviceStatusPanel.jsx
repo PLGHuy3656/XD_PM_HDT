@@ -5,8 +5,9 @@ function StatusDot({ status }) {
   return <span className={`technician-status-dot ${status}`} />
 }
 
-function DeviceStatusPanel() {
+function DeviceStatusPanel({ devices: propDevices }) {
   const navigate = useNavigate()
+  const displayDevices = propDevices && propDevices.length > 0 ? propDevices : devices
 
   return (
     <section className="technician-card technician-device-panel">
@@ -38,7 +39,7 @@ function DeviceStatusPanel() {
           <span>Cập nhật</span>
         </div>
 
-        {devices.map((device) => (
+        {displayDevices.map((device) => (
           <article className="technician-device-row" key={device.id}>
             <div className="technician-device-row__node">
               <span

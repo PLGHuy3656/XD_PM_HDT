@@ -6,6 +6,8 @@ function DeviceDetailPanel({
   zoneName,
   onClose,
 }) {
+  if (!device) return null
+
   return (
     <section className="device-detail-panel">
       <div className="device-detail-heading">
