@@ -1,0 +1,8 @@
+fastapi[standard]
+psycopg[binary]
+pydantic-settings
+python-dotenv
+httpx
+pytest>=8.0
+aio-pika
+reportlab
