@@ -35,10 +35,14 @@ class PostgreSQLAnalyticsRepository(IAnalyticsRepository):
     ):
         resolved_url = database_url or os.getenv("ANALYTICS_DATABASE_URL")
         if not resolved_url:
+            pw = os.getenv("PGPASSWORD")
+            if not pw:
+                raise ValueError(
+                    "ANALYTICS_DATABASE_URL or PGPASSWORD must be configured."
+                )
             host = os.getenv("PGHOST", "127.0.0.1")
             port = int(os.getenv("PGPORT", "5432"))
             user = os.getenv("PGUSER", "postgres")
-            pw = os.getenv("PGPASSWORD", "263656")
             db = os.getenv("PGDATABASE", "analytics_db")
             resolved_url = make_conninfo(host=host, port=port, user=user, password=pw, dbname=db)
         self.database_url = resolved_url
