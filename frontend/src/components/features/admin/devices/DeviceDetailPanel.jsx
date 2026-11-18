@@ -11,7 +11,7 @@ function CloseIcon() {
   )
 }
 
-function DeviceDetailPanel({ device, onClose }) {
+function DeviceDetailPanel({ device, onClose, onEdit, onDelete }) {
   if (!device) return null
 
   return (
@@ -41,6 +41,30 @@ function DeviceDetailPanel({ device, onClose }) {
             <CloseIcon />
           </button>
         </header>
+
+        {(onEdit || onDelete) && (
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+            {onEdit && (
+              <button
+                type="button"
+                className="admin-farm-edit-button"
+                onClick={() => onEdit(device)}
+              >
+                Chỉnh sửa thiết bị
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                className="admin-farm-edit-button"
+                style={{ borderColor: '#dc2626', color: '#dc2626' }}
+                onClick={() => onDelete(device)}
+              >
+                Xóa thiết bị
+              </button>
+            )}
+          </div>
+        )}
 
         <section className="admin-device-detail__status">
           <div>

@@ -83,6 +83,16 @@ export const techniciansApi = {
   async assignFarm(technicianId, farmId, options = {}) {
     return apiClient.post(ENDPOINTS.TECHNICIANS.ASSIGN_FARM(technicianId, farmId), {}, options)
   },
+
+  /**
+   * Unassign technician from farm (Admin only)
+   * @param {string} technicianId
+   * @param {string} farmId
+   * @param {Object} [options]
+   */
+  async unassignFarm(technicianId, farmId, options = {}) {
+    return apiClient.delete(ENDPOINTS.TECHNICIANS.ASSIGN_FARM(technicianId, farmId), options)
+  },
 }
 
 export default techniciansApi

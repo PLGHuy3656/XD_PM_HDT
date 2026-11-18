@@ -23,7 +23,9 @@ function FarmDetailPanel({
   farm,
   onClose,
   onEdit,
+  onDelete,
   onAssignTechnician,
+  onUnassignTechnician,
 }) {
   if (!farm) return null
 
@@ -60,13 +62,34 @@ function FarmDetailPanel({
           </button>
         </header>
 
-        <button
-          type="button"
-          className="admin-farm-edit-button"
-          onClick={() => onEdit(farm)}
-        >
-          Chỉnh sửa nhà yến
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="admin-farm-edit-button"
+            onClick={() => onEdit(farm)}
+          >
+            Chỉnh sửa nhà yến
+          </button>
+          {onDelete && (
+            <button
+              type="button"
+              className="admin-farm-edit-button"
+              style={{ borderColor: '#dc2626', color: '#dc2626' }}
+              onClick={() => onDelete(farm)}
+            >
+              Xóa nhà yến
+            </button>
+          )}
+          {onUnassignTechnician && farm.technician?.id && (
+            <button
+              type="button"
+              className="admin-farm-edit-button"
+              onClick={() => onUnassignTechnician(farm)}
+            >
+              Hủy phân công KTV
+            </button>
+          )}
+        </div>
 
         <div className="admin-farm-detail__summary">
           <div>
