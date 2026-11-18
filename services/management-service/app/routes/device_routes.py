@@ -65,3 +65,47 @@ def get_device(device_id: str, current_user: dict = Depends(get_current_user)):
         )
     verify_farm_resource_access(current_user, parent_farm_id)
     return device_controller.get_device(device_id)
+
+
+camera_router = APIRouter(
+    prefix="/api/cameras",
+    tags=["Camera Registry"],
+)
+
+
+@camera_router.get(
+    "/{camera_id}",
+    response_model=DeviceRegistryResponse,
+    summary="Get registered camera metadata with parent farm resource authorization",
+)
+def get_camera(camera_id: str, current_user: dict = Depends(get_current_user)):
+    """Authoritatively resolves camera metadata (CP13 hardening R3).
+
+    Order matters to avoid cross-tenant metadata disclosure:
+    1. Resolve the parent farm.
+    2. Verify the caller's farm authorization BEFORE reading any device detail.
+    3. Only then check device_type.
+    Unknown ids, devices of another tenant and non-CAMERA devices all receive the
+    same 404 "Camera not found", so callers cannot enumerate other farms' device
+    ids or learn a device's real type.
+    """
+    not_found = HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Camera not found",
+    )
+    parent_farm_id = user_repository.get_farm_id_for_device(camera_id)
+    if not parent_farm_id:
+        raise not_found
+    try:
+        verify_farm_resource_access(current_user, str(parent_farm_id))
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_403_FORBIDDEN:
+            raise not_found from None
+        raise
+
+    device = device_controller.get_device(camera_id)
+    dev_type = device.get("device_type") if isinstance(device, dict) else getattr(device, "device_type", None)
+    if str(dev_type or "").upper() != "CAMERA":
+        raise not_found
+    return device
+

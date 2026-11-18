@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 
 from app.routes.auth_routes import router as auth_router
-from app.routes.device_routes import router as device_router
+from app.routes.device_routes import camera_router, router as device_router
 from app.routes.farm_routes import router as farm_router
+from app.routes.internal_routes import router as internal_router
 from app.routes.technician_routes import router as technician_router
+from app.routes.user_routes import router as user_router
 from app.routes.zone_routes import router as zone_router
 
 app = FastAPI(
@@ -19,7 +21,12 @@ app.include_router(auth_router)
 app.include_router(farm_router)
 app.include_router(zone_router)
 app.include_router(device_router)
+app.include_router(camera_router)
 app.include_router(technician_router)
+app.include_router(user_router)
+
+# Internal Service-to-Service Router (CP11.4-B1-R2-MGMT)
+app.include_router(internal_router)
 
 
 @app.get("/health")

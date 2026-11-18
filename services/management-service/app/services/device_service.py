@@ -13,5 +13,10 @@ class DeviceService:
             raise ValueError("device_id is required")
         return self.repository.get_device_by_id(device_id)
 
+    def get_internal_metadata(self, identifier: str) -> dict | None:
+        if not identifier or not str(identifier).strip():
+            raise ValueError("Device identifier cannot be empty")
+        return self.repository.get_internal_device_metadata(identifier)
+
 
 device_service = DeviceService()
