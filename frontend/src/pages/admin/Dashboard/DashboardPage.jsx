@@ -4,7 +4,8 @@ import AppLayout from '../../../components/layout/AppLayout'
 import ManagementCard from '../../../components/features/admin/dashboard/ManagementCard'
 import UserAccessPanel from '../../../components/features/admin/dashboard/UserAccessPanel'
 import SystemHealthPanel from '../../../components/features/admin/dashboard/SystemHealthPanel'
-import { managementItems } from '../../../components/features/admin/dashboard/dashboardMockData'
+import { managementItems as defaultManagementItems } from '../../../components/features/admin/dashboard/dashboardMockData'
+import { useAdminData } from '../../../features/admin'
 
 import './DashboardPage.css'
 
@@ -14,6 +15,12 @@ function StatusDot({ status = 'healthy' }) {
 
 function DashboardPage() {
   const navigate = useNavigate()
+  const { dashboardStats, loading, error } = useAdminData()
+
+  const items = dashboardStats?.managementItems || defaultManagementItems
+  const roles = dashboardStats?.roles
+  const recentAccounts = dashboardStats?.recentAccounts
+  const services = dashboardStats?.services
 
   return (
     <AppLayout>
@@ -33,14 +40,20 @@ function DashboardPage() {
           </div>
 
           <div className="admin-hero__status">
-            <StatusDot />
+            <StatusDot status={error ? 'attention' : 'healthy'} />
 
             <div>
               <span>PLATFORM STATUS</span>
-              <strong>Hoạt động ổn định</strong>
+              <strong>{error ? 'Cần kiểm tra API' : 'Hoạt động ổn định'}</strong>
             </div>
           </div>
         </section>
+
+        {error && (
+          <div className="admin-dashboard-error" style={{ padding: '1rem', margin: '1rem 0', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', color: '#ef4444' }}>
+            <span>⚠️ {error}</span>
+          </div>
+        )}
 
         <section className="admin-dashboard-section">
           <div className="admin-section-heading">
@@ -54,7 +67,7 @@ function DashboardPage() {
           </div>
 
           <div className="admin-management-grid">
-            {managementItems.map((item) => (
+            {items.map((item) => (
               <ManagementCard
                 key={item.id}
                 item={item}
@@ -65,15 +78,23 @@ function DashboardPage() {
         </section>
 
         <section className="admin-dashboard-section">
-          <UserAccessPanel onOpen={navigate} />
+          <UserAccessPanel
+            onOpen={navigate}
+            roles={roles}
+            recentAccounts={recentAccounts}
+          />
         </section>
 
         <section className="admin-dashboard-section">
-          <SystemHealthPanel onOpen={navigate} />
+          <SystemHealthPanel
+            onOpen={navigate}
+            services={services}
+          />
         </section>
       </div>
     </AppLayout>
   )
 }
+
 
 export default DashboardPage

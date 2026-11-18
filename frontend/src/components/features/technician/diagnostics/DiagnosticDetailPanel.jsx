@@ -79,7 +79,7 @@ function DiagnosticDetailPanel({ node, onClose }) {
               <div>
                 <span>RSSI</span>
                 <strong>
-                  {node.connectivity.rssi === null
+                  {node.connectivity?.rssi == null
                     ? '--'
                     : `${node.connectivity.rssi} dBm`}
                 </strong>

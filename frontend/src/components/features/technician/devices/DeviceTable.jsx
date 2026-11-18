@@ -49,11 +49,12 @@ function SignalIcon() {
 }
 
 function DeviceTable({
-  devices,
-  farmName,
-  getZoneName,
+  devices = [],
+  farmName = '',
+  getZoneName = (zoneId) => zoneId || 'Khu vực',
   onOpenDetail,
-  onOpenAssignment,
+  onOpenAssignment = () => {},
+  onSelectDevice,
 }) {
   return (
     <div className="tech-device-table">
@@ -76,7 +77,7 @@ function DeviceTable({
                 <button
                   type="button"
                   className="tech-device-identity"
-                  onClick={() => onOpenDetail(device.id)}
+                  onClick={() => (onOpenDetail || onSelectDevice || (() => {}))(device.id)}
                 >
                   <span
                     className={`tech-device-icon ${device.type.toLowerCase()}`}
@@ -93,7 +94,7 @@ function DeviceTable({
                 </button>
 
                 <div className="tech-assignment-cell">
-                  <span>{getZoneName(device.zoneId)}</span>
+                  <span>{typeof getZoneName === 'function' ? getZoneName(device.zoneId) : (device.zoneId || 'Khu vực')}</span>
                   <small>{farmName}</small>
                 </div>
 

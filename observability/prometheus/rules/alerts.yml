@@ -1,0 +1,38 @@
+groups:
+  - name: swiftletcare_service_alerts
+    rules:
+      # Alert when any critical backend microservice is unreachable
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instance {{ $labels.instance }} (job: {{ $labels.job }}) is down"
+          description: "Service {{ $labels.job }} on {{ $labels.instance }} has been unreachable for more than 1 minute."
+
+      # Alert when HTTP 5xx error rate exceeds 5% of total requests
+      - alert: HighHttpErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[2m])) by (job)
+            /
+            sum(rate(http_requests_total[2m])) by (job)
+          ) * 100 > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP 5xx Error Rate on {{ $labels.job }}"
+          description: "HTTP 5xx error rate on {{ $labels.job }} is {{ $value | printf \"%.2f\" }}% (> 5%) over the last 2 minutes."
+
+      # Alert when 95th percentile HTTP request latency exceeds 2 seconds
+      - alert: SlowResponseLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_highr_seconds_bucket[3m])) by (le, job)) > 2.0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Request Latency on {{ $labels.job }}"
+          description: "95th percentile request latency on {{ $labels.job }} is {{ $value | printf \"%.2f\" }}s (> 2.0s) for over 3 minutes."

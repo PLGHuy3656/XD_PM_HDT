@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AppLayout from '../../../components/layout/AppLayout'
 import Select from '../../../components/ui/Select'
 import FarmTable from '../../../components/features/admin/farms/FarmTable'
@@ -14,6 +14,7 @@ import {
 import {
   initialAdminUsers,
 } from '../../../components/features/admin/users/usersMockData'
+import { useAdminData } from '../../../features/admin'
 
 import './FarmsPage.css'
 
@@ -24,7 +25,21 @@ const healthFilterOptions = [
 ]
 
 function FarmsPage() {
-  const [farms, setFarms] = useState(adminFarms)
+  const {
+    farms: realFarms,
+    technicians: realTechs,
+    assignTechnician: apiAssignTechnician,
+    loading,
+    error,
+  } = useAdminData()
+
+  const isMock = import.meta.env.VITE_USE_MOCK === 'true'
+  const [localFarms, setLocalFarms] = useState(() => (isMock ? adminFarms : []))
+
+  const farms = useMemo(() => {
+    if (realFarms && realFarms.length > 0) return realFarms
+    return localFarms
+  }, [realFarms, localFarms])
 
   const [searchTerm, setSearchTerm] = useState('')
   const [healthFilter, setHealthFilter] =
@@ -39,11 +54,12 @@ function FarmsPage() {
   const [assignmentFarmId, setAssignmentFarmId] =
     useState(null)
 
-  const technicians = initialAdminUsers.filter(
+  const defaultTechs = initialAdminUsers.filter(
     (user) =>
       user.role === 'TECHNICIAN' &&
       user.status === 'ACTIVE',
   )
+  const technicians = realTechs && realTechs.length > 0 ? realTechs : defaultTechs
 
   const selectedFarm = farms.find(
     (farm) => farm.id === selectedFarmId,
@@ -72,9 +88,7 @@ function FarmsPage() {
         farm.address
           .toLowerCase()
           .includes(keyword) ||
-        farm.owner.name
-          .toLowerCase()
-          .includes(keyword) ||
+        (farm.owner?.name && farm.owner.name.toLowerCase().includes(keyword)) ||
         technicianName.includes(keyword)
 
       const matchesHealth =
@@ -87,13 +101,13 @@ function FarmsPage() {
 
   const totalZones = farms.reduce(
     (total, farm) =>
-      total + farm.zones.length,
+      total + (farm.zoneCount || farm.zones?.length || 0),
     0,
   )
 
   const totalDevices = farms.reduce(
     (total, farm) =>
-      total + getFarmDeviceCount(farm),
+      total + (farm.deviceCount !== undefined ? farm.deviceCount : (farm.zones ? getFarmDeviceCount(farm) : 0)),
     0,
   )
 
@@ -102,7 +116,7 @@ function FarmsPage() {
   ).length
 
   function handleSaveFarm(updatedFarm) {
-    setFarms((current) =>
+    setLocalFarms((current) =>
       current.map((farm) =>
         farm.id === updatedFarm.id
           ? updatedFarm
@@ -114,7 +128,7 @@ function FarmsPage() {
     setSelectedFarmId(updatedFarm.id)
   }
 
-  function handleAssignTechnician(
+  async function handleAssignTechnician(
     farm,
     technician,
   ) {
@@ -126,7 +140,7 @@ function FarmsPage() {
       status: 'ASSIGNED',
     }
 
-    setFarms((current) =>
+    setLocalFarms((current) =>
       current.map((item) =>
         item.id === farm.id
           ? {
@@ -137,9 +151,14 @@ function FarmsPage() {
       ),
     )
 
+    if (apiAssignTechnician) {
+      await apiAssignTechnician(farm.id, technician.id)
+    }
+
     setAssignmentFarmId(null)
     setSelectedFarmId(farm.id)
   }
+
 
   return (
     <AppLayout>

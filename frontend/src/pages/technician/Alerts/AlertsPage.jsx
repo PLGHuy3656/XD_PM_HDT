@@ -6,10 +6,14 @@ import TechnicalAlertsTab from '../../../components/features/technician/alerts/T
 import WorkRequestsTab from '../../../components/features/technician/alerts/WorkRequestsTab'
 import AlertDetailPanel from '../../../components/features/technician/alerts/AlertDetailPanel'
 import WorkRequestDetailPanel from '../../../components/features/technician/alerts/WorkRequestDetailPanel'
+import { LoadingSpinner, ErrorMessage, EmptyState } from '../../../components/common/feedback/index.js'
+
 import {
-  technicalAlerts,
+  technicalAlerts as mockTechnicalAlerts,
   workRequests as initialWorkRequests,
 } from '../../../components/features/technician/alerts/alertsMockData'
+
+import { useTechnicianData } from '../../../features/technicians/hooks/useTechnicianData'
 
 import './AlertsPage.css'
 
@@ -28,97 +32,85 @@ const workStatusOptions = [
 ]
 
 function AlertsPage() {
+  const {
+    farms,
+    selectedFarm,
+    selectedFarmId,
+    setSelectedFarmId,
+    alerts: apiAlerts,
+    loading,
+    error,
+    refetch,
+    acknowledgeAlert,
+    resolveAlert,
+  } = useTechnicianData()
+
   const [activeTab, setActiveTab] = useState('technical')
-  const [farmFilter, setFarmFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [search, setSearch] = useState('')
 
   const [selectedAlert, setSelectedAlert] = useState(null)
   const [selectedRequest, setSelectedRequest] = useState(null)
 
-  const [workRequests, setWorkRequests] =
-    useState(initialWorkRequests)
+  const [workRequests, setWorkRequests] = useState(initialWorkRequests)
+
+  const effectiveAlerts = apiAlerts.length > 0 ? apiAlerts : mockTechnicalAlerts
 
   const farmOptions = useMemo(() => {
-    const uniqueFarms = [
-      ...new Set([
-        ...technicalAlerts.map((item) => item.farm),
-        ...workRequests.map((item) => item.farm),
-      ]),
-    ]
-
     return [
-      { value: 'ALL', label: 'Tất cả nhà yến' },
-      ...uniqueFarms.map((farm) => ({
-        value: farm,
-        label: farm,
+      { value: 'ALL', label: 'Tất cả nhà yến phụ trách' },
+      ...farms.map((farm) => ({
+        value: farm.id,
+        label: farm.name,
       })),
     ]
-  }, [workRequests])
+  }, [farms])
 
   const filteredAlerts = useMemo(() => {
     const keyword = search.trim().toLowerCase()
 
-    return technicalAlerts.filter((item) => {
+    return effectiveAlerts.filter((item) => {
       const matchesFarm =
-        farmFilter === 'ALL' || item.farm === farmFilter
+        selectedFarmId === 'ALL' ||
+        !item.farmId ||
+        item.farmId === selectedFarmId
 
       const matchesStatus =
-        statusFilter === 'ALL' ||
-        item.status === statusFilter
+        statusFilter === 'ALL' || item.status === statusFilter
 
       const matchesSearch =
         !keyword ||
-        item.title.toLowerCase().includes(keyword) ||
-        item.device.toLowerCase().includes(keyword) ||
-        item.zone.toLowerCase().includes(keyword)
+        (item.title && item.title.toLowerCase().includes(keyword)) ||
+        (item.device && item.device.toLowerCase().includes(keyword)) ||
+        (item.zone && item.zone.toLowerCase().includes(keyword))
 
-      return (
-        matchesFarm &&
-        matchesStatus &&
-        matchesSearch
-      )
+      return matchesFarm && matchesStatus && matchesSearch
     })
-  }, [farmFilter, statusFilter, search])
+  }, [effectiveAlerts, selectedFarmId, statusFilter, search])
 
   const filteredRequests = useMemo(() => {
     const keyword = search.trim().toLowerCase()
 
     return workRequests.filter((item) => {
-      const matchesFarm =
-        farmFilter === 'ALL' || item.farm === farmFilter
-
       const matchesStatus =
-        statusFilter === 'ALL' ||
-        item.status === statusFilter
+        statusFilter === 'ALL' || item.status === statusFilter
 
       const matchesSearch =
         !keyword ||
-        item.title.toLowerCase().includes(keyword) ||
-        item.sender.toLowerCase().includes(keyword) ||
-        item.zone.toLowerCase().includes(keyword)
+        (item.title && item.title.toLowerCase().includes(keyword)) ||
+        (item.sender && item.sender.toLowerCase().includes(keyword)) ||
+        (item.zone && item.zone.toLowerCase().includes(keyword))
 
-      return (
-        matchesFarm &&
-        matchesStatus &&
-        matchesSearch
-      )
+      return matchesStatus && matchesSearch
     })
-  }, [
-    workRequests,
-    farmFilter,
-    statusFilter,
-    search,
-  ])
+  }, [workRequests, statusFilter, search])
 
-  const openTechnical = technicalAlerts.filter(
+  const openTechnical = filteredAlerts.filter(
     (item) => item.status !== 'RESOLVED',
   ).length
 
-  const criticalTechnical = technicalAlerts.filter(
-    (item) =>
-      item.severity === 'CRITICAL' &&
-      item.status !== 'RESOLVED',
+  const criticalTechnical = filteredAlerts.filter(
+    (item) => item.level === 'critical' && item.status !== 'RESOLVED',
   ).length
 
   const newRequests = workRequests.filter(
@@ -137,133 +129,120 @@ function AlertsPage() {
   const handleTabChange = (tab) => {
     setActiveTab(tab)
     setStatusFilter('ALL')
-
     setSelectedAlert(null)
     setSelectedRequest(null)
   }
 
-  const handleRequestStatusChange = (id, status) => {
-    setWorkRequests((current) =>
-      current.map((request) =>
-        request.id === id
-          ? { ...request, status }
-          : request,
-      ),
-    )
+  const handleAcknowledgeAlert = async (alertId) => {
+    await acknowledgeAlert(alertId, 'Kỹ thuật viên đang kiểm tra')
+  }
 
-    setSelectedRequest((current) =>
-      current?.id === id
-        ? { ...current, status }
-        : current,
-    )
+  const handleResolveAlert = async (alertId) => {
+    await resolveAlert(alertId, 'Kỹ thuật viên đã xử lý sự cố')
   }
 
   return (
     <AppLayout>
-      <div className="technician-alerts-page">
-        <section className="tech-alerts-hero">
+      <div className="tech-alerts-page">
+        <header className="tech-alerts-hero">
           <div>
-            <span className="tech-alerts-eyebrow">
-              TECHNICAL OPERATIONS
-            </span>
-
-            <h1>Cảnh báo & Công việc</h1>
-
+            <span className="tech-alerts-eyebrow">TECHNICIAN WORKSPACE</span>
+            <h1>Cảnh báo & Yêu cầu</h1>
             <p>
-              Theo dõi sự cố kỹ thuật và các yêu cầu hỗ
-              trợ tại những nhà yến được phân công.
+              Theo dõi sự cố kỹ thuật và phiếu yêu cầu xử lý từ chủ nhà yến hoặc
+              hệ thống tự động phát hiện.
             </p>
           </div>
 
-          <div className="tech-alerts-hero-status">
-            <span />
-            Theo dõi kỹ thuật
-          </div>
-        </section>
-
-        <section className="tech-alert-summary">
-          <article>
-            <span>Cảnh báo đang mở</span>
-            <strong>{openTechnical}</strong>
-            <small>
-              Cần theo dõi hoặc kiểm tra
-            </small>
-          </article>
-
-          <article>
-            <span>Sự cố nghiêm trọng</span>
-            <strong>{criticalTechnical}</strong>
-            <small>Ưu tiên xử lý</small>
-          </article>
-
-          <article>
-            <span>Yêu cầu mới</span>
-            <strong>{newRequests}</strong>
-            <small>Từ Farm Owner / Admin</small>
-          </article>
-
-          <article>
-            <span>Đang xử lý</span>
-            <strong>{inProgressRequests}</strong>
-            <small>Công việc hiện tại</small>
-          </article>
-        </section>
-
-        <section className="tech-alert-tabs">
-          <button
-            type="button"
-            className={
-              activeTab === 'technical'
-                ? 'active'
-                : ''
-            }
-            onClick={() =>
-              handleTabChange('technical')
-            }
-          >
-            Cảnh báo kỹ thuật
-            <span>{openTechnical}</span>
-          </button>
-
-          <button
-            type="button"
-            className={
-              activeTab === 'work'
-                ? 'active'
-                : ''
-            }
-            onClick={() =>
-              handleTabChange('work')
-            }
-          >
-            Công việc / Yêu cầu
-            <span>{newRequests}</span>
-          </button>
-        </section>
-
-        <section className="tech-alert-toolbar">
-          <div className="tech-alert-search">
-            <span>⌕</span>
-
-            <input
-              value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
-              placeholder={
-                activeTab === 'technical'
-                  ? 'Tìm cảnh báo, thiết bị, khu vực...'
-                  : 'Tìm công việc, người gửi, khu vực...'
-              }
-            />
-          </div>
-
-          <div className="tech-alert-filter-group">
+          <div className="tech-alerts-farm-picker">
+            <span>Nhà yến</span>
             <EnvironmentSelect
-              value={farmFilter}
+              value={selectedFarmId || 'ALL'}
               options={farmOptions}
-              onChange={setFarmFilter}
+              onChange={(nextId) => {
+                setSelectedFarmId(nextId === 'ALL' ? farms[0]?.id : nextId)
+                setSelectedAlert(null)
+              }}
             />
+          </div>
+        </header>
+
+        {error && (
+          <ErrorMessage
+            title="Lỗi tải danh sách cảnh báo"
+            message={error}
+            onRetry={refetch}
+          />
+        )}
+
+        <section className="tech-alerts-overview">
+          <article className="tech-alerts-metric-card">
+            <span className="metric-title">Sự cố kỹ thuật mở</span>
+            <strong className="metric-number metric-open">
+              {openTechnical}
+            </strong>
+            <small className="metric-caption">Cần kỹ thuật viên xử lý</small>
+          </article>
+
+          <article className="tech-alerts-metric-card">
+            <span className="metric-title">Sự cố nghiêm trọng</span>
+            <strong className="metric-number metric-critical">
+              {criticalTechnical}
+            </strong>
+            <small className="metric-caption">Ảnh hưởng trực tiếp vi khí hậu</small>
+          </article>
+
+          <article className="tech-alerts-metric-card">
+            <span className="metric-title">Yêu cầu mới</span>
+            <strong className="metric-number metric-new">
+              {newRequests}
+            </strong>
+            <small className="metric-caption">Từ Farm Owner cần phản hồi</small>
+          </article>
+
+          <article className="tech-alerts-metric-card">
+            <span className="metric-title">Đang xử lý</span>
+            <strong className="metric-number metric-progress">
+              {inProgressRequests}
+            </strong>
+            <small className="metric-caption">Phiếu công việc đang triển khai</small>
+          </article>
+        </section>
+
+        <section className="tech-alerts-tabs-nav">
+          <div className="tech-alerts-tab-buttons">
+            <button
+              type="button"
+              className={activeTab === 'technical' ? 'active' : ''}
+              onClick={() => handleTabChange('technical')}
+            >
+              <span>Sự cố kỹ thuật</span>
+              <strong className="tab-badge">{openTechnical}</strong>
+            </button>
+
+            <button
+              type="button"
+              className={activeTab === 'requests' ? 'active' : ''}
+              onClick={() => handleTabChange('requests')}
+            >
+              <span>Phiếu yêu cầu</span>
+              <strong className="tab-badge">{newRequests}</strong>
+            </button>
+          </div>
+
+          <div className="tech-alerts-tab-actions">
+            <div className="tech-alerts-search">
+              <input
+                type="text"
+                placeholder={
+                  activeTab === 'technical'
+                    ? 'Tìm theo mã, thiết bị, khu vực...'
+                    : 'Tìm theo tiêu đề, người gửi...'
+                }
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
 
             <EnvironmentSelect
               value={statusFilter}
@@ -273,73 +252,54 @@ function AlertsPage() {
           </div>
         </section>
 
-        <section className="tech-alert-content">
-          <div className="tech-alert-list-card">
-            <div className="tech-alert-list-title">
-              <div>
-                <span>
-                  {activeTab === 'technical'
-                    ? 'TECHNICAL ALERTS'
-                    : 'WORK REQUESTS'}
-                </span>
-
-                <h2>
-                  {activeTab === 'technical'
-                    ? 'Sự cố cần theo dõi'
-                    : 'Công việc được gửi đến'}
-                </h2>
+        <section className="tech-alerts-layout">
+          <div className="tech-alerts-table-area">
+            {loading && effectiveAlerts.length === 0 ? (
+              <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}>
+                <LoadingSpinner size="lg" text="Đang tải cảnh báo..." />
               </div>
-
-              <strong>
-                {activeTab === 'technical'
-                  ? filteredAlerts.length
-                  : filteredRequests.length}
-              </strong>
-            </div>
-
-            {activeTab === 'technical' ? (
-              <TechnicalAlertsTab
-                alerts={filteredAlerts}
-                selectedId={selectedAlert?.id}
-                onSelect={(alert) => {
-                  setSelectedAlert(alert)
-                  setSelectedRequest(null)
-                }}
+            ) : activeTab === 'technical' ? (
+              filteredAlerts.length === 0 ? (
+                <EmptyState
+                  title="Không có sự cố kỹ thuật nào"
+                  description="Hiện tại hạ tầng thiết bị và cảm biến đang hoạt động ổn định."
+                />
+              ) : (
+                <TechnicalAlertsTab
+                  alerts={filteredAlerts}
+                  selectedAlertId={selectedAlert?.id}
+                  onSelectAlert={setSelectedAlert}
+                />
+              )
+            ) : filteredRequests.length === 0 ? (
+              <EmptyState
+                title="Không có phiếu yêu cầu nào"
+                description="Không có yêu cầu bảo trì hoặc hỗ trợ mới từ chủ nhà yến."
               />
             ) : (
               <WorkRequestsTab
                 requests={filteredRequests}
-                selectedId={selectedRequest?.id}
-                onSelect={(request) => {
-                  setSelectedRequest(request)
-                  setSelectedAlert(null)
-                }}
+                selectedRequestId={selectedRequest?.id}
+                onSelectRequest={setSelectedRequest}
               />
             )}
           </div>
 
-          {activeTab === 'technical' &&
-            selectedAlert && (
+          <aside className="tech-alerts-side-panel">
+            {activeTab === 'technical' ? (
               <AlertDetailPanel
                 alert={selectedAlert}
-                onClose={() =>
-                  setSelectedAlert(null)
-                }
+                onClose={() => setSelectedAlert(null)}
+                onAcknowledge={handleAcknowledgeAlert}
+                onResolve={handleResolveAlert}
               />
-            )}
-
-          {activeTab === 'work' &&
-            selectedRequest && (
+            ) : (
               <WorkRequestDetailPanel
                 request={selectedRequest}
-                onClose={() =>
-                  setSelectedRequest(null)
-                }
-                onStatusChange={
-                  handleRequestStatusChange
-                }
+                onClose={() => setSelectedRequest(null)}
               />
             )}
+          </aside>
         </section>
       </div>
     </AppLayout>

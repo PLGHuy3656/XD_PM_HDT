@@ -4,6 +4,12 @@ function AutomaticRulesPanel({
   onRuleChange,
   onSave,
 }) {
+  const effectiveZone = zone || {}
+  const effectiveRules = rules || {
+    temperature: { min: 26, max: 31 },
+    humidity: { min: 75, max: 88 },
+  }
+
   return (
     <section className="control-section">
       <div className="control-section-title">
@@ -22,11 +28,11 @@ function AutomaticRulesPanel({
         <div className="automatic-rules-header">
           <div>
             <span className="control-mini-label">LOCAL RULE SET</span>
-            <h3>{zone.name}</h3>
+            <h3>{effectiveZone.name || 'Khu vực'}</h3>
           </div>
 
           <span className="rule-sync-badge">
-            Đồng bộ với {zone.controller}
+            Đồng bộ với {effectiveZone.controller || 'Bộ điều khiển ESP32'}
           </span>
         </div>
 
@@ -53,7 +59,7 @@ function AutomaticRulesPanel({
                 <div>
                   <input
                     type="number"
-                    value={rules.temperature.min}
+                    value={effectiveRules?.temperature?.min ?? 26}
                     onChange={(event) =>
                       onRuleChange(
                         'temperature',
@@ -75,7 +81,7 @@ function AutomaticRulesPanel({
                 <div>
                   <input
                     type="number"
-                    value={rules.temperature.max}
+                    value={effectiveRules?.temperature?.max ?? 31}
                     onChange={(event) =>
                       onRuleChange(
                         'temperature',
@@ -119,7 +125,7 @@ function AutomaticRulesPanel({
                 <div>
                   <input
                     type="number"
-                    value={rules.humidity.min}
+                    value={effectiveRules?.humidity?.min ?? 75}
                     onChange={(event) =>
                       onRuleChange(
                         'humidity',
@@ -141,7 +147,7 @@ function AutomaticRulesPanel({
                 <div>
                   <input
                     type="number"
-                    value={rules.humidity.max}
+                    value={effectiveRules?.humidity?.max ?? 88}
                     onChange={(event) =>
                       onRuleChange(
                         'humidity',

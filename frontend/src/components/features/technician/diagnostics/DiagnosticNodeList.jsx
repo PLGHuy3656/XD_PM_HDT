@@ -50,7 +50,7 @@ function DiagnosticNodeList({
 
             <div className="diagnostic-node-signal">
               <strong>
-                {node.connectivity.rssi === null
+                {node.connectivity?.rssi == null
                   ? '--'
                   : `${node.connectivity.rssi} dBm`}
               </strong>

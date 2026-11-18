@@ -5,17 +5,47 @@ import EnvironmentSelect from '../../../components/ui/Select'
 import Toggle from '../../../components/features/farm-owner/environment/Toggle'
 import AutomaticRulesPanel from '../../../components/features/farm-owner/environment/AutomaticRulesPanel'
 import ActuatorControlPanel from '../../../components/features/farm-owner/environment/ActuatorControlPanel'
-import { controlFarms as farms } from '../../../components/features/farm-owner/environment/environmentMockData'
+import { controlFarms as defaultMockFarms } from '../../../components/features/farm-owner/environment/environmentMockData'
+import { useFarms } from '../../../features/farms/hooks/useFarms'
 import './EnvironmentControlPage.css'
 
+const DEFAULT_ZONE_CONTROL_STATE = {
+  mode: 'AUTO',
+  rules: {
+    temperature: { active: true, target: 28.5, min: 27, max: 31 },
+    humidity: { active: true, target: 80, min: 75, max: 90 },
+  },
+  actuators: {
+    misting: false,
+    ventilation: true,
+    heating: false,
+    humidifier: false,
+  },
+}
+
 function EnvironmentControlPage() {
-  const [selectedFarmId, setSelectedFarmId] = useState(farms[0].id)
-  const [selectedZoneId, setSelectedZoneId] = useState(farms[0].zones[0].id)
+  const {
+    farms,
+    selectedFarm,
+    selectedFarmId,
+    setSelectedFarmId,
+    zones,
+  } = useFarms()
+
+  const effectiveZones =
+    zones.length > 0
+      ? zones.map((z, idx) => ({
+          ...z,
+          controller: `ESP32-CTRL-${String(idx + 1).padStart(2, '0')}`,
+          lastSync: 'Vừa xong',
+        }))
+      : selectedFarm?.zones || defaultMockFarms[0]?.zones || []
+
+  const [selectedZoneId, setSelectedZoneId] = useState('')
 
   const [zoneState, setZoneState] = useState(() => {
     const state = {}
-
-    farms.forEach((farm) => {
+    defaultMockFarms.forEach((farm) => {
       farm.zones.forEach((zone) => {
         state[zone.id] = {
           mode: zone.mode,
@@ -27,21 +57,22 @@ function EnvironmentControlPage() {
         }
       })
     })
-
     return state
   })
 
   const [manualConfirmOpen, setManualConfirmOpen] = useState(false)
   const [ruleNotice, setRuleNotice] = useState('')
 
-  const selectedFarm =
-    farms.find((farm) => farm.id === selectedFarmId) || farms[0]
-
   const selectedZone =
-    selectedFarm.zones.find((zone) => zone.id === selectedZoneId) ||
-    selectedFarm.zones[0]
+    effectiveZones.find((zone) => zone.id === selectedZoneId) ||
+    effectiveZones[0] || {
+      id: 'default-zone',
+      name: 'Khu vực 1',
+      controller: 'ESP32-CTRL-01',
+      lastSync: 'Vừa xong',
+    }
 
-  const currentState = zoneState[selectedZone.id]
+  const currentState = zoneState[selectedZone.id] || DEFAULT_ZONE_CONTROL_STATE
   const isManual = currentState.mode === 'MANUAL'
 
   const handleModeRequest = (mode) => {
@@ -55,7 +86,7 @@ function EnvironmentControlPage() {
     setZoneState((previous) => ({
       ...previous,
       [selectedZone.id]: {
-        ...previous[selectedZone.id],
+        ...(previous[selectedZone.id] || DEFAULT_ZONE_CONTROL_STATE),
         mode: 'AUTO',
       },
     }))
@@ -69,7 +100,7 @@ function EnvironmentControlPage() {
     setZoneState((previous) => ({
       ...previous,
       [selectedZone.id]: {
-        ...previous[selectedZone.id],
+        ...(previous[selectedZone.id] || DEFAULT_ZONE_CONTROL_STATE),
         mode: 'MANUAL',
       },
     }))
@@ -86,9 +117,9 @@ function EnvironmentControlPage() {
     setZoneState((previous) => ({
       ...previous,
       [selectedZone.id]: {
-        ...previous[selectedZone.id],
+        ...(previous[selectedZone.id] || DEFAULT_ZONE_CONTROL_STATE),
         actuators: {
-          ...previous[selectedZone.id].actuators,
+          ...(previous[selectedZone.id]?.actuators || DEFAULT_ZONE_CONTROL_STATE.actuators),
           [key]: value,
         },
       },
@@ -99,54 +130,42 @@ function EnvironmentControlPage() {
     setZoneState((previous) => ({
       ...previous,
       [selectedZone.id]: {
-        ...previous[selectedZone.id],
+        ...(previous[selectedZone.id] || DEFAULT_ZONE_CONTROL_STATE),
         rules: {
-          ...previous[selectedZone.id].rules,
+          ...(previous[selectedZone.id]?.rules || DEFAULT_ZONE_CONTROL_STATE.rules),
           [group]: {
-            ...previous[selectedZone.id].rules[group],
-            [key]: Number(value),
+            ...(previous[selectedZone.id]?.rules?.[group] ||
+              DEFAULT_ZONE_CONTROL_STATE.rules[group]),
+            [key]: value,
           },
         },
       },
     }))
-
-    setRuleNotice('')
   }
 
-  const saveRules = () => {
-    setRuleNotice(
-      `Đã lưu cấu hình mock cho ${selectedZone.name}. Khi tích hợp Backend, cấu hình sẽ được đồng bộ xuống controller.`,
-    )
-  }
+  const activeActuatorCount = Object.values(currentState.actuators).filter(
+    Boolean,
+  ).length
 
   return (
     <AppLayout>
-      <div className="environment-control-page">
-        <section className="environment-control-heading">
+      <div className="control-page">
+        <section className="control-page-heading">
           <div>
-            <span className="environment-control-eyebrow">
-              ENVIRONMENT CONTROL
-            </span>
-
+            <span className="control-eyebrow">ENVIRONMENT CONTROLS</span>
             <h1>Điều khiển môi trường</h1>
-
             <p>
-              Quản lý chế độ vận hành, quy tắc tự động và thiết bị điều khiển
-              theo từng khu vực.
+              Cấu hình tự động theo ngưỡng an toàn hoặc can thiệp thủ công theo
+              từng khu vực.
             </p>
-          </div>
-
-          <div className="environment-control-live">
-            <span className="environment-control-live-dot" />
-            Controller online
           </div>
         </section>
 
         <EnvironmentTabs />
 
-        <section className="control-context-card">
-          <div className="control-context-copy">
-            <span className="control-mini-label">CONTROL CONTEXT</span>
+        <section className="control-context-bar">
+          <div className="control-context-heading">
+            <span className="control-step-tag">Khu vực điều khiển</span>
             <h2>Chọn khu vực điều khiển</h2>
             <p>
               Mọi thay đổi bên dưới chỉ áp dụng cho khu vực đang được chọn.
@@ -155,47 +174,41 @@ function EnvironmentControlPage() {
 
           <div className="control-context-fields">
             <EnvironmentSelect
-                label="Nhà yến"
-                value={selectedFarmId}
-                options={farms.map((farm) => ({
+              label="Nhà yến"
+              value={selectedFarmId || ''}
+              options={farms.map((farm) => ({
                 value: farm.id,
                 label: farm.name,
-                }))}
-                onChange={(farmId) => {
-                const farm = farms.find((item) => item.id === farmId)
-
-                if (!farm) return
-
-                setSelectedFarmId(farm.id)
-                setSelectedZoneId(farm.zones[0].id)
+              }))}
+              onChange={(farmId) => {
+                setSelectedFarmId(farmId)
+                setSelectedZoneId('')
                 setRuleNotice('')
-                }}
+              }}
             />
 
             <EnvironmentSelect
-                label="Khu vực"
-                value={selectedZone.id}
-                options={selectedFarm.zones.map((zone) => ({
+              label="Khu vực"
+              value={selectedZone.id}
+              options={effectiveZones.map((zone) => ({
                 value: zone.id,
                 label: zone.name,
-                }))}
-                onChange={(zoneId) => {
+              }))}
+              onChange={(zoneId) => {
                 setSelectedZoneId(zoneId)
                 setRuleNotice('')
-                }}
+              }}
             />
 
             <div className="control-controller-field">
-                <span>Controller Node</span>
-
-                <strong>{selectedZone.controller}</strong>
-
-                <small>
+              <span>Controller Node</span>
+              <strong>{selectedZone.controller}</strong>
+              <small>
                 <i className="online-dot" />
                 Online · {selectedZone.lastSync}
-                </small>
+              </small>
             </div>
-            </div>
+          </div>
         </section>
 
         <section className="control-section">
@@ -262,138 +275,125 @@ function EnvironmentControlPage() {
                 >
                   <span className="mode-option-icon">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M8 11V7a2 2 0 0 1 4 0v4" />
-                      <path d="M12 10V5a2 2 0 0 1 4 0v6" />
-                      <path d="M16 10V7a2 2 0 0 1 4 0v7c0 4-3 7-7 7h-1c-3 0-5-1-7-4l-2-3a2 2 0 0 1 3-2l2 2" />
+                      <rect x="5" y="11" width="14" height="10" rx="2" />
+                      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
                     </svg>
                   </span>
 
                   <span>
                     <strong>MANUAL</strong>
-                    <small>Cho phép bật/tắt thiết bị trực tiếp</small>
+                    <small>Bật/tắt thủ công từng thiết bị</small>
                   </span>
                 </button>
               </div>
 
-              <div className={`control-mode-note ${isManual ? 'warning' : ''}`}>
-                <span>
-                  {isManual ? '!' : 'i'}
-                </span>
-
-                <p>
-                  {isManual
-                    ? 'Automatic control đang tạm dừng tại Khu vực này. Người dùng chịu trách nhiệm điều khiển các actuator.'
-                    : 'Controller thực thi quy tắc ngay tại ESP32 và vẫn có thể tiếp tục AUTO khi mất kết nối cloud.'}
-                </p>
-              </div>
+              {ruleNotice && (
+                <div className="control-notice-banner">
+                  <span className="notice-dot" />
+                  <p>{ruleNotice}</p>
+                </div>
+              )}
             </div>
 
-            <div className="controller-health-card">
-              <div className="controller-health-header">
-                <div>
-                  <span className="control-mini-label">CONTROLLER STATUS</span>
-                  <h3>{selectedZone.controller}</h3>
-                </div>
+            <div className="control-fail-safe-card">
+              <span className="control-mini-label">FAIL-SAFE MECHANISM</span>
+              <h4>Bảo vệ cục bộ ESP32</h4>
+              <p>
+                Khi mất kết nối Gateway hoặc đám mây, ESP32 tự động giữ ngưỡng an
+                toàn cục bộ để đảm bảo đàn yến không bị sốc nhiệt hay thiếu ẩm.
+              </p>
 
-                <span className="controller-online-badge">ONLINE</span>
-              </div>
-
-              <div className="controller-health-grid">
-                <div>
-                  <span>Nhiệt độ hiện tại</span>
-                  <strong>{selectedZone.temperature}°C</strong>
-                </div>
-
-                <div>
-                  <span>Độ ẩm hiện tại</span>
-                  <strong>{selectedZone.humidity}%</strong>
-                </div>
-
-                <div>
-                  <span>Local control</span>
-                  <strong>Available</strong>
-                </div>
-
-                <div>
-                  <span>Đồng bộ gần nhất</span>
-                  <strong>{selectedZone.lastSync}</strong>
-                </div>
-              </div>
+              <ul className="fail-safe-checklist">
+                <li>
+                  <i /> Tự động chuyển AUTO sau 30 phút ở MANUAL
+                </li>
+                <li>
+                  <i /> Cắt phun sương nếu độ ẩm vượt 92%
+                </li>
+                <li>
+                  <i /> Cắt sưởi nếu nhiệt độ vượt 33°C
+                </li>
+              </ul>
             </div>
           </div>
         </section>
 
-        <AutomaticRulesPanel
-          zone={selectedZone}
-          rules={currentState.rules}
-          onRuleChange={updateRule}
-          onSave={saveRules}
-        />
-
-        <ActuatorControlPanel
-          actuators={currentState.actuators}
-          isManual={isManual}
-          onActuatorChange={updateActuator}
-        />
-
-        {ruleNotice && (
-          <div className="control-toast" role="status">
-            <span>✓</span>
-            <p>{ruleNotice}</p>
-            <button type="button" onClick={() => setRuleNotice('')}>
-              ×
-            </button>
+        <section className="control-section">
+          <div className="control-section-title">
+            <span>02</span>
+            <div>
+              <small>SETPOINTS & RULES</small>
+              <h2>Quy tắc tự động</h2>
+              <p>
+                Cấu hình ngưỡng kích hoạt và mục tiêu duy trì cho chế độ AUTO.
+              </p>
+            </div>
           </div>
-        )}
+
+          <AutomaticRulesPanel
+            rules={currentState.rules}
+            disabled={isManual}
+            onUpdateRule={updateRule}
+          />
+        </section>
+
+        <section className="control-section">
+          <div className="control-section-title">
+            <span>03</span>
+            <div>
+              <small>ACTUATORS</small>
+              <h2>Điều khiển thiết bị chấp hành</h2>
+              <p>
+                Trạng thái rơ-le và công tắc chấp hành tại {selectedZone.name}.
+              </p>
+            </div>
+
+            <span className="actuators-active-count">
+              {activeActuatorCount}/4 thiết bị đang chạy
+            </span>
+          </div>
+
+          <ActuatorControlPanel
+            actuators={currentState.actuators}
+            isManual={isManual}
+            onToggleActuator={updateActuator}
+          />
+        </section>
 
         {manualConfirmOpen && (
-          <div
-            className="manual-modal-backdrop"
-            role="presentation"
-            onMouseDown={() => setManualConfirmOpen(false)}
-          >
-            <div
-              className="manual-modal"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="manual-mode-title"
-              onMouseDown={(event) => event.stopPropagation()}
-            >
-              <span className="manual-modal-icon">!</span>
-
-              <span className="control-mini-label">MANUAL OVERRIDE</span>
-
-              <h2 id="manual-mode-title">Chuyển sang MANUAL?</h2>
-
-              <p>
-                Điều khiển tự động tại <strong>{selectedZone.name}</strong> sẽ
-                tạm dừng. Bạn có thể trực tiếp bật hoặc tắt phun sương, quạt và
-                sưởi.
-              </p>
-
-              <div className="manual-modal-warning">
-                <strong>Lưu ý</strong>
-                <span>
-                  Hãy theo dõi nhiệt độ và độ ẩm trong thời gian sử dụng chế độ
-                  thủ công.
-                </span>
+          <div className="control-modal-overlay">
+            <div className="control-modal-card">
+              <div className="control-modal-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
               </div>
 
-              <div className="manual-modal-actions">
+              <h3>Xác nhận chuyển sang điều khiển thủ công</h3>
+
+              <p>
+                Chế độ MANUAL sẽ <strong>tạm dừng quy tắc tự động</strong> của{' '}
+                {selectedZone.name}. Thiết bị có thể hoạt động liên tục nếu bạn
+                không chủ động tắt.
+              </p>
+
+              <div className="control-modal-actions">
                 <button
                   type="button"
-                  className="secondary"
+                  className="modal-cancel-btn"
                   onClick={() => setManualConfirmOpen(false)}
                 >
-                  Hủy
+                  Hủy bỏ
                 </button>
 
                 <button
                   type="button"
-                  className="primary"
+                  className="modal-confirm-btn"
                   onClick={confirmManualMode}
                 >
-                  Chuyển sang MANUAL
+                  Xác nhận chuyển MANUAL
                 </button>
               </div>
             </div>

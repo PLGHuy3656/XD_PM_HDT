@@ -79,7 +79,8 @@ CREATE TABLE IF NOT EXISTS devices (
     ip_address VARCHAR(50),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    metadata_version BIGINT NOT NULL DEFAULT 1
 );
 
 -- 7. Technicians (Technician Domain Profile, linked to users)
@@ -111,3 +112,20 @@ CREATE INDEX IF NOT EXISTS idx_devices_farm_id ON devices(farm_id);
 CREATE INDEX IF NOT EXISTS idx_devices_zone_id ON devices(zone_id);
 CREATE INDEX IF NOT EXISTS idx_technician_assignments_tech ON technician_assignments(technician_id);
 CREATE INDEX IF NOT EXISTS idx_technician_assignments_farm ON technician_assignments(farm_id);
+
+
+-- Trigger to maintain devices.metadata_version and devices.updated_at on any UPDATE
+CREATE OR REPLACE FUNCTION trg_devices_update_metadata_version()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CLOCK_TIMESTAMP();
+    NEW.metadata_version = COALESCE(OLD.metadata_version, 0) + 1;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_devices_metadata_version_bump ON devices;
+CREATE TRIGGER trg_devices_metadata_version_bump
+    BEFORE UPDATE ON devices
+    FOR EACH ROW
+    EXECUTE FUNCTION trg_devices_update_metadata_version();
