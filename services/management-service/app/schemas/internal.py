@@ -43,3 +43,11 @@ class InternalDeviceMetadataResponse(BaseModel):
             self.updated_at = self.updatedAt
         if self.metadata_version is None:
             self.metadata_version = self.metadataVersion
+
+
+class InternalFarmRecipientsResponse(BaseModel):
+    """Authoritative farm-to-recipient mapping for Notification Service (AUD-C-02)."""
+    farm_id: str
+    farm_code: str
+    owner_id: Optional[str] = None
+    technician_ids: list[str] = Field(default_factory=list)
