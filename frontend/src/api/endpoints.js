@@ -21,6 +21,7 @@ export const ENDPOINTS = {
     LIST: '/api/farms',
     DETAIL: (farmId) => `/api/farms/${farmId}`,
     ZONES: (farmId) => `/api/farms/${farmId}/zones`,
+    ZONE_DETAIL: (zoneId) => `/api/zones/${zoneId}`,
   },
 
   DEVICES: {

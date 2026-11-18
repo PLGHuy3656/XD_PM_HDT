@@ -253,6 +253,28 @@ async def proxy_technician_assign(
     )
 
 
+@router.delete(
+    "/api/technicians/{technician_id}/farms/{farm_id}/assign",
+    tags=["Management - Technicians (Admin Only)"],
+    summary="Unassign a farm from a technician (Admin only)",
+)
+async def proxy_technician_unassign(
+    request: Request,
+    technician_id: str,
+    farm_id: str,
+    current_user: Dict[str, Any] = Depends(require_admin),
+) -> Response:
+    """Unassign farm from technician. Strictly requires ADMIN role."""
+    path = f"{technician_id}/farms/{farm_id}/assign"
+    _check_path_security(request, path)
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path=f"/api/technicians/{path}",
+        timeout=settings.management_timeout_seconds,
+    )
+
+
 @router.get(
     "/api/technicians",
     tags=["Management - Technicians"],
@@ -626,6 +648,190 @@ async def proxy_zone_detail(
         request=request,
         upstream_base_url=settings.management_service_url,
         upstream_path=f"/api/zones/{zone_id}",
+        timeout=settings.management_timeout_seconds,
+    )
+
+
+@router.post(
+    "/api/farms",
+    tags=["Management - Farms"],
+    summary="Create a new farm (Admin or Farm Owner)",
+)
+async def proxy_farm_create(
+    request: Request,
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER")),
+) -> Response:
+    _check_path_security(request, "")
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path="/api/farms",
+        timeout=settings.management_timeout_seconds,
+    )
+
+
+@router.put(
+    "/api/farms/{farm_id}",
+    tags=["Management - Farms"],
+    summary="Update farm metadata (Admin or owning Farm Owner)",
+)
+async def proxy_farm_update(
+    request: Request,
+    farm_id: str,
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER")),
+) -> Response:
+    _check_path_security(request, farm_id)
+    canonical_farm_id = await resolve_farm_access(farm_id, request)
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path=f"/api/farms/{canonical_farm_id}",
+        timeout=settings.management_timeout_seconds,
+    )
+
+
+@router.delete(
+    "/api/farms/{farm_id}",
+    tags=["Management - Farms"],
+    summary="Delete a farm (Admin only)",
+)
+async def proxy_farm_delete(
+    request: Request,
+    farm_id: str,
+    current_user: Dict[str, Any] = Depends(require_admin),
+) -> Response:
+    _check_path_security(request, farm_id)
+    canonical_farm_id = await resolve_farm_access(farm_id, request)
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path=f"/api/farms/{canonical_farm_id}",
+        timeout=settings.management_timeout_seconds,
+    )
+
+
+@router.post(
+    "/api/farms/{farm_id}/zones",
+    tags=["Management - Zones"],
+    summary="Create a zone inside an authorized farm (Admin or owning Farm Owner)",
+)
+async def proxy_zone_create(
+    request: Request,
+    farm_id: str,
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER")),
+) -> Response:
+    _check_path_security(request, f"{farm_id}/zones")
+    canonical_farm_id = await resolve_farm_access(farm_id, request)
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path=f"/api/farms/{canonical_farm_id}/zones",
+        timeout=settings.management_timeout_seconds,
+    )
+
+
+@router.put(
+    "/api/zones/{zone_id}",
+    tags=["Management - Zones"],
+    summary="Update a zone (Admin or owning Farm Owner)",
+)
+async def proxy_zone_update(
+    request: Request,
+    zone_id: str,
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER")),
+) -> Response:
+    _check_path_security(request, zone_id)
+    if not is_valid_uuid(zone_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bad Request: zone_id must be a valid UUID.",
+        )
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path=f"/api/zones/{zone_id}",
+        timeout=settings.management_timeout_seconds,
+    )
+
+
+@router.delete(
+    "/api/zones/{zone_id}",
+    tags=["Management - Zones"],
+    summary="Delete a zone (Admin or owning Farm Owner)",
+)
+async def proxy_zone_delete(
+    request: Request,
+    zone_id: str,
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER")),
+) -> Response:
+    _check_path_security(request, zone_id)
+    if not is_valid_uuid(zone_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bad Request: zone_id must be a valid UUID.",
+        )
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path=f"/api/zones/{zone_id}",
+        timeout=settings.management_timeout_seconds,
+    )
+
+
+@router.post(
+    "/api/devices",
+    tags=["Management - Devices"],
+    summary="Register a new device in a farm (Admin or owning Farm Owner)",
+)
+async def proxy_device_create(
+    request: Request,
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER")),
+) -> Response:
+    _check_path_security(request, "")
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path="/api/devices",
+        timeout=settings.management_timeout_seconds,
+    )
+
+
+@router.put(
+    "/api/devices/{device_id}",
+    tags=["Management - Devices"],
+    summary="Update device metadata (Admin or owning Farm Owner)",
+)
+async def proxy_device_update(
+    request: Request,
+    device_id: str,
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER")),
+) -> Response:
+    _check_path_security(request, device_id)
+    await resolve_device_access(device_id, request)
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path=f"/api/devices/{device_id}",
+        timeout=settings.management_timeout_seconds,
+    )
+
+
+@router.delete(
+    "/api/devices/{device_id}",
+    tags=["Management - Devices"],
+    summary="Delete a device from registry (Admin or owning Farm Owner)",
+)
+async def proxy_device_delete(
+    request: Request,
+    device_id: str,
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER")),
+) -> Response:
+    _check_path_security(request, device_id)
+    await resolve_device_access(device_id, request)
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path=f"/api/devices/{device_id}",
         timeout=settings.management_timeout_seconds,
     )
 

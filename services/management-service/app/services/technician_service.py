@@ -97,5 +97,12 @@ class TechnicianService:
 
         return self.repository.assign_technician(technician_id, farm_id, is_primary)
 
+    def unassign_technician(self, technician_id: str, farm_id: str) -> bool:
+        if not technician_id:
+            raise ValueError("technician_id is required")
+        if not farm_id:
+            raise ValueError("farm_id is required")
+        return self.repository.unassign_technician(technician_id, farm_id)
+
 
 technician_service = TechnicianService()
