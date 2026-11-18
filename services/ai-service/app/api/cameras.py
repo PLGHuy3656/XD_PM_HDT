@@ -59,15 +59,21 @@ def list_cameras(
 ) -> List[CameraRuntimeStatus]:
     """Return runtime status for all cameras registered in AIRuntimeManager / runtime state."""
     statuses_by_id = {s.cameraId: s for s in state_store.list_camera_statuses()}
-    if not state_store.redis_enabled:
-        for cam_id in runtime_manager.list_camera_ids():
-            if cam_id not in statuses_by_id:
-                pipeline = runtime_manager.get_pipeline(cam_id)
-                if pipeline is not None:
-                    statuses_by_id[cam_id] = pipeline.status
+    for cam_id in runtime_manager.list_camera_ids():
+        if cam_id not in statuses_by_id:
+            pipeline = runtime_manager.get_pipeline(cam_id)
+            if pipeline is not None:
+                state_store.record_status(pipeline.status)
+                statuses_by_id[cam_id] = pipeline.status
     return [statuses_by_id[k] for k in sorted(statuses_by_id.keys())]
 
 
+@router.get(
+    "/{cameraId}",
+    response_model=CameraRuntimeStatus,
+    responses={404: {"model": ErrorResponse}},
+    summary="Get runtime status for a registered AI camera (Frontend alias)",
+)
 @router.get(
     "/{cameraId}/status",
     response_model=CameraRuntimeStatus,
@@ -83,10 +89,10 @@ def get_camera_status(
     if status is not None:
         return status
 
-    if not state_store.redis_enabled:
-        pipeline = runtime_manager.get_pipeline(cameraId)
-        if pipeline is not None:
-            return pipeline.status
+    pipeline = runtime_manager.get_pipeline(cameraId)
+    if pipeline is not None:
+        state_store.record_status(pipeline.status)
+        return pipeline.status
 
     raise_ai_error(
         404,

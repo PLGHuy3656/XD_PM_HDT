@@ -5,6 +5,8 @@ from pathlib import Path
 
 from fastapi import Request, WebSocket
 
+from app.config import settings
+from app.ports.camera_registry import CameraRegistry, ManagementCameraRegistry
 from app.runtime.manager import AIRuntimeManager
 from app.runtime.state_store import InMemoryAIRuntimeStateStore
 from app.websocket.manager import AIWebSocketManager
@@ -16,6 +18,16 @@ def get_runtime_manager(request: Request) -> AIRuntimeManager:
 
 def get_state_store(request: Request) -> InMemoryAIRuntimeStateStore:
     return request.app.state.runtime_manager.state_store
+
+
+def get_camera_registry(request: Request) -> CameraRegistry:
+    custom = getattr(request.app.state, "camera_registry", None)
+    if custom is not None:
+        return custom
+    return ManagementCameraRegistry(
+        base_url=settings.ai_management_service_url,
+        timeout_seconds=settings.ai_registry_timeout_seconds,
+    )
 
 
 def get_snapshot_dir(request: Request) -> Path:

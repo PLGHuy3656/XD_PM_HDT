@@ -409,6 +409,7 @@ class AIRuntimeManager:
             count_window_s=float(c_cfg.get("window_s", 0.0)),
         )
         self._pipelines[camera_config.camera_id] = pipeline
+        self.state_store.record_status(pipeline.status)
         return pipeline
 
     @property

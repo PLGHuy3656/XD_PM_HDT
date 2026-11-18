@@ -21,4 +21,11 @@ def get_connection(database_url: str | None = None, connect_timeout: int = 5) ->
     return psycopg.connect(url, connect_timeout=connect_timeout)
 
 
-__all__ = ["get_connection", "get_database_url"]
+def run_migrations(database_url: str | None = None) -> list[str]:
+    """Apply SQL migrations idempotently to ai_db."""
+    from database.apply_migrations import apply_migrations
+
+    return apply_migrations(database_url=get_database_url(database_url))
+
+
+__all__ = ["get_connection", "get_database_url", "run_migrations"]
