@@ -9,6 +9,10 @@ from app.domain_events.evaluator import (
     IoTConditionEvaluator,
     default_condition_evaluator,
 )
+from app.domain_events.metadata_resolver import (
+    DeviceMetadataResolver,
+    default_metadata_resolver,
+)
 from app.realtime.publisher import RealtimePublisher, ws_manager
 from app.repositories.telemetry_repository import (
     TelemetryRepository,
@@ -39,6 +43,7 @@ class TelemetryService:
         repository: TelemetryRepository | None = None,
         realtime_publisher: RealtimePublisher | None = None,
         condition_evaluator: IoTConditionEvaluator | None = None,
+        metadata_resolver: DeviceMetadataResolver | None = None,
     ):
         self.repository: TelemetryRepository = (
             repository or default_telemetry_repository
@@ -48,6 +53,9 @@ class TelemetryService:
         )
         self.condition_evaluator: IoTConditionEvaluator = (
             condition_evaluator or default_condition_evaluator
+        )
+        self.metadata_resolver: DeviceMetadataResolver = (
+            metadata_resolver or default_metadata_resolver
         )
 
     def get_latest(self, device_id: str) -> AcceptedTelemetry | None:
@@ -119,8 +127,17 @@ class TelemetryService:
             logger.warning("[TELEMETRY REJECTED] %s", msg)
             return TelemetryProcessResult(success=False, error=msg)
 
-        # Step 5: Assign server UTC received_at
+        # Step 5: Assign server UTC received_at & resolve authoritative farm_id via Management (fail-closed)
         received_at = datetime.now(timezone.utc)
+        resolved_farm_id: str | None = None
+        if self.metadata_resolver is not None:
+            mgmt_url, _ = self.metadata_resolver._get_mgmt_config()
+            if mgmt_url:
+                location = self.metadata_resolver.resolve(telemetry_payload.deviceId)
+                if location is not None:
+                    resolved_farm_id = location.farm_id
+                    if hasattr(self.repository, "register_device_farm"):
+                        self.repository.register_device_farm(telemetry_payload.deviceId, resolved_farm_id)
 
         # Step 6: Create normalized AcceptedTelemetry
         accepted = AcceptedTelemetry(
@@ -129,6 +146,7 @@ class TelemetryService:
             metrics=telemetry_payload.metrics,
             actuators=telemetry_payload.actuators,
             state=telemetry_payload.state,
+            farm_id=resolved_farm_id,
         )
 
         # Step 7: Save to repository abstraction

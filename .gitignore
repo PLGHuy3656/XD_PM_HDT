@@ -73,3 +73,6 @@ infrastructure/mosquitto/password_file
 infrastructure/mosquitto/*password_file*
 infrastructure/mosquitto/acl_file
 infrastructure/redis/redis.conf
+
+# INT01 isolated integration environment (never commit secrets)
+.env.int01

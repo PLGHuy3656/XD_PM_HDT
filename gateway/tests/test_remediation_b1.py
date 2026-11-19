@@ -403,11 +403,15 @@ def test_iot_command_status_admin_allowed(b1_test_env):
 
 
 def test_iot_command_status_non_admin_denied(b1_test_env):
-    """Non-admin callers cannot query /api/iot/commands/{id} (fail-closed pending resolver)."""
+    """INT01 command-to-device ownership resolver: device owner gets 200; cross-farm caller gets 403."""
     client = b1_test_env["client"]
-    token_owner = make_jwt_token(user_id=OWNER_A_ID, roles=["FARM_OWNER"])
-    resp = client.get("/api/iot/commands/cmd-001", headers={"Authorization": f"Bearer {token_owner}"})
-    assert resp.status_code == 403
+    token_owner_a = make_jwt_token(user_id=OWNER_A_ID, roles=["FARM_OWNER"])
+    resp_a = client.get("/api/iot/commands/cmd-001", headers={"Authorization": f"Bearer {token_owner_a}"})
+    assert resp_a.status_code == 200
+
+    token_owner_b = make_jwt_token(user_id=OWNER_B_ID, roles=["FARM_OWNER"])
+    resp_b = client.get("/api/iot/commands/cmd-001", headers={"Authorization": f"Bearer {token_owner_b}"})
+    assert resp_b.status_code == 403
 
 
 # =============================================================================

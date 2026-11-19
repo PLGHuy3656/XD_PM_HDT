@@ -33,7 +33,7 @@ export function useTelemetryWebSocket(farmId = null) {
     let httpInterval = null
     let stopped = false
 
-    // Authenticated farm-scoped HTTP fallback polling (3s) — never uses a hardcoded farmId
+    // Authenticated farm-scoped HTTP polling (3s) — safe INT01 transport (no unauthenticated /ws/iot broadcast exposure)
     const fetchLatestHttp = async () => {
       if (stopped || !farmId || !getAuthToken()) return
       try {
@@ -42,10 +42,17 @@ export function useTelemetryWebSocket(farmId = null) {
           const normalized = normalizeTelemetry(response, false)
           if (normalized && (normalized.temperature != null || normalized.humidity != null)) {
             setLatestTelemetry(normalized)
+            setConnectionStatus('connected')
           }
         }
-      } catch {
-        // Ignore transient polling errors; WebSocket / connectionStatus reflects live link state
+      } catch (err) {
+        if (!stopped) {
+          if (err?.status === 404 || err?.statusCode === 404) {
+            setConnectionStatus('connected')
+          } else {
+            setConnectionStatus('disconnected')
+          }
+        }
       }
     }
 
@@ -53,6 +60,8 @@ export function useTelemetryWebSocket(farmId = null) {
       fetchLatestHttp()
       httpInterval = setInterval(fetchLatestHttp, 3000)
     }
+
+    const enableWs = import.meta.env.VITE_ENABLE_TELEMETRY_WS === 'true'
 
     function connect() {
       if (stopped) return
@@ -106,7 +115,9 @@ export function useTelemetryWebSocket(farmId = null) {
       reconnectTimer = setTimeout(connect, backoffDelay)
     }
 
-    connect()
+    if (enableWs) {
+      connect()
+    }
 
     return () => {
       stopped = true

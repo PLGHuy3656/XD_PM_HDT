@@ -216,7 +216,7 @@ class DeviceRepository:
 
         health_meta = {
             "uptime": presence_info.get("uptime") if presence_info else None,
-            "ip": presence_info.get("ip") or row[7],
+            "ip": (presence_info.get("ip") if presence_info else None) or row[7],
             "freeHeap": presence_info.get("free_heap") if presence_info else None,
             "lastSeen": presence_info.get("last_seen") if presence_info else None,
         }

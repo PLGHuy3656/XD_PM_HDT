@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import urllib.parse
 from typing import Any, Dict, Optional
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse
 
@@ -1006,30 +1007,76 @@ async def proxy_iot_device_commands(
 
 @router.get(
     "/api/iot/commands/{command_id}",
-    tags=["IoT - Commands (Locked for non-admin)"],
-    summary="Query command lifecycle status (Locked for non-admin pending command resolver)",
+    tags=["IoT - Commands"],
+    summary="Query command lifecycle status with device ownership verification",
 )
 async def proxy_iot_command_status(
     request: Request,
     command_id: str,
-    current_user: Dict[str, Any] = Depends(require_any_authenticated),
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER", "TECHNICIAN")),
 ) -> Response:
-    """Command lifecycle state. Locked for non-admins pending command-to-device resolver."""
+    """Command lifecycle state.
+    - ADMIN: global access.
+    - FARM_OWNER / TECHNICIAN: resolves command -> deviceId from IoT Service,
+      then authoritatively verifies device ownership/assignment via Management
+      (fail-closed 403 on cross-farm, 503 if Management/IoT unavailable).
+    """
     path = f"commands/{command_id}"
     _check_path_security(request, path)
     roles = current_user.get("roles") or []
-    if "ADMIN" not in roles:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: Command status query is restricted to ADMIN pending command-to-device resolver",
+    if "ADMIN" in roles:
+        return await proxy_handler.forward(
+            request=request,
+            upstream_base_url=settings.iot_service_url,
+            upstream_path=f"/api/iot/{path}",
+            timeout=settings.iot_timeout_seconds,
         )
 
-    return await proxy_handler.forward(
-        request=request,
-        upstream_base_url=settings.iot_service_url,
-        upstream_path=f"/api/iot/{path}",
-        timeout=settings.iot_timeout_seconds,
-    )
+    client = getattr(request.app.state, "http_client", None)
+    owns_client = client is None
+    if owns_client:
+        client = httpx.AsyncClient()
+    cmd_url = f"{settings.iot_service_url.rstrip('/')}/api/iot/{path}"
+    try:
+        resp = await client.get(cmd_url, timeout=settings.iot_timeout_seconds)
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service Unavailable: IoT Service unreachable while verifying command ownership",
+        ) from exc
+    finally:
+        if owns_client:
+            await client.aclose()
+
+    if resp.status_code == status.HTTP_404_NOT_FOUND:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Command '{command_id}' not found",
+        )
+    if resp.status_code != status.HTTP_200_OK:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service Unavailable: Could not resolve command ownership",
+        )
+
+    try:
+        payload = resp.json()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Invalid response from IoT Service",
+        ) from exc
+
+    cmd_device_id = payload.get("deviceId") if isinstance(payload, dict) else None
+    if not isinstance(cmd_device_id, str) or not cmd_device_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Command ownership could not be resolved",
+        )
+
+    # Authoritative cross-farm / technician assignment verification via Management Service
+    await resolve_device_access(cmd_device_id.strip(), request)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=payload)
 
 
 @router.get(

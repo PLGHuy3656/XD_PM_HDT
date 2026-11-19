@@ -10,7 +10,27 @@ import { useFarms } from '../../../features/farms/hooks/useFarms'
 import { useTelemetry } from '../../../features/telemetry/hooks/useTelemetry'
 import { SERVICE_STATE } from '../../../api/serviceStatus.js'
 import { USE_MOCK } from '../../../api/config.js'
+import apiClient from '../../../api/client.js'
 import './EnvironmentControlPage.css'
+
+const ACTUATOR_TO_IOT_TARGET = {
+  misting: 'misting',
+  ventilation: 'fan',
+  heating: 'heater',
+  alarm: 'alarm',
+}
+
+async function pollIoTCommandAck(commandId, maxAttempts = 12, delayMs = 500) {
+  for (let i = 0; i < maxAttempts; i += 1) {
+    const res = await apiClient.get(`/api/iot/commands/${commandId}`)
+    const status = res?.status
+    if (status === 'SUCCESS' || status === 'FAILED' || status === 'TIMEOUT') {
+      return res
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs))
+  }
+  return { status: 'TIMEOUT', ackMessage: 'Hết thời gian chờ thiết bị xác nhận ACK.' }
+}
 
 const DEFAULT_ZONE_CONTROL_STATE = {
   mode: 'AUTO',
@@ -36,6 +56,7 @@ function EnvironmentControlPage() {
   } = useFarms()
 
   const {
+    telemetry,
     hasData: hasTelemetry,
     error: telemetryError,
     serviceState: iotState,
@@ -44,8 +65,9 @@ function EnvironmentControlPage() {
 
   const iotUnavailable = !USE_MOCK && iotState === SERVICE_STATE.UNAVAILABLE
   const iotConnected = USE_MOCK || iotState === SERVICE_STATE.AVAILABLE
-  // Actuator command execution requires a verified live IoT control API (or explicit mock mode)
-  const iotControlAvailable = USE_MOCK
+  const liveNodeId = !USE_MOCK ? telemetry?.deviceId || null : null
+  // Actuator command execution requires a verified live IoT control API & active device (or explicit mock mode)
+  const iotControlAvailable = USE_MOCK || (iotConnected && Boolean(liveNodeId))
 
   const effectiveZones =
     zones.length > 0
@@ -105,11 +127,40 @@ function EnvironmentControlPage() {
     }
 
   const currentState = zoneState[selectedZone.id] || DEFAULT_ZONE_CONTROL_STATE
-  // Verified controller mode is null when IoT control state has not been confirmed by API
-  const verifiedMode = iotControlAvailable ? currentState.mode : null
+  // Verified controller mode comes strictly from live telemetry in real mode (never fabricated by tab switch)
+  const verifiedMode = USE_MOCK
+    ? currentState.mode
+    : iotControlAvailable
+      ? telemetry?.mode || null
+      : null
   const isManualActive = verifiedMode === 'MANUAL'
 
-  const handleModeAction = (targetMode) => {
+  const sendModeConfigCommand = async (targetMode) => {
+    if (USE_MOCK) return true
+    if (!liveNodeId) return false
+    const rules = currentState.rules || DEFAULT_ZONE_CONTROL_STATE.rules
+    try {
+      const dispatched = await apiClient.post(`/api/iot/devices/${liveNodeId}/commands/config`, {
+        targetTemp: Number(rules.temperature?.max ?? 28.5),
+        tempDeadband: 1.5,
+        targetHum: Number(rules.humidity?.min ?? 80.0),
+        humDeadband: 3.0,
+        isAutoMode: targetMode === 'AUTO',
+      })
+      const finalCmd = await pollIoTCommandAck(dispatched.commandId)
+      if (finalCmd.status === 'SUCCESS') {
+        refetchTelemetry()
+        return true
+      }
+      setRuleNotice(`Lệnh chuyển chế độ ${targetMode} thất bại (${finalCmd.status}): ${finalCmd.ackMessage || 'Thiết bị không xác nhận.'}`)
+      return false
+    } catch (err) {
+      setRuleNotice(`Không thể gửi lệnh chuyển chế độ: ${err?.message || 'Lỗi kết nối IoT.'}`)
+      return false
+    }
+  }
+
+  const handleModeAction = async (targetMode) => {
     if (!iotControlAvailable || targetMode === verifiedMode) return
 
     if (targetMode === 'MANUAL') {
@@ -117,6 +168,8 @@ function EnvironmentControlPage() {
       return
     }
 
+    const ok = await sendModeConfigCommand('AUTO')
+    if (!ok) return
     setZoneState((previous) => ({
       ...previous,
       [selectedZone.id]: {
@@ -126,15 +179,18 @@ function EnvironmentControlPage() {
     }))
     setActiveView('AUTO')
     setRuleNotice(
-      `Đã chuyển ${selectedZone.name} về AUTO. Bộ điều khiển áp dụng lại quy tắc tự động.`,
+      `Đã chuyển ${selectedZone.name} về AUTO (đã nhận ACK từ bộ điều khiển).`,
     )
   }
 
-  const confirmManualMode = () => {
+  const confirmManualMode = async () => {
     if (!iotControlAvailable) {
       setManualConfirmOpen(false)
       return
     }
+    setManualConfirmOpen(false)
+    const ok = await sendModeConfigCommand('MANUAL')
+    if (!ok) return
     setZoneState((previous) => ({
       ...previous,
       [selectedZone.id]: {
@@ -143,27 +199,63 @@ function EnvironmentControlPage() {
       },
     }))
     setActiveView('MANUAL')
-    setManualConfirmOpen(false)
     setRuleNotice(
-      `${selectedZone.name} đã chuyển sang MANUAL. Quy tắc tự động tạm dừng.`,
+      `${selectedZone.name} đã chuyển sang MANUAL (đã nhận ACK từ bộ điều khiển).`,
     )
   }
 
-  const updateActuator = (key, value) => {
+  const updateActuator = async (key, value) => {
     if (!iotControlAvailable || !isManualActive) return
 
-    setCommandStatus((prev) => ({ ...prev, [key]: { state: 'pending' } }))
-    setZoneState((previous) => ({
-      ...previous,
-      [selectedZone.id]: {
-        ...(previous[selectedZone.id] || DEFAULT_ZONE_CONTROL_STATE),
-        actuators: {
-          ...(previous[selectedZone.id]?.actuators || DEFAULT_ZONE_CONTROL_STATE.actuators),
-          [key]: value,
+    setCommandStatus((prev) => ({ ...prev, [key]: { state: 'pending', message: 'Đang chờ thiết bị xác nhận ACK...' } }))
+
+    if (USE_MOCK) {
+      setZoneState((previous) => ({
+        ...previous,
+        [selectedZone.id]: {
+          ...(previous[selectedZone.id] || DEFAULT_ZONE_CONTROL_STATE),
+          actuators: {
+            ...(previous[selectedZone.id]?.actuators || DEFAULT_ZONE_CONTROL_STATE.actuators),
+            [key]: value,
+          },
         },
-      },
-    }))
-    setCommandStatus((prev) => ({ ...prev, [key]: { state: 'acked' } }))
+      }))
+      setCommandStatus((prev) => ({ ...prev, [key]: { state: 'acked' } }))
+      return
+    }
+
+    const iotTarget = ACTUATOR_TO_IOT_TARGET[key] || key
+    try {
+      const dispatched = await apiClient.post(`/api/iot/devices/${liveNodeId}/commands/relay`, {
+        target: iotTarget,
+        state: Boolean(value),
+      })
+      const finalCmd = await pollIoTCommandAck(dispatched.commandId)
+      if (finalCmd.status === 'SUCCESS') {
+        setZoneState((previous) => ({
+          ...previous,
+          [selectedZone.id]: {
+            ...(previous[selectedZone.id] || DEFAULT_ZONE_CONTROL_STATE),
+            actuators: {
+              ...(previous[selectedZone.id]?.actuators || DEFAULT_ZONE_CONTROL_STATE.actuators),
+              [key]: value,
+            },
+          },
+        }))
+        setCommandStatus((prev) => ({ ...prev, [key]: { state: 'acked', message: 'Thiết bị đã xác nhận ACK.' } }))
+        refetchTelemetry()
+      } else {
+        setCommandStatus((prev) => ({
+          ...prev,
+          [key]: { state: 'failed', message: `Lệnh ${finalCmd.status}: ${finalCmd.ackMessage || 'Không nhận được ACK.'}` },
+        }))
+      }
+    } catch (err) {
+      setCommandStatus((prev) => ({
+        ...prev,
+        [key]: { state: 'failed', message: err?.message || 'Gửi lệnh điều khiển thất bại.' },
+      }))
+    }
   }
 
   const updateRule = (group, key, value) => {

@@ -24,6 +24,10 @@ export function normalizeTelemetry(raw, isMockMode = false) {
     (raw.deviceId ? new Date().toISOString() : null)
 
   return {
+    deviceId: raw.deviceId || raw.device_id || null,
+    farmId: raw.farmId || raw.farm_id || null,
+    mode: raw.state?.mode || raw.mode || null,
+    actuators: raw.actuators || null,
     temperature: temp != null ? Number(temp) : isMockMode ? 28.5 : null,
     humidity: hum != null ? Number(hum) : isMockMode ? 78 : null,
     co2: co2 != null ? Number(co2) : isMockMode ? 620 : null,
