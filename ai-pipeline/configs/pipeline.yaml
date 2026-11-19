@@ -23,6 +23,7 @@ counting:
   inside_side: positive       # phía "trong nhà" của đường đếm: positive | negative
   report_interval_s: 5        # chu kỳ đẩy số liệu đếm lên Backend
   min_track_hits: 2           # track phải tồn tại >= N frame mới được tính
+  window_s: 0                 # 0 = không tự xoay vòng cửa sổ theo thời gian (AI-FR-015)
 
 predator:
   classes: [rat, snake]       # Open Question 7.5: có thể giảm class
@@ -37,9 +38,10 @@ snapshot:
   dir: outputs/snapshots
   public_base_url: ""         # vd http://minio:9000/swiftlet/snapshots ; rỗng -> đường dẫn local
   jpeg_quality: 85
+  max_files: 500              # giới hạn số lượng ảnh snapshot lưu trữ
 
 publisher:
-  type: jsonl                 # jsonl | http | mqtt | multi
+  type: rabbitmq              # rabbitmq | http | jsonl
   jsonl_path: outputs/ai_events.jsonl
   publish_detections: false   # tiết kiệm băng thông (AI-NFR-006)
   detections_interval_s: 1.0
@@ -47,14 +49,38 @@ publisher:
     base_url: http://localhost:3000
     paths: {detections: /api/ai/detections, counts: /api/ai/counts, events: /api/ai/events}
     timeout_s: 3
-  mqtt:
-    host: localhost
-    port: 1883
-    username: ""
-    password: ""
-    topic_prefix: swiftletcare/ai   # -> {prefix}/{cameraId}/{counts|events|detections}
+
+rabbitmq:
+  enabled: false                        # Bật qua true hoặc biến môi trường AI_RABBITMQ_ENABLED=true
+  url: amqp://guest:guest@localhost:5672/%2F
+  exchange: swiftletcare.ai
+  exchange_type: topic
+  durable: true
+  max_retries: 2
+  routing_keys:
+    predator_detected: ai.predator.detected   # Notification Queue bind key này
+    count_updated: ai.count.updated           # Persistence / Analytics Queue bind key này
+    camera_status: ai.camera.status           # Optional runtime status key
+  publish_counts: true                        # Cho phép tắt nếu chỉ test Notification Queue
+  publish_status: false                       # Mặc định tắt; AI giữ runtime state qua REST/WS
 
 runtime:
   frame_skip: 0               # bỏ qua N frame giữa 2 lần infer
   max_fps: 0                  # 0 = không giới hạn
   draw_overlay: true
+
+
+input_cleaning:
+  dark_threshold: 60        # mean brightness below this = dark frame, brighten it
+  target_brightness: 100
+  enhance_dark: true
+  reconnect_retries: 5
+  reconnect_delay_s: 2
+
+
+postfilter:
+  min_area_frac: 0.0005
+  cross_class_iou: 0.6
+
+ws:
+  detection_max_hz: 0.0       # 0 = không giới hạn tần suất detection.updated (AI-NFR-006)
