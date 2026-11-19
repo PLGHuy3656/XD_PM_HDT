@@ -41,28 +41,21 @@ class AnalyticsPipelineRunner:
         base_host = os.getenv("PGHOST", "127.0.0.1")
         base_port = int(os.getenv("PGPORT", "5432"))
         reader_user = os.getenv("ANALYTICS_READER_USER", "analytics_reader")
-        reader_pw = os.getenv("ANALYTICS_READER_PASS", "analytics_reader_secure_pass_2026")
+        reader_pw = os.getenv("ANALYTICS_READER_PASS", "")
 
-        self.analytics_db_url = analytics_db_url or os.getenv(
-            "ANALYTICS_DATABASE_URL",
-            make_conninfo(host=base_host, port=base_port, user=reader_user, password=reader_pw, dbname="analytics_db"),
-        )
-        self.management_db_url = management_db_url or os.getenv(
-            "MANAGEMENT_DATABASE_URL",
-            make_conninfo(host=base_host, port=base_port, user=reader_user, password=reader_pw, dbname="management_db"),
-        )
-        self.iot_db_url = iot_db_url or os.getenv(
-            "IOT_DATABASE_URL",
-            make_conninfo(host=base_host, port=base_port, user=reader_user, password=reader_pw, dbname="iot_db"),
-        )
-        self.ai_db_url = ai_db_url or os.getenv(
-            "AI_DATABASE_URL",
-            make_conninfo(host=base_host, port=base_port, user=reader_user, password=reader_pw, dbname="ai_db"),
-        )
-        self.notification_db_url = notification_db_url or os.getenv(
-            "NOTIFICATION_DATABASE_URL",
-            make_conninfo(host=base_host, port=base_port, user=reader_user, password=reader_pw, dbname="notification_db"),
-        )
+        def _require_url(explicit: Optional[str], env_key: str, dbname: str) -> str:
+            val = explicit or os.getenv(env_key)
+            if val:
+                return val
+            if not reader_pw:
+                raise ValueError(f"{env_key} or ANALYTICS_READER_PASS must be configured")
+            return make_conninfo(host=base_host, port=base_port, user=reader_user, password=reader_pw, dbname=dbname)
+
+        self.analytics_db_url = _require_url(analytics_db_url, "ANALYTICS_DATABASE_URL", "analytics_db")
+        self.management_db_url = _require_url(management_db_url, "MANAGEMENT_DATABASE_URL", "management_db")
+        self.iot_db_url = _require_url(iot_db_url, "IOT_DATABASE_URL", "iot_db")
+        self.ai_db_url = _require_url(ai_db_url, "AI_DATABASE_URL", "ai_db")
+        self.notification_db_url = _require_url(notification_db_url, "NOTIFICATION_DATABASE_URL", "notification_db")
         self.timeout_seconds = timeout_seconds
 
     # -------------------------------------------------------------------------

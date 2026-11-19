@@ -1,91 +1,65 @@
-"""FastAPI service entrypoint for Alert & Notification Service (CP6.3)."""
-from __future__ import annotations
-
 import asyncio
+import logging
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
-from fastapi import FastAPI, HTTPException
-from fastapi.exceptions import RequestValidationError
+from fastapi import FastAPI
 
-from app.api import (
-    alerts_router,
-    devices_router,
-    health_router,
-    internal_events_router,
-    notifications_router,
-)
-from app.dependencies import get_ws_manager
-from app.errors import http_exception_handler, validation_exception_handler
-from app.websocket.routes import router as ws_router
+from app.config import settings
+from app.consumer import consume_events, deliver_pending_notifications
+from app.routes import router, websocket_router
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """FastAPI lifespan attaching running event loop to WebSocket manager on startup."""
-    loop = asyncio.get_running_loop()
-    ws_manager = get_ws_manager()
-    ws_manager.attach_loop(loop)
-
-    from app.infrastructure.rabbitmq import RabbitMQSettings, get_rabbitmq_consumer
-    rmq_settings = RabbitMQSettings.from_env()
-    consumer = None
-    if rmq_settings.enabled:
-        consumer = get_rabbitmq_consumer()
-        try:
-            await consumer.start()
-        except Exception as exc:
-            import logging
-            logging.getLogger("notification_service").error(
-                "Failed to start RabbitMQ consumer on startup: %s", exc
+async def lifespan(app: FastAPI):
+    background_tasks = []
+    if settings.rabbitmq_url and settings.database_url:
+        background_tasks.append(asyncio.create_task(
+            consume_events(
+                settings.rabbitmq_url,
+                settings.event_exchange,
+                settings.notification_queue,
             )
+        ))
+    else:
+        if not settings.rabbitmq_url:
+            logger.warning(
+                "RabbitMQ is not configured; notification consumer is disabled"
+            )
+        if not settings.database_url:
+            logger.warning(
+                "DATABASE_URL is not configured; notification consumer is disabled"
+            )
+    if settings.database_url:
+        background_tasks.append(asyncio.create_task(deliver_pending_notifications()))
+    else:
+        logger.warning(
+            "DATABASE_URL is not configured; notification delivery worker is disabled"
+        )
 
-    yield
-
-    if consumer and consumer.is_running:
-        try:
-            await consumer.stop()
-        except Exception:
-            pass
-
-    await ws_manager.close_all()
-
-
-def create_app() -> FastAPI:
-    """Create and configure the FastAPI application instance."""
-    app = FastAPI(
-        title="SwiftletCare Alert & Notification Service",
-        description=(
-            "Microservice managing operational alert lifecycles, deduplication, "
-            "and multi-channel notification delivery (IN_APP and FCM) for SwiftletCare."
-        ),
-        version="0.1.0",
-        lifespan=lifespan,
-        openapi_tags=[
-            {"name": "health", "description": "Service health probe"},
-            {"name": "alerts", "description": "Alert queries, acknowledgement, and resolution"},
-            {"name": "notifications", "description": "User notification inbox and read state"},
-            {"name": "devices", "description": "User device registration and push token management"},
-            {"name": "websocket", "description": "Realtime WebSocket event streams"},
-        ],
-    )
-
-    # Error Handlers
-    app.add_exception_handler(RequestValidationError, validation_exception_handler)
-    app.add_exception_handler(HTTPException, http_exception_handler)
-
-    # API Routers
-    app.include_router(health_router)
-    app.include_router(alerts_router)
-    app.include_router(notifications_router)
-    app.include_router(devices_router)
-    app.include_router(internal_events_router)
-    app.include_router(ws_router)
-
-    return app
+    try:
+        yield
+    finally:
+        for task in background_tasks:
+            task.cancel()
+        for task in background_tasks:
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
 
-app = create_app()
+app = FastAPI(
+    title="SwiftletCare Notification Service",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+app.include_router(router)
+app.include_router(router, prefix="/api/v1", include_in_schema=False)
+app.include_router(websocket_router)
 
 
-__all__ = ["app", "create_app"]
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "notification-service"}

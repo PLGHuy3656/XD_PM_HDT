@@ -5,6 +5,10 @@ from datetime import datetime, timezone
 
 from pydantic import ValidationError
 
+from app.domain_events.evaluator import (
+    IoTConditionEvaluator,
+    default_condition_evaluator,
+)
 from app.realtime.publisher import RealtimePublisher, ws_manager
 from app.repositories.telemetry_repository import (
     TelemetryRepository,
@@ -34,12 +38,16 @@ class TelemetryService:
         self,
         repository: TelemetryRepository | None = None,
         realtime_publisher: RealtimePublisher | None = None,
+        condition_evaluator: IoTConditionEvaluator | None = None,
     ):
         self.repository: TelemetryRepository = (
             repository or default_telemetry_repository
         )
         self.realtime_publisher: RealtimePublisher = (
             realtime_publisher or ws_manager
+        )
+        self.condition_evaluator: IoTConditionEvaluator = (
+            condition_evaluator or default_condition_evaluator
         )
 
     def get_latest(self, device_id: str) -> AcceptedTelemetry | None:
@@ -51,21 +59,6 @@ class TelemetryService:
     ) -> list[AcceptedTelemetry]:
         """Lists recent telemetry records for a device up to limit."""
         return self.repository.list_by_device(device_id, limit=limit)
-
-    def get_latest_by_farm(self, farm_id: str) -> AcceptedTelemetry | None:
-        """Retrieves the most recent accepted telemetry for any device in a farm."""
-        return self.repository.get_latest_by_farm(farm_id)
-
-    def list_by_farm(
-        self, farm_id: str, limit: int = 50
-    ) -> list[AcceptedTelemetry]:
-        """Lists recent telemetry records for a farm up to limit."""
-        return self.repository.list_by_farm(farm_id, limit=limit)
-
-    def register_device_farm(self, device_id: str, farm_id: str) -> None:
-        """Registers device-to-farm association in the repository."""
-        if hasattr(self.repository, "register_device_farm"):
-            self.repository.register_device_farm(device_id, farm_id)
 
     def process_message(
         self, topic_device_code: str, payload_bytes: bytes | str
@@ -145,7 +138,17 @@ class TelemetryService:
             accepted.received_at.isoformat(),
         )
 
-        # Step 8: Publish realtime event (isolated from domain success)
+        # Step 8: Evaluate domain alert events (Hysteresis & condition state machine)
+        try:
+            self.condition_evaluator.evaluate_telemetry(accepted)
+        except Exception as exc:
+            logger.warning(
+                "[TELEMETRY CONDITION EVALUATION WARNING] Failed to evaluate conditions for '%s': %s",
+                accepted.device_id,
+                exc,
+            )
+
+        # Step 9: Publish realtime event (isolated from domain success)
         try:
             event = RealtimeEvent(
                 type="telemetry.updated",

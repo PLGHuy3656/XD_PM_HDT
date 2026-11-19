@@ -6,6 +6,8 @@ import threading
 import time
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
+import numpy as np
+
 from app.config import (
     AI_PIPELINE_DIR,
     Cfg,
@@ -14,22 +16,107 @@ from app.config import (
     load_runtime_cameras,
     resolve_path,
 )
+from app.ports.metadata_resolver import default_camera_metadata_resolver
 from app.repositories import (
     AIEventRepository,
     CountUpdateRepository,
     default_ai_event_repository,
     default_count_update_repository,
 )
+from app.runtime.backend_sink import HttpBackendSink
 from app.runtime.camera_pipeline import CameraPipeline
+from app.runtime.rabbitmq_sink import RabbitMQRuntimeSink
 from app.runtime.sink import CompositeRuntimeSink, RuntimeEventSink
 from app.runtime.state_store import InMemoryAIRuntimeStateStore
-from app.schemas.canonical import CameraRuntimeStatus
+from app.schemas.canonical import (
+    BoundingBox,
+    CameraRuntimeStatus,
+    CountUpdate,
+    Detection,
+    DetectionResult,
+    FrameInfo,
+    epoch_to_iso8601_utc,
+)
 from swiftletcare_ai.detector import BaseDetector, YoloDetector
+from swiftletcare_ai.frame_clean import FrameCleaner
+from swiftletcare_ai.postfilter import DetectionFilter
 from swiftletcare_ai.predator import PredatorMonitor
 from swiftletcare_ai.schemas import FramePacket
-from swiftletcare_ai.snapshot import SnapshotStore
+from swiftletcare_ai.snapshot import SnapshotStore, draw_detections
 from swiftletcare_ai.tracker import BaseTracker, ByteTrackTracker, build_tracker
 from swiftletcare_ai.video_source import FrameSource, open_source
+
+
+class LockedDetector(BaseDetector):
+    """Thread-safe serialized wrapper around any BaseDetector instance."""
+
+    def __init__(self, inner: BaseDetector):
+        self.inner = inner
+        self.names = getattr(inner, "names", {})
+        self._lock = threading.Lock()
+
+    def detect(self, image):
+        with self._lock:
+            return self.inner.detect(image)
+
+    def warmup(self):
+        fn = getattr(self.inner, "warmup", None)
+        if fn:
+            with self._lock:
+                fn()
+
+
+class PruningSnapshotStore(SnapshotStore):
+    """SnapshotStore with automatic pruning of oldest files when file count exceeds max_files."""
+
+    def __init__(
+        self,
+        directory: str | Path = "outputs/snapshots",
+        public_base_url: str = "",
+        jpeg_quality: int = 85,
+        max_files: int = 500,
+    ) -> None:
+        super().__init__(str(directory), public_base_url, jpeg_quality)
+        self.max_files = max(0, int(max_files))
+
+    @classmethod
+    def from_store(cls, store: SnapshotStore, max_files: int = 500) -> "PruningSnapshotStore":
+        if isinstance(store, cls):
+            store.max_files = max(0, int(max_files))
+            return store
+        return cls(
+            directory=str(store.dir),
+            public_base_url=store.base,
+            jpeg_quality=store.q,
+            max_files=max_files,
+        )
+
+    def prune(self) -> int:
+        """Remove oldest files if count exceeds max_files. Returns count of deleted files."""
+        if self.max_files <= 0 or not self.dir.exists():
+            return 0
+        extensions = {".jpg", ".jpeg", ".png", ".webp"}
+        try:
+            files = [p for p in self.dir.iterdir() if p.is_file() and p.suffix.lower() in extensions]
+        except OSError:
+            return 0
+        if len(files) <= self.max_files:
+            return 0
+        files.sort(key=lambda p: p.stat().st_mtime)
+        to_delete = files[: len(files) - self.max_files]
+        deleted = 0
+        for p in to_delete:
+            try:
+                p.unlink(missing_ok=True)
+                deleted += 1
+            except OSError:
+                pass
+        return deleted
+
+    def save(self, image: np.ndarray, camera_id: str, event_type: str, timestamp: float) -> str:
+        ref = super().save(image, camera_id, event_type, timestamp)
+        self.prune()
+        return ref
 
 
 class PacedRepeatFrameSource(FrameSource):
@@ -87,6 +174,8 @@ class AIRuntimeManager:
         degraded_fps_threshold: float = 0.0,
         count_repository: Optional[CountUpdateRepository] = None,
         event_repository: Optional[AIEventRepository] = None,
+        backend_sink: Optional[RuntimeEventSink] = None,
+        rabbitmq_sink: Optional[RuntimeEventSink] = None,
     ) -> None:
         self.cfg = Cfg(pipeline_cfg or {})
         self.base_dir = Path(base_dir)
@@ -94,14 +183,43 @@ class AIRuntimeManager:
             count_repository=count_repository or default_count_update_repository,
             event_repository=event_repository or default_ai_event_repository,
         )
-        self.composite_sink = CompositeRuntimeSink([self.state_store, *(sinks or [])])
+
+        if backend_sink is not None:
+            self.backend_sink: Optional[RuntimeEventSink] = backend_sink
+        else:
+            candidate_sink = HttpBackendSink.from_config(self.cfg)
+            self.backend_sink = candidate_sink if candidate_sink.enabled else None
+
+        if rabbitmq_sink is not None:
+            self.rabbitmq_sink: Optional[RuntimeEventSink] = rabbitmq_sink
+        else:
+            candidate_rmq = RabbitMQRuntimeSink.from_config(self.cfg)
+            self.rabbitmq_sink = candidate_rmq if candidate_rmq.enabled else None
+
+        active_sinks: List[RuntimeEventSink] = [self.state_store, *(sinks or [])]
+        if self.backend_sink is not None:
+            active_sinks.append(self.backend_sink)
+        if self.rabbitmq_sink is not None:
+            active_sinks.append(self.rabbitmq_sink)
+        self.composite_sink = CompositeRuntimeSink(active_sinks)
+
         self._shared_detector = detector
         self._detector_factory = detector_factory
         self._tracker_factory = tracker_factory
         self._source_factory = source_factory
-        self._snapshot_store = snapshot_store
+        s_cfg = self.cfg.get("snapshot", {})
+        snap_max_files = int(s_cfg.get("max_files", 500))
+        if snapshot_store is not None:
+            self._snapshot_store: Optional[SnapshotStore] = (
+                snapshot_store
+                if isinstance(snapshot_store, PruningSnapshotStore)
+                else PruningSnapshotStore.from_store(snapshot_store, max_files=snap_max_files)
+            )
+        else:
+            self._snapshot_store = None
         self.degraded_fps_threshold = degraded_fps_threshold
         self._pipelines: Dict[str, CameraPipeline] = {}
+        self._threads: Dict[str, threading.Thread] = {}
 
     @classmethod
     def from_yaml(
@@ -140,12 +258,17 @@ class AIRuntimeManager:
         if self._shared_detector is not None:
             return self._shared_detector
         if self._detector_factory is not None:
-            self._shared_detector = self._detector_factory(self.cfg, self.base_dir)
+            raw_detector = self._detector_factory(self.cfg, self.base_dir)
+            self._shared_detector = (
+                LockedDetector(raw_detector)
+                if not isinstance(raw_detector, LockedDetector)
+                else raw_detector
+            )
             return self._shared_detector
 
         m_cfg = self.cfg.get("model", {})
         model_path = resolve_path(m_cfg.get("path", "models/best.pt"), self.base_dir)
-        self._shared_detector = YoloDetector(
+        raw_detector = YoloDetector(
             model_path=model_path,
             imgsz=int(m_cfg.get("imgsz", 640)),
             device=str(m_cfg.get("device", "auto")),
@@ -153,6 +276,7 @@ class AIRuntimeManager:
             min_conf=float(m_cfg.get("min_conf", 0.15)),
             iou=float(m_cfg.get("iou", 0.5)),
         )
+        self._shared_detector = LockedDetector(raw_detector)
         return self._shared_detector
 
     def _get_or_create_snapshot_store(self) -> SnapshotStore:
@@ -160,10 +284,12 @@ class AIRuntimeManager:
             return self._snapshot_store
         s_cfg = self.cfg.get("snapshot", {})
         snap_dir = resolve_path(s_cfg.get("dir", "outputs/snapshots"), self.base_dir)
-        self._snapshot_store = SnapshotStore(
+        max_files = int(s_cfg.get("max_files", 500))
+        self._snapshot_store = PruningSnapshotStore(
             directory=snap_dir,
             public_base_url=str(s_cfg.get("public_base_url", "")),
             jpeg_quality=int(s_cfg.get("jpeg_quality", 85)),
+            max_files=max_files,
         )
         return self._snapshot_store
 
@@ -192,11 +318,46 @@ class AIRuntimeManager:
         tracker: Optional[BaseTracker] = None,
         predator_monitor: Optional[PredatorMonitor] = None,
         snapshot_store: Optional[SnapshotStore] = None,
+        frame_cleaner: Optional[FrameCleaner] = None,
+        detection_filter: Optional[DetectionFilter] = None,
     ) -> CameraPipeline:
         if camera_config.camera_id in self._pipelines:
             raise ValueError(f"Camera already registered: {camera_config.camera_id}")
 
+        if camera_config.farm_id and camera_config.zone_id:
+            default_camera_metadata_resolver.set_camera_metadata(
+                camera_config.camera_id,
+                camera_config.farm_id,
+                camera_config.zone_id,
+            )
+
         det = detector or self._get_or_create_detector()
+        raw_det = getattr(det, "inner", det)
+
+        if frame_cleaner is not None:
+            cleaner = frame_cleaner
+        else:
+            cleaner = None
+            cc = self.cfg.get("input_cleaning", {})
+            if cc and cc.get("enabled", True) and isinstance(raw_det, YoloDetector):
+                cleaner = FrameCleaner(
+                    min_size=int(cc.get("min_size", 32)),
+                    dark_threshold=float(cc.get("dark_threshold", 60.0)),
+                    target_brightness=float(cc.get("target_brightness", 100.0)),
+                    enhance_dark=bool(cc.get("enhance_dark", True)),
+                )
+
+        if detection_filter is not None:
+            flt = detection_filter
+        else:
+            flt = None
+            pf = self.cfg.get("postfilter", {})
+            if pf and pf.get("enabled", True) and isinstance(raw_det, YoloDetector):
+                flt = DetectionFilter(
+                    min_area_frac=float(pf.get("min_area_frac", 0.0005)),
+                    cross_class_iou=float(pf.get("cross_class_iou", 0.6)),
+                )
+
         if tracker is not None:
             tr = tracker
             tr_type = "bytetrack" if isinstance(tr, ByteTrackTracker) else "centroid"
@@ -224,6 +385,7 @@ class AIRuntimeManager:
             inside_side=camera_config.inside_side,
             farm_id=camera_config.farm_id,
             zone_id=camera_config.zone_id,
+            autostart=camera_config.autostart,
         )
 
         pipeline = CameraPipeline(
@@ -240,8 +402,14 @@ class AIRuntimeManager:
             model_version=model_version,
             tracker_type=tr_type,
             max_fps=float(r_cfg.get("max_fps", 0.0)),
+            frame_cleaner=cleaner,
+            detection_filter=flt,
+            max_reconnects=int(self.cfg.get("input_cleaning", {}).get("reconnect_retries", 5)),
+            reconnect_delay_s=float(self.cfg.get("input_cleaning", {}).get("reconnect_delay_s", 2.0)),
+            count_window_s=float(c_cfg.get("window_s", 0.0)),
         )
         self._pipelines[camera_config.camera_id] = pipeline
+        self.state_store.record_status(pipeline.status)
         return pipeline
 
     @property
@@ -258,12 +426,74 @@ class AIRuntimeManager:
         return sorted(self._pipelines.keys())
 
     def close_all(self) -> None:
-        """Close all registered camera pipelines cleanly."""
-        for pipeline in self._pipelines.values():
+        """Stop all workers and close all registered camera pipelines cleanly."""
+        for cid in list(self._pipelines.keys()):
+            if self.is_running(cid):
+                try:
+                    self.stop_camera(cid)
+                except Exception:
+                    pass
+            else:
+                try:
+                    self._pipelines[cid].close()
+                except Exception:
+                    pass
+        self._threads.clear()
+        if self.backend_sink is not None:
             try:
-                pipeline.close()
+                if hasattr(self.backend_sink, "close"):
+                    self.backend_sink.close()
             except Exception:
                 pass
+        if self.rabbitmq_sink is not None:
+            try:
+                if hasattr(self.rabbitmq_sink, "close"):
+                    self.rabbitmq_sink.close()
+            except Exception:
+                pass
+
+    def is_running(self, camera_id: str) -> bool:
+        """Return True if background worker thread for camera_id is currently running."""
+        t = self._threads.get(camera_id)
+        return bool(t is not None and t.is_alive())
+
+    def start_camera(self, camera_id: str, max_frames: int = 0) -> CameraRuntimeStatus:
+        """Start a background worker thread for the camera pipeline."""
+        pipeline = self._pipelines.get(camera_id)
+        if pipeline is None:
+            raise KeyError(f"Unknown camera_id: {camera_id}")
+        if self.is_running(camera_id):
+            return pipeline.status
+
+        pipeline.reset_stop()
+        t = threading.Thread(
+            target=self.run_camera,
+            args=(camera_id, max_frames),
+            name=f"CameraWorker-{camera_id}",
+            daemon=True,
+        )
+        self._threads[camera_id] = t
+        t.start()
+        return pipeline.status
+
+    def stop_camera(self, camera_id: str, timeout: float = 5.0) -> CameraRuntimeStatus:
+        """Stop a running camera pipeline worker and ensure OFFLINE status."""
+        pipeline = self._pipelines.get(camera_id)
+        if pipeline is None:
+            raise KeyError(f"Unknown camera_id: {camera_id}")
+        pipeline.stop()
+        t = self._threads.get(camera_id)
+        if t is not None and t.is_alive():
+            t.join(timeout=timeout)
+        self._threads.pop(camera_id, None)
+        return pipeline.close()
+
+    def reset_camera_counts(self, camera_id: str) -> CountUpdate:
+        """Reset virtual line counter and window for a camera."""
+        pipeline = self._pipelines.get(camera_id)
+        if pipeline is None:
+            raise KeyError(f"Camera '{camera_id}' is not registered.")
+        return pipeline.reset_counts()
 
     def run_camera(self, camera_id: str, max_frames: int = 0) -> CameraRuntimeStatus:
         pipeline = self._pipelines.get(camera_id)
@@ -285,18 +515,21 @@ class AIRuntimeManager:
         model_path: Optional[str | Path] = None,
         repeat: int = 1,
         fps: float = 0.0,
-        farm_id: Optional[str] = "FARM-01",
-        zone_id: Optional[str] = "ZONE-A",
+        farm_id: Optional[str] = None,
+        zone_id: Optional[str] = None,
         line: tuple[tuple[float, float], tuple[float, float]] = ((0.10, 0.55), (0.90, 0.55)),
         inside_side: str = "positive",
     ) -> CameraPipeline:
         """Register or replace a camera pipeline for a real media/video/image source."""
-        existing = self._pipelines.pop(camera_id, None)
-        if existing is not None:
-            try:
-                existing.close()
-            except Exception:
-                pass
+        if self.is_running(camera_id):
+            self.stop_camera(camera_id)
+        else:
+            existing = self._pipelines.pop(camera_id, None)
+            if existing is not None:
+                try:
+                    existing.close()
+                except Exception:
+                    pass
 
         if isinstance(source, FrameSource):
             raw_source = source
@@ -326,13 +559,15 @@ class AIRuntimeManager:
             m_cfg = self.cfg.get("model", {})
             mp = Path(str(model_path))
             resolved_model = str(mp.resolve()) if mp.exists() else resolve_path(str(model_path), self.base_dir)
-            det = YoloDetector(
-                model_path=resolved_model,
-                imgsz=int(m_cfg.get("imgsz", 640)),
-                device=str(m_cfg.get("device", "auto")),
-                half=bool(m_cfg.get("half", False)),
-                min_conf=float(m_cfg.get("min_conf", 0.15)),
-                iou=float(m_cfg.get("iou", 0.5)),
+            det = LockedDetector(
+                YoloDetector(
+                    model_path=resolved_model,
+                    imgsz=int(m_cfg.get("imgsz", 640)),
+                    device=str(m_cfg.get("device", "auto")),
+                    half=bool(m_cfg.get("half", False)),
+                    min_conf=float(m_cfg.get("min_conf", 0.15)),
+                    iou=float(m_cfg.get("iou", 0.5)),
+                )
             )
 
         cam_cfg = RuntimeCameraConfig(
@@ -355,8 +590,8 @@ class AIRuntimeManager:
         repeat: int = 1,
         fps: float = 0.0,
         max_frames: int = 0,
-        farm_id: Optional[str] = "FARM-01",
-        zone_id: Optional[str] = "ZONE-A",
+        farm_id: Optional[str] = None,
+        zone_id: Optional[str] = None,
         line: tuple[tuple[float, float], tuple[float, float]] = ((0.10, 0.55), (0.90, 0.55)),
         inside_side: str = "positive",
     ) -> CameraRuntimeStatus:
@@ -384,8 +619,8 @@ class AIRuntimeManager:
         repeat: int = 1,
         fps: float = 0.0,
         max_frames: int = 0,
-        farm_id: Optional[str] = "FARM-01",
-        zone_id: Optional[str] = "ZONE-A",
+        farm_id: Optional[str] = None,
+        zone_id: Optional[str] = None,
         line: tuple[tuple[float, float], tuple[float, float]] = ((0.10, 0.55), (0.90, 0.55)),
         inside_side: str = "positive",
     ) -> threading.Thread:
@@ -402,14 +637,101 @@ class AIRuntimeManager:
             line=line,
             inside_side=inside_side,
         )
-        worker = threading.Thread(
-            target=self.run_camera,
-            kwargs={"camera_id": camera_id, "max_frames": max_frames},
-            name=f"ai-runtime-{camera_id}",
-            daemon=True,
+        self.start_camera(camera_id, max_frames=max_frames)
+        return self._threads[camera_id]
+
+    def analyze_single_image(
+        self,
+        image: np.ndarray,
+        camera_id: str = "CAM-01",
+        annotate: bool = False,
+    ) -> tuple[DetectionResult, Optional[str]]:
+        """Run one-off detection on a static image without affecting tracking, counting, state store, or WebSocket."""
+        if image is None or not isinstance(image, np.ndarray) or image.ndim != 3 or image.shape[2] != 3:
+            raise ValueError("Invalid image array for analysis")
+
+        h, w = int(image.shape[0]), int(image.shape[1])
+        detector = self._get_or_create_detector()
+        raw_detections = detector.detect(image)
+
+        pf = self.cfg.get("postfilter", {})
+        if pf and pf.get("enabled", True):
+            filter_ = DetectionFilter(
+                min_area_frac=float(pf.get("min_area_frac", 0.0005)),
+                cross_class_iou=float(pf.get("cross_class_iou", 0.6)),
+            )
+            raw_detections = filter_.apply(raw_detections, image.shape)
+
+        canonical_detections: List[Detection] = [
+            Detection(
+                **{
+                    "class": d.cls,
+                    "confidence": d.confidence,
+                    "bbox": BoundingBox.from_xyxy(d.bbox),
+                    "trackId": None,
+                }
+            )
+            for d in raw_detections
+        ]
+
+        now_iso = epoch_to_iso8601_utc()
+        result = DetectionResult(
+            cameraId=camera_id,
+            frameId=0,
+            capturedAt=now_iso,
+            frame=FrameInfo(width=w, height=h),
+            detections=canonical_detections,
         )
-        worker.start()
-        return worker
+
+        snapshot_url: Optional[str] = None
+        if annotate:
+            store = self._get_or_create_snapshot_store()
+            annotated_img = draw_detections(
+                image,
+                raw_detections,
+                line=None,
+                counts=None,
+            )
+            raw_path = store.save(
+                annotated_img,
+                camera_id=camera_id,
+                event_type="analyze",
+                timestamp=time.time(),
+            )
+            snapshot_url = CameraPipeline.normalize_snapshot_ref(raw_path)
+
+        return result, snapshot_url
+
+    def prune_snapshots(self, max_files: Optional[int] = None) -> int:
+        """Prune oldest snapshot files if count exceeds limit."""
+        snap_store = self._snapshot_store or self._get_or_create_snapshot_store()
+        if isinstance(snap_store, PruningSnapshotStore):
+            if max_files is not None:
+                old_max = snap_store.max_files
+                snap_store.max_files = max(0, int(max_files))
+                try:
+                    return snap_store.prune()
+                finally:
+                    snap_store.max_files = old_max
+            return snap_store.prune()
+        target_dir = Path(snap_store.dir)
+        limit = max_files if max_files is not None else int(self.cfg.get("snapshot", {}).get("max_files", 500))
+        if limit <= 0 or not target_dir.exists():
+            return 0
+        extensions = {".jpg", ".jpeg", ".png", ".webp"}
+        files = [p for p in target_dir.iterdir() if p.is_file() and p.suffix.lower() in extensions]
+        if len(files) <= limit:
+            return 0
+        files.sort(key=lambda p: p.stat().st_mtime)
+        to_delete = files[: len(files) - limit]
+        deleted = 0
+        for p in to_delete:
+            try:
+                p.unlink(missing_ok=True)
+                deleted += 1
+            except OSError:
+                pass
+        return deleted
 
 
-__all__ = ["AIRuntimeManager", "PacedRepeatFrameSource"]
+__all__ = ["AIRuntimeManager", "LockedDetector", "PacedRepeatFrameSource", "PruningSnapshotStore"]

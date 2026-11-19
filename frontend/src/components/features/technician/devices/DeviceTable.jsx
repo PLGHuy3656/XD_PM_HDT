@@ -70,14 +70,15 @@ function DeviceTable({
       {devices.length > 0 ? (
         <div className="tech-device-table-body">
           {devices.map((device) => {
-            const status = statusMeta[device.status]
+            const status = statusMeta[device.status] || statusMeta.UNKNOWN
+            const signalVal = device.signal ?? device.rssi ?? null
 
             return (
               <div className="tech-device-row" key={device.id}>
                 <button
                   type="button"
                   className="tech-device-identity"
-                  onClick={() => (onOpenDetail || onSelectDevice || (() => {}))(device.id)}
+                  onClick={() => (onOpenDetail || (() => onSelectDevice?.(device)))(device.id)}
                 >
                   <span
                     className={`tech-device-icon ${device.type.toLowerCase()}`}
@@ -86,7 +87,7 @@ function DeviceTable({
                   </span>
 
                   <span>
-                    <strong>{device.id}</strong>
+                    <strong>{device.nodeId || device.id}</strong>
                     <small>
                       {device.name} · {device.typeLabel}
                     </small>
@@ -94,8 +95,12 @@ function DeviceTable({
                 </button>
 
                 <div className="tech-assignment-cell">
-                  <span>{typeof getZoneName === 'function' ? getZoneName(device.zoneId) : (device.zoneId || 'Khu vực')}</span>
-                  <small>{farmName}</small>
+                  <span>
+                    {device.isZoneAssigned
+                      ? device.zoneName || getZoneName(device.zoneId)
+                      : 'Chưa phân bổ Zone'}
+                  </span>
+                  <small>{device.farmName || farmName}</small>
                 </div>
 
                 <div>
@@ -108,12 +113,12 @@ function DeviceTable({
                 <div className="tech-network-cell">
                   <span>
                     <SignalIcon />
-                    {device.rssi !== null
-                      ? `${device.rssi} dBm`
-                      : 'No signal'}
+                    {signalVal !== null && signalVal !== undefined
+                      ? `${signalVal} dBm`
+                      : 'Chưa có tín hiệu'}
                   </span>
                   <small>
-                    MQTT {device.mqttStatus} · {device.ip}
+                    MQTT: {device.mqttStatus} · {device.ipAddress || device.ip || '--'}
                   </small>
                 </div>
 
@@ -126,7 +131,7 @@ function DeviceTable({
                   <button
                     type="button"
                     className="tech-action-secondary"
-                    onClick={() => onOpenDetail(device.id)}
+                    onClick={() => (onOpenDetail || (() => onSelectDevice?.(device)))(device.id)}
                   >
                     Chi tiết
                   </button>
@@ -134,9 +139,10 @@ function DeviceTable({
                   <button
                     type="button"
                     className="tech-action-primary"
+                    title="Gán hoặc thay đổi khu vực lắp đặt của thiết bị trong cùng nhà yến"
                     onClick={() => onOpenAssignment(device)}
                   >
-                    Chuyển Zone
+                    Gán / đổi khu vực
                   </button>
                 </div>
               </div>

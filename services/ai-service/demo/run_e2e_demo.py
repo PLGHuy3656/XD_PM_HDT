@@ -29,14 +29,20 @@ SERVICE_DIR = Path(__file__).resolve().parent.parent
 if str(SERVICE_DIR) not in sys.path:
     sys.path.insert(0, str(SERVICE_DIR))
 
-from app.config import AI_PIPELINE_DIR, RuntimeCameraConfig  # noqa: E402
+from app.config import AI_PIPELINE_DIR, RuntimeCameraConfig, settings  # noqa: E402
 from app.main import create_app  # noqa: E402
+from app.repositories import InMemoryAIEventRepository, InMemoryCountUpdateRepository  # noqa: E402
+import app.runtime.publisher_sink as publisher_sink_mod  # noqa: E402
 from app.runtime.manager import AIRuntimeManager  # noqa: E402
+from app.runtime.state_store import InMemoryAIRuntimeStateStore  # noqa: E402
 from app.websocket.manager import AIWebSocketManager  # noqa: E402
 from swiftletcare_ai.detector import CallableDetector, YoloDetector  # noqa: E402
 from swiftletcare_ai.schemas import Detection as TV2Detection  # noqa: E402
 from swiftletcare_ai.snapshot import SnapshotStore  # noqa: E402
 from swiftletcare_ai.video_source import ListFrameSource  # noqa: E402
+
+settings.ai_redis_enabled = False
+publisher_sink_mod.default_ai_event_repository = InMemoryAIEventRepository()
 
 
 async def run_synthetic_e2e_demo(port: int = 18003) -> None:
@@ -63,6 +69,11 @@ async def run_synthetic_e2e_demo(port: int = 18003) -> None:
 
         manager = AIRuntimeManager(
             pipeline_cfg=pipeline_cfg,
+            state_store=InMemoryAIRuntimeStateStore(
+                redis_enabled=False,
+                count_repository=InMemoryCountUpdateRepository(),
+                event_repository=InMemoryAIEventRepository(),
+            ),
             detector=CallableDetector(lambda _img: []),
             snapshot_store=snap_store,
         )
@@ -223,6 +234,11 @@ async def run_real_model_e2e_demo(port: int = 18004) -> None:
                 "tracker": {"type": "bytetrack"},
                 "snapshot": {"dir": str(snap_dir), "public_base_url": ""},
             },
+            state_store=InMemoryAIRuntimeStateStore(
+                redis_enabled=False,
+                count_repository=InMemoryCountUpdateRepository(),
+                event_repository=InMemoryAIEventRepository(),
+            ),
             detector=detector,
             snapshot_store=SnapshotStore(directory=str(snap_dir), public_base_url=""),
         )
@@ -252,7 +268,33 @@ async def run_real_model_e2e_demo(port: int = 18004) -> None:
 
         ws_task = asyncio.create_task(ws_reader())
 
-        frames = [np.zeros((720, 1280, 3), dtype=np.uint8) for _ in range(2)]
+        import cv2
+
+        pred_dir = AI_PIPELINE_DIR / "data" / "samples" / "predators"
+        pred_files = (
+            sorted([p for p in pred_dir.iterdir() if p.suffix.lower() in (".jpg", ".png", ".webp")])
+            if pred_dir.exists()
+            else []
+        )
+        frames = []
+        for p in pred_files[:3]:
+            img = cv2.imread(str(p))
+            if img is not None:
+                frames.append(img)
+        if not frames:
+            vid_path = AI_PIPELINE_DIR / "data" / "samples" / "38s.mp4"
+            if vid_path.exists():
+                cap = cv2.VideoCapture(str(vid_path))
+                for _ in range(3):
+                    ret, fr = cap.read()
+                    if ret and fr is not None:
+                        frames.append(fr)
+                cap.release()
+        if not frames:
+            frames = [np.zeros((720, 1280, 3), dtype=np.uint8) for _ in range(2)]
+
+        expected_count = len(frames)
+        last_h, last_w = frames[-1].shape[:2]
 
         def run_real_worker() -> None:
             cam_cfg = RuntimeCameraConfig(
@@ -272,7 +314,7 @@ async def run_real_model_e2e_demo(port: int = 18004) -> None:
 
         async with httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}") as client:
             status = (await client.get("/api/v1/ai/cameras/CAM-REAL-01/status")).json()
-            assert status["processedFrames"] == 2 and status["trackerType"] == "bytetrack"
+            assert status["processedFrames"] == expected_count and status["trackerType"] == "bytetrack"
             print(
                 f"[REAL-MODEL] 2. GET /api/v1/ai/cameras/CAM-REAL-01/status -> "
                 f"modelVersion={status['modelVersion']}, trackerType={status['trackerType']}, "
@@ -280,7 +322,7 @@ async def run_real_model_e2e_demo(port: int = 18004) -> None:
             )
 
             det = (await client.get("/api/v1/ai/cameras/CAM-REAL-01/detections/latest")).json()
-            assert det["frame"] == {"width": 1280, "height": 720}
+            assert det["frame"] == {"width": last_w, "height": last_h}
             print(
                 f"[REAL-MODEL] 3. GET /api/v1/ai/cameras/CAM-REAL-01/detections/latest -> "
                 f"frameId={det['frameId']}, frame={det['frame']}"

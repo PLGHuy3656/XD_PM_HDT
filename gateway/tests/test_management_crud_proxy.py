@@ -44,8 +44,9 @@ def test_gateway_management_crud_proxy_and_rbac(monkeypatch):
     assert client.post(f"/api/farms/{farm_id}/zones", headers=tech_hdr, json={"zone_code": "Z1", "name": "Z"}).status_code == 403
     assert client.put(f"/api/zones/{zone_id}", headers=tech_hdr, json={"name": "Z2"}).status_code == 403
     assert client.delete(f"/api/zones/{zone_id}", headers=tech_hdr).status_code == 403
-    assert client.post("/api/devices", headers=tech_hdr, json={"node_id": "N1", "farm_id": farm_id}).status_code == 403
+    assert client.post("/api/devices", headers=tech_hdr, json={"node_id": "N1", "farm_id": farm_id}).status_code == 200
     assert client.put(f"/api/devices/{dev_id}", headers=tech_hdr, json={"name": "D2"}).status_code == 403
+    assert client.patch(f"/api/devices/{dev_id}/zone", headers=tech_hdr, json={"zone_id": zone_id}).status_code == 200
     assert client.delete(f"/api/devices/{dev_id}", headers=tech_hdr).status_code == 403
     assert client.delete(f"/api/technicians/{tech_id}/farms/{farm_id}/assign", headers=tech_hdr).status_code == 403
 
@@ -62,10 +63,16 @@ def test_gateway_management_crud_proxy_and_rbac(monkeypatch):
     assert client.put(f"/api/devices/{dev_id}", headers=owner_hdr, json={"name": "D2"}).status_code == 200
     assert client.delete(f"/api/devices/{dev_id}", headers=owner_hdr).status_code == 200
     assert client.delete(f"/api/technicians/{tech_id}/farms/{farm_id}/assign", headers=owner_hdr).status_code == 403
+    assert client.post(f"/api/farms/{farm_id}/approve", headers=tech_hdr).status_code == 403
+    assert client.post(f"/api/farms/{farm_id}/reject", headers=tech_hdr, json={"rejection_reason": "No"}).status_code == 403
+    assert client.post(f"/api/farms/{farm_id}/approve", headers=owner_hdr).status_code == 403
+    assert client.post(f"/api/farms/{farm_id}/reject", headers=owner_hdr, json={"rejection_reason": "No"}).status_code == 403
 
-    # ADMIN -> 200 on DELETE farm & unassign
+    # ADMIN -> 200 on DELETE farm, approve/reject farm & unassign
     admin_hdr = _hdr(["ADMIN"])
     assert client.delete(f"/api/farms/{farm_id}", headers=admin_hdr).status_code == 200
+    assert client.post(f"/api/farms/{farm_id}/approve", headers=admin_hdr).status_code == 200
+    assert client.post(f"/api/farms/{farm_id}/reject", headers=admin_hdr, json={"rejection_reason": "Incomplete"}).status_code == 200
     assert client.delete(f"/api/technicians/{tech_id}/farms/{farm_id}/assign", headers=admin_hdr).status_code == 200
 
     # Internal recipients endpoint must NOT be exposed publicly on Gateway

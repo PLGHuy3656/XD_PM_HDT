@@ -90,6 +90,23 @@ class DeviceRepository:
                 iot_reachable,
             )
 
+            # Map provisioning status for Administrator (preserve UNKNOWN when IoT unreachable or no heartbeat yet)
+            if status_val in ("OFFLINE", "STALE"):
+                prov_status = "DISCONNECTED"
+            elif status_val == "WARNING":
+                prov_status = "ATTENTION"
+            elif status_val == "ONLINE":
+                prov_status = "PROVISIONED"
+            else:
+                prov_status = "UNKNOWN"
+
+            health_meta = {
+                "uptime": presence_info.get("uptime") if presence_info else None,
+                "ip": presence_info.get("ip") or row[7],
+                "freeHeap": presence_info.get("free_heap") if presence_info else None,
+                "lastSeen": presence_info.get("last_seen") if presence_info else None,
+            }
+
             devices.append(
                 {
                     "device_id": dev_id,
@@ -104,6 +121,8 @@ class DeviceRepository:
                     "is_active": row[9],
                     "status": status_val,
                     "presence_status": status_val,
+                    "provisioning_status": prov_status,
+                    "health_metadata": health_meta,
                     "created_at": row[10].isoformat() if row[10] else None,
                 }
             )
@@ -186,6 +205,22 @@ class DeviceRepository:
             iot_reachable,
         )
 
+        if status_val in ("OFFLINE", "STALE"):
+            prov_status = "DISCONNECTED"
+        elif status_val == "WARNING":
+            prov_status = "ATTENTION"
+        elif status_val == "ONLINE":
+            prov_status = "PROVISIONED"
+        else:
+            prov_status = "UNKNOWN"
+
+        health_meta = {
+            "uptime": presence_info.get("uptime") if presence_info else None,
+            "ip": presence_info.get("ip") or row[7],
+            "freeHeap": presence_info.get("free_heap") if presence_info else None,
+            "lastSeen": presence_info.get("last_seen") if presence_info else None,
+        }
+
         return {
             "device_id": dev_uuid,
             "node_id": row[1],
@@ -199,6 +234,8 @@ class DeviceRepository:
             "is_active": row[9],
             "status": status_val,
             "presence_status": status_val,
+            "provisioning_status": prov_status,
+            "health_metadata": health_meta,
             "created_at": row[10].isoformat() if row[10] else None,
         }
 
@@ -305,6 +342,117 @@ class DeviceRepository:
             "updated_at": updated_at_str,
             "metadata_version": metadata_version,
         }
+
+    def create_device(
+        self,
+        node_id: str,
+        farm_uuid: str,
+        zone_id: str | None = None,
+        name: str | None = None,
+        device_type: str = "CONTROLLER",
+        firmware_version: str | None = None,
+        ip_address: str | None = None,
+    ) -> dict:
+        import psycopg
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                try:
+                    cur.execute(
+                        """
+                        INSERT INTO devices (node_id, farm_id, zone_id, name, device_type, firmware_version, ip_address)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id;
+                        """,
+                        (node_id.strip(), farm_uuid, zone_id, name, device_type, firmware_version, ip_address),
+                    )
+                    new_id = str(cur.fetchone()[0])
+                    conn.commit()
+                except psycopg.errors.UniqueViolation as exc:
+                    conn.rollback()
+                    raise ValueError(f"Device node_id '{node_id}' already exists") from exc
+                except psycopg.errors.ForeignKeyViolation as exc:
+                    conn.rollback()
+                    raise ValueError("Invalid farm_id or zone_id reference") from exc
+        return self.get_device_by_id(new_id)
+
+    def update_device(
+        self,
+        device_id: str,
+        name: str | None = None,
+        device_type: str | None = None,
+        zone_id: str | None = None,
+        firmware_version: str | None = None,
+        ip_address: str | None = None,
+        is_active: bool | None = None,
+    ) -> dict | None:
+        import psycopg
+        existing = self.get_device_by_id(device_id)
+        if not existing:
+            return None
+        updates = []
+        params = []
+        if name is not None:
+            updates.append("name = %s")
+            params.append(name)
+        if device_type is not None:
+            updates.append("device_type = %s")
+            params.append(device_type)
+        if zone_id is not None:
+            updates.append("zone_id = %s")
+            params.append(zone_id)
+        if firmware_version is not None:
+            updates.append("firmware_version = %s")
+            params.append(firmware_version)
+        if ip_address is not None:
+            updates.append("ip_address = %s")
+            params.append(ip_address)
+        if is_active is not None:
+            updates.append("is_active = %s")
+            params.append(is_active)
+        if updates:
+            updates.append("updated_at = NOW()")
+            params.append(existing["device_id"])
+            with get_connection() as conn:
+                with conn.cursor() as cur:
+                    try:
+                        cur.execute(
+                            f"UPDATE devices SET {', '.join(updates)} WHERE id = %s;",
+                            tuple(params),
+                        )
+                        conn.commit()
+                    except psycopg.errors.ForeignKeyViolation as exc:
+                        conn.rollback()
+                        raise ValueError("Invalid zone_id reference") from exc
+        return self.get_device_by_id(existing["device_id"])
+
+    def update_device_zone(self, device_id: str, zone_id: str | None) -> dict | None:
+        import psycopg
+        existing = self.get_device_by_id(device_id)
+        if not existing:
+            return None
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                try:
+                    cur.execute(
+                        "UPDATE devices SET zone_id = %s, updated_at = NOW() WHERE id = %s;",
+                        (zone_id, existing["device_id"]),
+                    )
+                    conn.commit()
+                except psycopg.errors.ForeignKeyViolation as exc:
+                    conn.rollback()
+                    raise ValueError("Invalid zone_id reference") from exc
+        return self.get_device_by_id(existing["device_id"])
+
+    def delete_device(self, device_id: str) -> bool:
+        existing = self.get_device_by_id(device_id)
+        if not existing:
+            return False
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM devices WHERE id = %s;", (existing["device_id"],))
+                deleted = cur.rowcount > 0
+                conn.commit()
+        return deleted
 
 
 device_repository = DeviceRepository()

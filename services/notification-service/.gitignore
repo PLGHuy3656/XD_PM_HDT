@@ -1,13 +1,8 @@
+.env
+.env.*
+!.env.example
 __pycache__/
 *.py[cod]
-*$py.class
 .pytest_cache/
-.coverage
-htmlcov/
 .venv/
-.env
-.env.local
-*serviceAccountKey*.json
-*firebase-adminsdk*.json
-*.pem
-*.key
+venv/

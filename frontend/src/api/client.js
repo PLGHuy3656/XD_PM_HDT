@@ -9,6 +9,13 @@ import { ApiError, normalizeError } from './errors.js'
 let currentToken =
   typeof window !== 'undefined' ? localStorage.getItem('swiftletcare_token') : null
 let onUnauthorizedCallback = null
+let isHandlingUnauthorized = false
+
+function shouldSkipUnauthorizedCallback(endpoint, skipAuth) {
+  if (skipAuth) return true
+  const raw = String(endpoint || '').split('?')[0].replace(/\/+$/, '')
+  return raw.endsWith('/auth/login') || raw.endsWith('/auth/logout')
+}
 
 /**
  * Configure active access token for Bearer authentication.
@@ -163,11 +170,19 @@ export async function request(endpoint, options = {}) {
                   ? 'SERVER_ERROR'
                   : 'CLIENT_ERROR'
 
-        if (response.status === 401 && typeof onUnauthorizedCallback === 'function') {
+        if (
+          response.status === 401 &&
+          typeof onUnauthorizedCallback === 'function' &&
+          !isHandlingUnauthorized &&
+          !shouldSkipUnauthorizedCallback(endpoint, skipAuth)
+        ) {
+          isHandlingUnauthorized = true
           try {
             onUnauthorizedCallback()
           } catch {
             // Prevent callback errors from masking the original HTTP error
+          } finally {
+            isHandlingUnauthorized = false
           }
         }
 

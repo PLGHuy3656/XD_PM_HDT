@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { techniciansApi } from '../../../api/modules/techniciansApi.js'
 import { farmsApi } from '../../../api/modules/farmsApi.js'
+import { devicesApi } from '../../../api/modules/devicesApi.js'
 import { alertsApi } from '../../../api/modules/alertsApi.js'
 import { telemetryApi } from '../../../api/modules/telemetryApi.js'
 import { USE_MOCK } from '../../../api/config.js'
+import { useRevalidateOnFocus } from '../../../api/serviceStatus.js'
 import { useAuth } from '../../../context/AuthContext.jsx'
 import {
   getMockTechDashboard,
@@ -27,6 +29,9 @@ export function useTechnicianData(overrideTechId = null) {
   const [zones, setZones] = useState([])
   const [alerts, setAlerts] = useState([])
   const [telemetry, setTelemetry] = useState(null)
+  const [alertsError, setAlertsError] = useState(null)
+  const [telemetryError, setTelemetryError] = useState(null)
+  const [contextNonce, setContextNonce] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -36,7 +41,7 @@ export function useTechnicianData(overrideTechId = null) {
         setLoading(true)
         setError(null)
 
-        if (USE_MOCK || !technicianId) {
+        if (USE_MOCK) {
           const mockDash = getMockTechDashboard()
           setDashboardRaw(mockDash)
           const mockFarms = getMockTechFarms()
@@ -44,6 +49,13 @@ export function useTechnicianData(overrideTechId = null) {
           if (mockFarms.length > 0) {
             setSelectedFarmId((prev) => prev || mockFarms[0].id)
           }
+          return
+        }
+
+        if (!technicianId) {
+          setDashboardRaw(null)
+          setFarms([])
+          setSelectedFarmId(null)
           return
         }
 
@@ -80,12 +92,22 @@ export function useTechnicianData(overrideTechId = null) {
 
   // 2. Cascade device, zone, alert, and telemetry loading when selectedFarmId changes
   useEffect(() => {
-    if (!selectedFarmId || !technicianId || USE_MOCK) {
-      if (USE_MOCK) {
-        const mockFarms = getMockTechFarms()
-        const currentFarm = mockFarms.find((f) => f.id === selectedFarmId) || mockFarms[0]
-        setZones(currentFarm?.zones || [])
-      }
+    if (USE_MOCK) {
+      const mockFarms = getMockTechFarms()
+      const currentFarm = mockFarms.find((f) => f.id === selectedFarmId) || mockFarms[0]
+      setZones(currentFarm?.zones || [])
+      return
+    }
+
+    // Immediately clear stale state from previous farm
+    setDevices([])
+    setZones([])
+    setAlerts([])
+    setTelemetry(null)
+    setAlertsError(null)
+    setTelemetryError(null)
+
+    if (!selectedFarmId || !technicianId) {
       return
     }
 
@@ -94,7 +116,6 @@ export function useTechnicianData(overrideTechId = null) {
 
     async function loadFarmContext() {
       try {
-        // Parallel queries scoped to the assigned farm
         const activeFarm = farms.find((f) => f.id === selectedFarmId)
         const farmName = activeFarm?.name || 'Nhà yến'
 
@@ -138,15 +159,25 @@ export function useTechnicianData(overrideTechId = null) {
             ? alertsResp.value
             : alertsResp.value?.items || alertsResp.value?.data || []
           setAlerts(rawAlerts.map(normalizeTechAlert))
+          setAlertsError(null)
         } else {
           setAlerts([])
+          const reason = alertsResp.reason
+          if (reason?.code !== 'ABORTED') {
+            setAlertsError(reason?.message || 'Dịch vụ Cảnh báo chưa khả dụng.')
+          }
         }
 
         // Telemetry
         if (telemResp.status === 'fulfilled') {
           setTelemetry(normalizeTelemetry(telemResp.value, false))
+          setTelemetryError(null)
         } else {
           setTelemetry(null)
+          const reason = telemResp.reason
+          if (reason?.code !== 'ABORTED' && reason?.status !== 404 && reason?.statusCode !== 404) {
+            setTelemetryError(reason?.message || 'Dịch vụ IoT chưa khả dụng.')
+          }
         }
       } catch {
         // Ignore aborts
@@ -159,7 +190,7 @@ export function useTechnicianData(overrideTechId = null) {
       isMounted = false
       controller.abort()
     }
-  }, [selectedFarmId, technicianId, farms])
+  }, [selectedFarmId, technicianId, farms, contextNonce])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -169,6 +200,13 @@ export function useTechnicianData(overrideTechId = null) {
       controller.abort()
     }
   }, [fetchTechData])
+
+  useRevalidateOnFocus(
+    useCallback(() => {
+      setContextNonce((n) => n + 1)
+    }, []),
+    { enabled: !USE_MOCK && Boolean(selectedFarmId) },
+  )
 
   const acknowledgeAlert = async (alertId, note = '') => {
     if (USE_MOCK) {
@@ -208,6 +246,41 @@ export function useTechnicianData(overrideTechId = null) {
     }
   }
 
+  const createDevice = useCallback(async (payload) => {
+    if (USE_MOCK) {
+      return { success: true, data: payload }
+    }
+    try {
+      const created = await devicesApi.createDevice(payload)
+      setContextNonce((n) => n + 1)
+      return { success: true, data: created }
+    } catch (err) {
+      return {
+        success: false,
+        error: err?.message || 'Không thể đăng ký thiết bị mới.',
+      }
+    }
+  }, [])
+
+  const updateDeviceZone = useCallback(async (deviceId, zoneId) => {
+    if (USE_MOCK) {
+      setDevices((prev) =>
+        prev.map((d) => (d.id === deviceId ? { ...d, zoneId: zoneId || '' } : d)),
+      )
+      return { success: true }
+    }
+    try {
+      const updated = await devicesApi.updateDeviceZone(deviceId, zoneId || null)
+      setContextNonce((n) => n + 1)
+      return { success: true, data: updated }
+    } catch (err) {
+      return {
+        success: false,
+        error: err?.message || 'Không thể cập nhật phân bổ khu vực cho thiết bị.',
+      }
+    }
+  }, [])
+
   const selectedFarm = farms.find((f) => f.id === selectedFarmId) || farms[0] || null
 
   const systemStats = normalizeTechStats(dashboardRaw, USE_MOCK)
@@ -223,9 +296,13 @@ export function useTechnicianData(overrideTechId = null) {
     zones,
     alerts,
     telemetry,
+    alertsError,
+    telemetryError,
     loading,
     error,
     refetch: () => fetchTechData(),
+    createDevice,
+    updateDeviceZone,
     acknowledgeAlert,
     resolveAlert,
   }

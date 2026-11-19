@@ -13,7 +13,18 @@ from app.schemas.api import (
     RelayCommandRequest,
     TelemetryResponse,
 )
+from app.schemas.diagnostics import (
+    AdminDeviceRegistryItem,
+    DeviceDiagnosticDetail,
+    DiagnosticSummary,
+    InstallationChecklistResponse,
+    ProvisionDeviceRequest,
+)
 from app.services.command_service import DeviceCommandService
+from app.services.diagnostics_service import (
+    DiagnosticsService,
+    default_diagnostics_service,
+)
 from app.services.presence_service import DevicePresenceService
 from app.services.telemetry_service import TelemetryService
 
@@ -49,48 +60,6 @@ def list_telemetry_history(
     svc: TelemetryService = Depends(get_telemetry_service),
 ) -> list[TelemetryResponse]:
     records = svc.list_by_device(device_id, limit=limit)
-    return [TelemetryResponse.from_domain(rec) for rec in records]
-
-
-@router.get(
-    "/farms/{farm_id}/telemetry/latest",
-    response_model=TelemetryResponse,
-    summary="Get latest normalized telemetry for a farm",
-)
-def get_latest_farm_telemetry(
-    farm_id: str,
-    svc: TelemetryService = Depends(get_telemetry_service),
-) -> TelemetryResponse:
-    if not farm_id or not farm_id.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid farm_id parameter",
-        )
-    telemetry = svc.get_latest_by_farm(farm_id.strip())
-    if telemetry is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No telemetry found for farm '{farm_id}'",
-        )
-    return TelemetryResponse.from_domain(telemetry)
-
-
-@router.get(
-    "/farms/{farm_id}/telemetry",
-    response_model=list[TelemetryResponse],
-    summary="List recent telemetry history for a farm",
-)
-def list_farm_telemetry(
-    farm_id: str,
-    limit: int = Query(default=50, ge=1, le=500, description="Maximum records to return (1..500)"),
-    svc: TelemetryService = Depends(get_telemetry_service),
-) -> list[TelemetryResponse]:
-    if not farm_id or not farm_id.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid farm_id parameter",
-        )
-    records = svc.list_by_farm(farm_id.strip(), limit=limit)
     return [TelemetryResponse.from_domain(rec) for rec in records]
 
 
@@ -191,3 +160,58 @@ def get_command_state(
             detail=f"Command '{command_id}' not found",
         )
     return CommandResponse.from_domain(cmd)
+
+
+# --- Provisioning, Installation & Diagnostics Routes ---
+
+@router.get(
+    "/devices/registry-summary",
+    response_model=list[AdminDeviceRegistryItem],
+    summary="Get overview of all registered devices with provisioning status for Administrator",
+)
+def get_registry_summary() -> list[AdminDeviceRegistryItem]:
+    return default_diagnostics_service.get_admin_registry_summary()
+
+
+@router.get(
+    "/diagnostics/summary",
+    response_model=DiagnosticSummary,
+    summary="Get aggregate health and diagnostic counts for Technician Dashboard",
+)
+def get_diagnostics_summary() -> DiagnosticSummary:
+    return default_diagnostics_service.get_diagnostic_summary()
+
+
+@router.get(
+    "/devices/{device_id}/diagnostics",
+    response_model=DeviceDiagnosticDetail,
+    summary="Get detailed technical diagnostic signals for a device (Technician)",
+)
+def get_device_diagnostics(device_id: str) -> DeviceDiagnosticDetail:
+    diag = default_diagnostics_service.get_device_diagnostics(device_id)
+    if diag is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Device '{device_id}' not found",
+        )
+    return diag
+
+
+@router.get(
+    "/devices/{device_id}/installation-checklist",
+    response_model=InstallationChecklistResponse,
+    summary="Check installation and readiness checklist for a device (Technician)",
+)
+def get_installation_checklist(device_id: str) -> InstallationChecklistResponse:
+    return default_diagnostics_service.get_installation_checklist(device_id)
+
+
+@router.post(
+    "/devices/{device_id}/provision",
+    status_code=status.HTTP_200_OK,
+    summary="Provision and assign a device to a farm and zone (Technician)",
+)
+def provision_device(device_id: str, body: ProvisionDeviceRequest):
+    return default_diagnostics_service.provision_device(device_id, body)
+
+

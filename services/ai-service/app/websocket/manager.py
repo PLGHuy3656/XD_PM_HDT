@@ -20,6 +20,7 @@ import asyncio
 import concurrent.futures
 import logging
 import threading
+import time
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import WebSocket
@@ -59,10 +60,26 @@ def build_ws_envelope(
 class WebSocketRuntimeSink(BaseRuntimeSink):
     """RuntimeEventSink observer forwarding canonical domain events to AIWebSocketManager."""
 
-    def __init__(self, ws_manager: "AIWebSocketManager") -> None:
+    def __init__(
+        self,
+        ws_manager: "AIWebSocketManager",
+        detection_max_hz: float = 0.0,
+    ) -> None:
         self._ws_manager = ws_manager
+        self.detection_max_hz = max(0.0, float(detection_max_hz))
+        self._last_detection_emit_ts: Dict[str, float] = {}
+        self._lock = threading.Lock()
 
     def on_detection(self, result: DetectionResult) -> None:
+        if self.detection_max_hz > 0.0:
+            now = time.monotonic()
+            min_interval = 1.0 / self.detection_max_hz
+            with self._lock:
+                last_ts = self._last_detection_emit_ts.get(result.cameraId)
+                if last_ts is not None and (now - last_ts) < min_interval:
+                    return
+                self._last_detection_emit_ts[result.cameraId] = now
+
         envelope = build_ws_envelope(
             "detection.updated",
             result.cameraId,
@@ -101,12 +118,20 @@ class WebSocketRuntimeSink(BaseRuntimeSink):
 class AIWebSocketManager:
     """Manages active `/ws/ai` WebSocket clients and thread-safe broadcasts."""
 
-    def __init__(self) -> None:
+    def __init__(self, detection_max_hz: float = 0.0) -> None:
         self._lock = threading.RLock()
         self._clients: Dict[WebSocket, Optional[str]] = {}
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._pending_futures: List[concurrent.futures.Future[Any]] = []
-        self._sink = WebSocketRuntimeSink(self)
+        self._sink = WebSocketRuntimeSink(self, detection_max_hz=detection_max_hz)
+
+    @property
+    def detection_max_hz(self) -> float:
+        return self._sink.detection_max_hz
+
+    @detection_max_hz.setter
+    def detection_max_hz(self, hz: float) -> None:
+        self._sink.detection_max_hz = max(0.0, float(hz))
 
     @property
     def sink(self) -> WebSocketRuntimeSink:

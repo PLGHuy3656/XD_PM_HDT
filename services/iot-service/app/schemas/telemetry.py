@@ -91,5 +91,3 @@ class AcceptedTelemetry(BaseModel):
     metrics: TelemetryMetrics
     actuators: ActuatorState
     state: DeviceRuntimeState
-    farm_id: str | None = None
-    zone_id: str | None = None

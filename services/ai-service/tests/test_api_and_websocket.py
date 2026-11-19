@@ -457,10 +457,16 @@ def test_24_openapi_and_docs_expose_canonical_v1_schemas(tmp_path: Path):
 
         paths = spec["paths"]
         assert "/health" in paths
+        assert "/api/v1/ai/analyze" in paths
         assert "/api/v1/ai/cameras" in paths
         assert "/api/v1/ai/cameras/{cameraId}/status" in paths
+        assert "/api/v1/ai/cameras/{cameraId}/start" in paths
+        assert "/api/v1/ai/cameras/{cameraId}/stop" in paths
         assert "/api/v1/ai/cameras/{cameraId}/detections/latest" in paths
         assert "/api/v1/ai/cameras/{cameraId}/counts/latest" in paths
+        assert "/api/v1/ai/cameras/{cameraId}/counts" in paths
+        assert "/api/v1/ai/cameras/{cameraId}/counts/reset" in paths
+        assert "/api/v1/ai/cameras/{cameraId}/counts/history" in paths
         assert "/api/v1/ai/events" in paths
         assert "/api/v1/ai/events/{eventId}" in paths
         assert "/api/v1/ai/snapshots/{filename}" in paths

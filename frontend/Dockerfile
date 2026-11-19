@@ -11,7 +11,9 @@ RUN npm ci
 # Copy application source
 COPY . ./
 
-# Build production bundle
+# Build production bundle (default to same-origin /api via Nginx unless overridden)
+ARG VITE_API_BASE_URL=""
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN npm run build
 
 # Stage 2: Production Nginx Server

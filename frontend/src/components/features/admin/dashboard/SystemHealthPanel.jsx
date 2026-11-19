@@ -1,4 +1,5 @@
 import { services } from './dashboardMockData'
+import { USE_MOCK } from '../../../../api/config.js'
 
 function StatusDot({ status = 'healthy' }) {
   return <span className={`admin-status-dot ${status}`} />
@@ -21,7 +22,7 @@ function ArrowIcon() {
 }
 
 function SystemHealthPanel({ onOpen, services: propServices }) {
-  const currentServices = propServices || services
+  const currentServices = propServices && propServices.length > 0 ? propServices : (USE_MOCK ? services : [])
   const healthyCount = currentServices.filter(
     (service) => service.status === 'healthy' || service.status === 'HEALTHY',
   ).length

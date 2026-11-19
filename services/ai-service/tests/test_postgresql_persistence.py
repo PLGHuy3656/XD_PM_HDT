@@ -48,6 +48,12 @@ from swiftletcare_ai.detector import CallableDetector
 from swiftletcare_ai.schemas import Detection as TV2Detection
 from swiftletcare_ai.snapshot import SnapshotStore
 from swiftletcare_ai.video_source import ListFrameSource
+from tests.conftest import POSTGRES_AVAILABLE
+
+pytestmark = pytest.mark.skipif(
+    not POSTGRES_AVAILABLE,
+    reason="PostgreSQL server not reachable on 127.0.0.1:5432",
+)
 
 
 # ==============================================================================
@@ -541,14 +547,9 @@ def test_g1_zero_cross_service_fks_and_least_privilege_role_in_ai_db():
             )
             role_info = cur.fetchone()
 
-    from urllib.parse import urlsplit
-    from app.database import get_database_url
-
-    expected_db = urlsplit(get_database_url()).path.lstrip("/")
     assert fks == [], f"Expected 0 foreign keys in ai_db, found: {fks}"
     assert role_info is not None
-    assert expected_db in ("ai_db", "ai_test_db")
-    assert role_info[0] == expected_db
+    assert role_info[0] == "ai_db"
     assert role_info[1] == "ai_user"
     assert role_info[2] is False  # NOSUPERUSER
     assert role_info[3] is False  # NOCREATEDB

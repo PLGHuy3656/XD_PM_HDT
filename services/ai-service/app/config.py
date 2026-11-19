@@ -1,17 +1,19 @@
 """Configuration and path bootstrap for the AI Service reference prototype."""
 from __future__ import annotations
 
+import hashlib
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 SERVICE_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = SERVICE_DIR.parent.parent
-AI_PIPELINE_DIR = REPO_ROOT / "ai-pipeline"
+AI_PIPELINE_DIR = Path(os.getenv("AI_PIPELINE_DIR", str(REPO_ROOT / "ai-pipeline"))).resolve()
 AI_PIPELINE_SRC = AI_PIPELINE_DIR / "src"
 
 if str(AI_PIPELINE_SRC) not in sys.path:
@@ -42,6 +44,7 @@ class RuntimeCameraConfig:
     inside_side: str = "positive"
     farm_id: Optional[str] = None
     zone_id: Optional[str] = None
+    autostart: bool = False
 
     @classmethod
     def from_tv2_camera_config(
@@ -49,6 +52,7 @@ class RuntimeCameraConfig:
         cam: CameraConfig,
         farm_id: Optional[str] = None,
         zone_id: Optional[str] = None,
+        autostart: bool = False,
     ) -> "RuntimeCameraConfig":
         return cls(
             camera_id=cam.camera_id,
@@ -58,11 +62,12 @@ class RuntimeCameraConfig:
             inside_side=cam.inside_side,
             farm_id=farm_id,
             zone_id=zone_id,
+            autostart=autostart,
         )
 
 
 def load_runtime_cameras(path: str | Path) -> List[RuntimeCameraConfig]:
-    """Load camera configurations from YAML, supporting optional farm_id / zone_id."""
+    """Load camera configurations from YAML, supporting optional farm_id / zone_id / autostart."""
     data = load_yaml(path)
     out: List[RuntimeCameraConfig] = []
     seen: set[str] = set()
@@ -87,9 +92,35 @@ def load_runtime_cameras(path: str | Path) -> List[RuntimeCameraConfig]:
                 inside_side=c.get("inside_side", "positive"),
                 farm_id=c.get("farm_id") or c.get("farmId"),
                 zone_id=c.get("zone_id") or c.get("zoneId"),
+                autostart=bool(c.get("autostart", False)),
             )
         )
     return out
+
+
+MIN_INTERNAL_KEY_LENGTH = 43
+_REVOKED_INTERNAL_KEY_SHA256 = frozenset(
+    {"5a995368ee43ac79c977a27578f9dd4a5f5eb2f2ca3dc375f4defac306920635"}
+)
+_REVOKED_INTERNAL_KEY_PREFIXES = (
+    "swiftlet-internal-",
+    "changeme",
+    "change-me",
+    "test-key",
+    "dev-key",
+)
+
+
+def is_internal_key_acceptable(key: str) -> bool:
+    """Validate internal service key entropy and ensure it is not a revoked placeholder."""
+    k = (key or "").strip()
+    if len(k) < MIN_INTERNAL_KEY_LENGTH or len(set(k)) < 16:
+        return False
+    if k.lower().startswith(_REVOKED_INTERNAL_KEY_PREFIXES):
+        return False
+    if hashlib.sha256(k.encode("utf-8")).hexdigest() in _REVOKED_INTERNAL_KEY_SHA256:
+        return False
+    return True
 
 
 class Settings(BaseSettings):
@@ -116,8 +147,16 @@ class Settings(BaseSettings):
         default=True,
         validation_alias=AliasChoices("ai_redis_enabled", "AI_REDIS_ENABLED", "redis_enabled", "REDIS_ENABLED"),
     )
+    redis_host: str = Field(
+        default="127.0.0.1",
+        validation_alias=AliasChoices("ai_redis_host", "AI_REDIS_HOST", "redis_host", "REDIS_HOST"),
+    )
+    redis_port: int = Field(
+        default=6379,
+        validation_alias=AliasChoices("ai_redis_port", "AI_REDIS_PORT", "redis_port", "REDIS_PORT"),
+    )
     ai_redis_url: str = Field(
-        default="redis://127.0.0.1:6379/0",
+        default="",
         validation_alias=AliasChoices("ai_redis_url", "AI_REDIS_URL", "redis_url", "REDIS_URL"),
     )
     ai_latest_ttl_seconds: int = Field(
@@ -130,27 +169,56 @@ class Settings(BaseSettings):
     )
 
     # RabbitMQ Configuration (CP7.3)
-    rabbitmq_enabled: bool = False
-    rabbitmq_host: str = "127.0.0.1"
-    rabbitmq_port: int = Field(default=5672, validation_alias=AliasChoices("rabbitmq_port", "rabbitmq_amqp_port"))
-    rabbitmq_user: str = Field(default="swiftlet", validation_alias=AliasChoices("rabbitmq_user", "rabbitmq_default_user"))
-    rabbitmq_password: str = Field(default="swiftlet123", validation_alias=AliasChoices("rabbitmq_password", "rabbitmq_default_pass"))
+    rabbitmq_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("rabbitmq_enabled", "RABBITMQ_ENABLED", "ai_rabbitmq_enabled", "AI_RABBITMQ_ENABLED"),
+    )
+    rabbitmq_host: str = Field(
+        default="127.0.0.1",
+        validation_alias=AliasChoices("rabbitmq_host", "RABBITMQ_HOST"),
+    )
+    rabbitmq_port: int = Field(
+        default=5672,
+        validation_alias=AliasChoices("rabbitmq_port", "RABBITMQ_PORT", "rabbitmq_amqp_port"),
+    )
+    rabbitmq_user: str = Field(
+        default="swiftlet",
+        validation_alias=AliasChoices("rabbitmq_user", "RABBITMQ_USER", "rabbitmq_default_user"),
+    )
+    rabbitmq_password: str = Field(
+        default="",
+        repr=False,
+        validation_alias=AliasChoices(
+            "rabbitmq_password",
+            "RABBITMQ_PASSWORD",
+            "rabbitmq_pass",
+            "RABBITMQ_PASS",
+            "rabbitmq_default_pass",
+        ),
+    )
     rabbitmq_vhost: str = "/"
     rabbitmq_exchange: str = "swiftlet.domain.events"
 
-    # AI Runtime Internal Control Endpoint Security (CP13 Remediation R1.3)
+    # Internal Runtime Control & Camera Registry Hardening (CP13 R1 & R2)
     ai_runtime_internal_enabled: bool = Field(
         default=False,
         validation_alias=AliasChoices("ai_runtime_internal_enabled", "AI_RUNTIME_INTERNAL_ENABLED"),
     )
-    # No default secret (CP13 hardening R1). Must be provisioned per environment,
-    # e.g. python -c "import secrets; print(secrets.token_urlsafe(32))".
+    ai_camera_control_require_auth: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("ai_camera_control_require_auth", "AI_CAMERA_CONTROL_REQUIRE_AUTH"),
+    )
     ai_internal_service_key: str = Field(
         default="",
         repr=False,
-        validation_alias=AliasChoices("ai_internal_service_key", "AI_INTERNAL_SERVICE_KEY"),
+        validation_alias=AliasChoices(
+            "ai_internal_service_key",
+            "AI_INTERNAL_SERVICE_KEY",
+            "internal_service_key",
+            "INTERNAL_SERVICE_KEY",
+            "INTERNAL_SERVICE_TOKEN",
+        ),
     )
-    # Authoritative camera registry (CP13 hardening R2): Management Service.
     ai_management_service_url: str = Field(
         default="http://127.0.0.1:8001",
         validation_alias=AliasChoices("ai_management_service_url", "AI_MANAGEMENT_SERVICE_URL", "MANAGEMENT_SERVICE_URL"),
@@ -160,49 +228,29 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ai_registry_timeout_seconds", "AI_REGISTRY_TIMEOUT_SECONDS"),
     )
     ai_allowed_source_dirs: list[str] = Field(
-        default_factory=lambda: [str((REPO_ROOT / "ai-pipeline" / "data" / "samples").resolve())],
+        default_factory=lambda: [str((AI_PIPELINE_DIR / "data" / "samples").resolve())],
         validation_alias=AliasChoices("ai_allowed_source_dirs", "AI_ALLOWED_SOURCE_DIRS"),
     )
     ai_allowed_model_paths: list[str] = Field(
         default_factory=lambda: [
-            str((REPO_ROOT / "ai-pipeline" / "models" / "best.pt").resolve()),
+            str((AI_PIPELINE_DIR / "models" / "best.pt").resolve()),
             "ai-pipeline/models/best.pt",
             "models/best.pt",
         ],
         validation_alias=AliasChoices("ai_allowed_model_paths", "AI_ALLOWED_MODEL_PATHS"),
     )
 
+    @model_validator(mode="after")
+    def _finalize_docker_defaults(self) -> "Settings":
+        if not self.ai_redis_url:
+            self.ai_redis_url = f"redis://{self.redis_host}:{self.redis_port}/0"
+        raw_rmq_enabled = os.getenv("RABBITMQ_ENABLED") or os.getenv("AI_RABBITMQ_ENABLED")
+        if raw_rmq_enabled is None and os.getenv("RABBITMQ_HOST"):
+            self.rabbitmq_enabled = True
+        return self
+
 
 settings = Settings()
-
-
-# Minimum length of a secrets.token_urlsafe(32) value (32 random bytes -> 43 chars).
-MIN_INTERNAL_KEY_LENGTH = 43
-# SHA-256 of secret values that were committed/published and must never be accepted.
-_REVOKED_INTERNAL_KEY_SHA256 = frozenset(
-    {
-        # CP13 pre-hardening default key (published in source/tests on 2026-11-14)
-        "5a995368ee43ac79c977a27578f9dd4a5f5eb2f2ca3dc375f4defac306920635",
-    }
-)
-_REVOKED_INTERNAL_KEY_PREFIXES = ("swiftlet-internal-", "changeme", "change-me", "test-key", "dev-key")
-
-
-def is_internal_key_acceptable(key: str) -> bool:
-    """Reject empty, short, low-variety, placeholder or previously published keys."""
-    import hashlib
-
-    k = (key or "").strip()
-    if len(k) < MIN_INTERNAL_KEY_LENGTH:
-        return False
-    if len(set(k)) < 16:
-        return False
-    lowered = k.lower()
-    if lowered.startswith(_REVOKED_INTERNAL_KEY_PREFIXES):
-        return False
-    if hashlib.sha256(k.encode("utf-8")).hexdigest() in _REVOKED_INTERNAL_KEY_SHA256:
-        return False
-    return True
 
 
 __all__ = [
@@ -210,10 +258,12 @@ __all__ = [
     "AI_PIPELINE_SRC",
     "CameraConfig",
     "Cfg",
+    "MIN_INTERNAL_KEY_LENGTH",
     "REPO_ROOT",
     "RuntimeCameraConfig",
     "SERVICE_DIR",
     "Settings",
+    "is_internal_key_acceptable",
     "load_pipeline_config",
     "load_runtime_cameras",
     "load_yaml",

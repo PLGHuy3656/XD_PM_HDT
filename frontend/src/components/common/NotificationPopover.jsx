@@ -178,8 +178,14 @@ function NotificationPopover() {
         return
       }
 
+      const currentUserId = user.id || user.user_id || user.sub
+      if (!currentUserId) {
+        setNotifications([])
+        return
+      }
+
       alertsApi
-        .getNotifications()
+        .getNotifications({ params: { userId: currentUserId } })
         .then((res) => {
           if (cancelled) return
           const raw = Array.isArray(res) ? res : res?.items || []

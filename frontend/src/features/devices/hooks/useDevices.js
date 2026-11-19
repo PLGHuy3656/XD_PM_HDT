@@ -3,7 +3,7 @@ import { devicesApi } from '../../../api/modules/devicesApi.js'
 import { USE_MOCK } from '../../../api/config.js'
 import { getMockDevices, normalizeDevice } from '../adapters/deviceAdapter.js'
 
-export function useDevices(farmId = null) {
+export function useDevices(farmId = null, { requireFarmId = false } = {}) {
   const [devices, setDevices] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -19,6 +19,12 @@ export function useDevices(farmId = null) {
         setDevices(filtered)
         return
       }
+
+      if (requireFarmId && !farmId) {
+        setDevices([])
+        return
+      }
+      setDevices([])
 
       // Query real Gateway /api/devices with optional farm_id filter
       const options = {
@@ -37,7 +43,7 @@ export function useDevices(farmId = null) {
     } finally {
       setLoading(false)
     }
-  }, [farmId])
+  }, [farmId, requireFarmId])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -48,10 +54,41 @@ export function useDevices(farmId = null) {
     }
   }, [fetchDevices])
 
+  const runDeviceMutation = useCallback(
+    async (fn, fallbackError) => {
+      try {
+        await fn()
+        await fetchDevices()
+        return { success: true }
+      } catch (err) {
+        return { success: false, error: err?.message || fallbackError }
+      }
+    },
+    [fetchDevices]
+  )
+
+  const createDevice = useCallback(
+    (payload) => runDeviceMutation(() => devicesApi.createDevice(payload), 'Đăng ký thiết bị thất bại'),
+    [runDeviceMutation]
+  )
+
+  const updateDevice = useCallback(
+    (deviceId, payload) => runDeviceMutation(() => devicesApi.updateDevice(deviceId, payload), 'Cập nhật thiết bị thất bại'),
+    [runDeviceMutation]
+  )
+
+  const deleteDevice = useCallback(
+    (deviceId) => runDeviceMutation(() => devicesApi.deleteDevice(deviceId), 'Xóa thiết bị thất bại'),
+    [runDeviceMutation]
+  )
+
   return {
     devices,
     loading,
     error,
+    createDevice,
+    updateDevice,
+    deleteDevice,
     refetch: () => fetchDevices(),
   }
 }

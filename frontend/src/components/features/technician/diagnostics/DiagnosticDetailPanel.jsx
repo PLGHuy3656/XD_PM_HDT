@@ -28,6 +28,11 @@ function DiagnosticDetailPanel({ node, onClose }) {
     return null
   }
 
+  const connectivity = node.connectivity || {}
+  const sensors = Array.isArray(node.sensors) ? node.sensors : []
+  const actuators = Array.isArray(node.actuators) ? node.actuators : []
+  const issues = Array.isArray(node.issues) ? node.issues : []
+
   return (
     <div
       className="diagnostic-overlay"
@@ -68,26 +73,26 @@ function DiagnosticDetailPanel({ node, onClose }) {
             <div className="diagnostic-connectivity-grid">
               <div>
                 <span>MQTT</span>
-                <strong>{node.connectivity.mqtt}</strong>
+                <strong>{connectivity.mqtt || 'Chưa kết nối IoT'}</strong>
               </div>
 
               <div>
                 <span>Wi-Fi</span>
-                <strong>{node.connectivity.wifi}</strong>
+                <strong>{connectivity.wifi || '--'}</strong>
               </div>
 
               <div>
                 <span>RSSI</span>
                 <strong>
-                  {node.connectivity?.rssi == null
+                  {connectivity.rssi == null
                     ? '--'
-                    : `${node.connectivity.rssi} dBm`}
+                    : `${connectivity.rssi} dBm`}
                 </strong>
               </div>
 
               <div>
                 <span>IP Address</span>
-                <strong>{node.connectivity.ip}</strong>
+                <strong>{connectivity.ip || '--'}</strong>
               </div>
             </div>
           </section>
@@ -99,8 +104,8 @@ function DiagnosticDetailPanel({ node, onClose }) {
             </div>
 
             <div className="diagnostic-health-list">
-              {node.sensors.length > 0 ? (
-                node.sensors.map((sensor) => (
+              {sensors.length > 0 ? (
+                sensors.map((sensor) => (
                   <HealthItem
                     key={sensor.name}
                     item={sensor}
@@ -109,7 +114,7 @@ function DiagnosticDetailPanel({ node, onClose }) {
                 ))
               ) : (
                 <p className="diagnostic-empty">
-                  Thiết bị này không có Sensor.
+                  Chưa có dữ liệu cảm biến từ IoT Service.
                 </p>
               )}
             </div>
@@ -122,8 +127,8 @@ function DiagnosticDetailPanel({ node, onClose }) {
             </div>
 
             <div className="diagnostic-health-list">
-              {node.actuators.length > 0 ? (
-                node.actuators.map((actuator) => (
+              {actuators.length > 0 ? (
+                actuators.map((actuator) => (
                   <HealthItem
                     key={actuator.name}
                     item={actuator}
@@ -131,7 +136,7 @@ function DiagnosticDetailPanel({ node, onClose }) {
                 ))
               ) : (
                 <p className="diagnostic-empty">
-                  Thiết bị này không quản lý Actuator.
+                  Chưa có dữ liệu actuator từ IoT Service.
                 </p>
               )}
             </div>
@@ -143,9 +148,9 @@ function DiagnosticDetailPanel({ node, onClose }) {
               <small>Lỗi kỹ thuật phát hiện được</small>
             </div>
 
-            {node.issues.length > 0 ? (
+            {issues.length > 0 ? (
               <div className="diagnostic-issue-list">
-                {node.issues.map((issue) => (
+                {issues.map((issue) => (
                   <div className="diagnostic-issue" key={issue}>
                     <span>!</span>
                     <p>{issue}</p>
@@ -154,17 +159,15 @@ function DiagnosticDetailPanel({ node, onClose }) {
               </div>
             ) : (
               <div className="diagnostic-no-issue">
-                Không phát hiện lỗi kỹ thuật trên thiết bị này.
+                Chưa ghi nhận sự cố kỹ thuật nào trên thiết bị này.
               </div>
             )}
           </section>
 
           <div className="diagnostic-permission-note">
-            <strong>Giới hạn quyền Technician</strong>
+            <strong>Phạm vi quyền Technician</strong>
             <p>
-              Chẩn đoán và thao tác kiểm tra thủ công chỉ được thực hiện
-              trong phạm vi quyền do Backend cấp. Giao diện hiện tại sử
-              dụng dữ liệu mock và chưa gửi lệnh trực tiếp đến ESP32.
+              Kỹ thuật viên chỉ xem và phân bổ khu vực cho các thiết bị thuộc nhà yến được Admin phân công. Dữ liệu heartbeat/sensor thời gian thực sẽ cập nhật khi IoT Service khả dụng.
             </p>
           </div>
         </div>

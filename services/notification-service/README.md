@@ -1,203 +1,131 @@
-# SwiftletCare Alert & Notification Service (TV3 Reference Implementation)
+# Notification Service
 
-> **TV3 Ownership Reference — Frozen at CP6.5**  
-> This directory contains the complete, transport-neutral, tested domain and application reference implementation for SwiftletCare's Alert & Notification subsystem.
+FastAPI service that stores user notifications, streams new notifications over
+WebSocket, and independently delivers email, Web Push, and Firebase Cloud
+Messaging (FCM) messages.
 
----
+## Requirements and setup
 
-## 1. Purpose & Service Scope
+- Python 3.11+
+- Isolated PostgreSQL database (`notification_db`)
+- Management Service for bearer-token verification and farm recipient lookup
+- RabbitMQ (`swiftlet.domain.events` topic exchange) for event-driven notifications
+- Optional SMTP, VAPID, and Firebase service-account credentials
 
-The **Alert & Notification Service** manages:
-1. **Operational Alert Lifecycles:** Detecting abnormal farm conditions (high/low temperature, abnormal humidity, audio sensor faults, offline gateways, actuator command failures, and predator sightings), deduplicating repeating conditions, and handling hysteresis auto-recovery.
-2. **Notification Delivery:** Resolving eligible recipients (Farm Owners, Technicians, Managers) and delivering notifications across multiple channels:
-   - **IN_APP:** Persistent notification inbox accessible via REST API and streamed live via WebSocket.
-   - **FCM (Firebase Cloud Messaging):** Push notifications to registered mobile devices (Android, iOS, Web).
+Run commands from this directory:
 
-```
-IoT Service (Telemetry/Presence/Command) ──┐
-                                          ├── Input Events ──→ [ Alert & Notification Service ]
-AI Service (Predator Detection) ──────────┘                         │
-                                                                   ├── State Machine & Dedup
-                                                                   ├── Recipient Resolver
-                                                                   └── Multi-Channel Dispatch
-                                                                        ├── IN_APP (REST/WS)
-                                                                        └── FCM Push (Firebase)
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
 ```
 
----
+Set `NOTIFICATION_DATABASE_URL` (or `DATABASE_URL`), `MANAGEMENT_SERVICE_URL`,
+and `RABBITMQ_URL` (or `RABBITMQ_HOST`/`RABBITMQ_PORT`/`RABBITMQ_USER`/`RABBITMQ_PASSWORD`)
+in `.env`. Apply `database/schema.sql` to `notification_db`. The script is
+idempotent (tracked in `schema_migrations`) and creates notification,
+subscription, FCM-token, and delivery tables without cross-service foreign keys.
 
-## 2. Core Concepts: Alert vs. Notification
+Run the API:
 
-A strict separation is enforced between the farm's operational state and user communication:
+```powershell
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8004
+```
 
-| Dimension | `Alert` | `Notification` |
+The service reads `.env` from this directory regardless of the process working
+directory. The API starts without RabbitMQ or PostgreSQL, but event ingestion
+and persistent delivery require both `RABBITMQ_URL` and `DATABASE_URL`.
+
+### Optional delivery channels
+
+- **Email:** configure `SMTP_HOST`, `SMTP_PORT`, and `SMTP_SENDER`; configure
+  username/password when the SMTP provider requires authentication.
+- **Web Push:** configure all `VAPID_*` values and register browser subscriptions
+  through `POST /api/notifications/subscriptions`.
+- **FCM:** configure `FIREBASE_SERVICE_ACCOUNT_PATH` with a Firebase Admin
+  service-account JSON file (keep this file outside Git), optionally set
+  `FIREBASE_PROJECT_ID`, then register a device token through
+  `POST /api/notifications/fcm-tokens`, for example:
+
+  ```json
+  {"token":"<device-registration-token>","platform":"android"}
+  ```
+
+Unconfigured channels or users without a destination are marked `skipped`.
+Delivery errors are retried independently for up to five attempts with
+exponential backoff (5, 10, 20, and 40 seconds). A delivery worker lease allows abandoned
+jobs to be recovered after a process crash. Delivery is at-least-once: if a
+provider accepts a message but the service crashes before recording success, a
+retry may deliver a duplicate. Realtime WebSocket delivery is best-effort;
+clients can fetch persisted notifications after reconnecting.
+
+## REST and WebSocket API
+
+All REST endpoints below (except health and the public VAPID key) require the
+Management Service bearer token.
+
+| Method | Path | Purpose |
 |---|---|---|
-| **Identity** | Identifies an operational **condition** at a farm/zone/device. | Identifies a **message delivered to a specific user**. |
-| **Cardinality** | 1 alert per active issue (deduplicated across time). | Many notifications per alert (1 per recipient / device). |
-| **Lifecycle** | `OPEN` → `ACKNOWLEDGED` → `RESOLVED` | `PENDING` → `SENT` → `DELIVERED` / `FAILED` / `SUPPRESSED` |
-| **Read State** | N/A (alerts are acknowledged/resolved). | `read_at: Optional[datetime]` (derived `is_read`). |
+| `GET` | `/health` | Liveness check |
+| `GET` | `/api/notifications` | List notifications; `limit` (1-100), `unread_only` |
+| `POST` | `/api/notifications/{id}/read` | Mark one owned notification as read |
+| `POST` | `/api/notifications/read-all` | Mark all of the user's notifications read |
+| `GET` | `/api/notifications/push/vapid-public-key` | Get the public VAPID key |
+| `POST` | `/api/notifications/subscriptions` | Register/update a Web Push subscription |
+| `POST` | `/api/notifications/fcm-tokens` | Register/update an FCM token |
+| `DELETE` | `/api/notifications/fcm-tokens` | Remove an FCM token (JSON body: `{"token":"..."}`) |
+| `WS` | `/ws/notifications` | Authenticated realtime stream |
 
----
+WebSocket clients send `{"type":"auth","authorization":"Bearer ..."}` within
+five seconds after connecting. New notifications arrive as
+`{"type":"notification","notification":{...}}`.
 
-## 3. Canonical Contracts (Frozen V1)
+## RabbitMQ event contract
 
-### Alert Status
-- `OPEN`: Condition active, unhandled.
-- `ACKNOWLEDGED`: Operator has claimed/acknowledged the alert.
-- `RESOLVED`: Condition resolved (by `SYSTEM` via recovery, or by human operator).
+The service consumes routing keys `management.#`, `device.#`,
+`environment.#`, and `ai.#` from the configured topic exchange. Supported
+events must be JSON objects with this envelope:
 
-### Alert Severity
-- `CRITICAL`: Immediate threat (e.g. `PREDATOR_DETECTED`, extreme temperature > 33°C).
-- `HIGH`: Major equipment failure (`COMMAND_FAILED`, temperature breach).
-- `MEDIUM`: Warning thresholds (`AUDIO_FAULT`, humidity breach).
-- `LOW`: Minor notifications.
+```json
+{
+  "event_id": "UUID",
+  "event_type": "environment.threshold_exceeded",
+  "occurred_at": "2026-01-01T00:00:00Z",
+  "recipient_user_ids": ["user-UUID"],
+  "data": {}
+}
+```
 
-### Alert Event Types
-- `PREDATOR_DETECTED`: AI visual detection (owl, snake, rat).
-- `HIGH_TEMPERATURE`: Ambient temperature > `high_temp_celsius`.
-- `LOW_TEMPERATURE`: Ambient temperature < `low_temp_celsius`.
-- `HIGH_HUMIDITY`: Ambient humidity > `high_humidity_pct`.
-- `LOW_HUMIDITY`: Ambient humidity < `low_humidity_pct`.
-- `AUDIO_FAULT`: Audio sensor health flag false.
-- `DEVICE_OFFLINE`: Gateway / node presence heartbeat lost.
-- `COMMAND_FAILED`: IoT actuator command returned `FAILED`, `ERROR`, or `TIMEOUT`.
+`event_id` and recipient IDs must be UUIDs. The producer is responsible for
+resolving authorized recipients; unsupported event types are acknowledged and
+ignored. Current event types and useful `data` fields:
 
----
+| Event type | Useful data |
+|---|---|
+| `management.technician_assigned` | `technician_id`, `technician_name`, `farm_name` |
+| `device.command.acknowledged` | `node_id`, `action` or `command_id`, `status`, farm/zone fields |
+| `environment.threshold_exceeded` | `metric`, `value`, `unit`, `threshold`, farm/zone fields |
+| `device.offline` | `node_id`, farm/zone fields |
+| `device.sensor.timeout` | `node_id`, `sensor_name` or `sensor_type`, farm/zone fields |
+| `device.actuator.failed` | `node_id`, `actuator_name`, `error`, farm/zone fields |
+| `ai.threat.detected` | `threat_type` or `label`, `confidence`, farm fields |
+| `management.work_request.created` | `work_request_id`, `farm_name`, `priority` |
+| `management.work_request.status_changed` | `work_request_id`, `status` |
 
-## 4. Deduplication & Recovery Mechanics
+The Management Service currently publishes technician assignment events; the
+IoT backend publishes command acknowledgements. The other event types are
+accepted contracts for producers to integrate; this service does not itself
+detect telemetry thresholds, offline devices, AI threats, or work-request
+changes.
 
-1. **Deduplication Key:** Active alerts are matched on `(farm_id, zone_id, device_id/camera_id, event_type)`.
-2. **Occurrence Count:** Repeated signals increment `occurrence_count` and update `last_occurred_at` on the active alert. **No new notifications are spammed.**
-3. **Hysteresis Deadband (Auto-Recovery):**
-   - High Temperature triggers when $T > 31.0^\circ\text{C}$.
-   - Auto-resolves only when $T \le 30.5^\circ\text{C}$ (recovery deadband = $0.5^\circ\text{C}$).
-   - Low Temperature triggers when $T < 27.0^\circ\text{C}$, auto-resolves when $T \ge 27.5^\circ\text{C}$.
-4. **Device Presence:**
-   - `OFFLINE` status creates `DEVICE_OFFLINE` alert.
-   - Subsequent `ONLINE` heartbeat auto-resolves the alert with `resolved_by = "SYSTEM"`.
-5. **Human-Only Resolution:**
-   - `PREDATOR_DETECTED` and `COMMAND_FAILED` alerts **never** auto-resolve; they require explicit operator resolution via `POST /api/v1/alerts/{alertId}/resolve`.
+RabbitMQ event-processing failures are retried three times via a 5-second
+dead-letter delay, then routed to `{NOTIFICATION_QUEUE}.dead`. Database delivery
+jobs are separate from event ingestion, so email/Push/FCM outages do not block
+or lose an already-persisted in-app notification.
 
----
+## Tests
 
-## 5. Recipient Resolution & Multi-Channel Delivery
-
-1. [`RecipientResolver`](file:///d:/Development/Projects/XD_PM_HDT/services/notification-service/app/ports/recipient_resolver.py): Queries farm/zone memberships to identify users eligible for the alert based on role and severity.
-2. **IN_APP Dispatch:** Exactly one `Notification(channel="IN_APP", delivery_status="SENT")` created per recipient.
-3. **FCM Push Dispatch:** One `Notification(channel="FCM")` created per enabled device registered to the recipient:
-   - On gateway accept: `delivery_status = "SENT"`. (Never automatically marked `DELIVERED`).
-   - On error: `delivery_status = "FAILED"`, failure details recorded.
-   - If token is reported unregistered/invalid: the device is **soft-disabled** (`UserDevice.is_enabled = False`) while preserving the database record.
-
----
-
-## 6. Firebase FCM Adapter (`app/infrastructure/firebase/`)
-
-The production adapter is encapsulated behind the abstract [`FCMProvider`](file:///d:/Development/Projects/XD_PM_HDT/services/notification-service/app/ports/fcm_provider.py) port.
-
-### Modes
-- `mock`: Uses [`MockFCMProvider`](file:///d:/Development/Projects/XD_PM_HDT/services/notification-service/app/services/mock_fcm_provider.py) for fast local unit testing without network dependencies.
-- `firebase`: Backed by [`RealFirebaseMessagingClient`](file:///d:/Development/Projects/XD_PM_HDT/services/notification-service/app/infrastructure/firebase/client.py) using official `firebase-admin` SDK with lazy initialization.
-- `disabled`: Backed by [`DisabledFCMProvider`](file:///d:/Development/Projects/XD_PM_HDT/services/notification-service/app/infrastructure/firebase/disabled_provider.py), suppressing push sends safely without throwing or impacting in-app notifications.
-
-### Data Payload Sanitization & Security
-- `sanitize_fcm_data()` guarantees all values are strings.
-- Strips any local filesystem paths (e.g. `C:\...`, `/home/...`, `file://`) to prevent path traversal leaks.
-- Preserves valid HTTP/HTTPS URLs (such as camera snapshot URLs).
-- `redact_token()` redacts tokens in logs (`fcm_...7890`).
-
----
-
-## 7. REST API & WebSocket Reference
-
-### Public REST Routes
-- `GET /health`: Health probe with non-sensitive FCM provider status.
-- `GET /api/v1/alerts`: List alerts with filters (`farmId`, `zoneId`, `status`, `severity`, `eventType`).
-- `GET /api/v1/alerts/{alertId}`: Detailed alert view.
-- `POST /api/v1/alerts/{alertId}/acknowledge`: Acknowledge alert (`actorId`).
-- `POST /api/v1/alerts/{alertId}/resolve`: Resolve alert (`actorId`, `resolutionNote`).
-- `GET /api/v1/notifications`: User notification inbox (requires `X-User-Id` header).
-- `POST /api/v1/notifications/{notificationId}/read`: Mark notification as read.
-- `POST /api/v1/notifications/read-all`: Mark all notifications as read for user.
-- `POST /api/v1/devices`: Register or update user device (`deviceId`, `userId`, `fcmToken`, `platform`).
-- `DELETE /api/v1/devices/{deviceRegistrationId}`: Unregister a user device.
-
-### Realtime WebSocket
-- **Endpoint:** `/ws/notifications?userId={userId}`
-- **Emitted Events:**
-  - `alert.created`, `alert.updated`
-  - `notification.created`, `notification.updated` (strictly scoped to authenticated `userId`).
-
-### Internal Test Ingress (Hidden from public OpenAPI)
-- `POST /internal/v1/events/iot/telemetry`
-- `POST /internal/v1/events/iot/presence`
-- `POST /internal/v1/events/iot/command`
-- `POST /internal/v1/events/ai`
-
----
-
-## 8. Configuration & Environment Variables
-
-| Variable | Type | Default | Description |
-|---|---|---|---|
-| `FCM_PROVIDER` | `str` | `mock` | `mock`, `firebase`, or `disabled` |
-| `FCM_ENABLED` | `bool` | `true` | Master push channel switch |
-| `FIREBASE_PROJECT_ID` | `str` | `None` | Google Cloud / Firebase project ID |
-| `FIREBASE_CREDENTIALS_PATH` | `str` | `None` | Path to `serviceAccountKey.json` |
-
-*Security Warning: Never commit real credentials, service account JSON files, or private keys to version control.*
-
----
-
-## 9. How to Run & Verify
-
-### Running Automated Tests
 ```powershell
-# Run all 109 Notification Service tests
-$env:PYTHONPATH="services/notification-service;services/notification-service/app"
-python -m pytest services/notification-service/tests
+python -m unittest discover -s tests -v
 ```
-
-### Running the End-to-End Demonstration Scripts
-```powershell
-# Comprehensive Cases A-E validation
-python services/notification-service/scripts/demo_final_e2e.py
-
-# Firebase FCM specific validation
-python services/notification-service/scripts/demo_fcm_e2e.py
-```
-
-### Starting the Local Development Server
-```powershell
-$env:PYTHONPATH="services/notification-service;services/notification-service/app"
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8004 --reload
-```
-- OpenAPI Documentation: `http://127.0.0.1:8004/docs`
-- Health Probe: `http://127.0.0.1:8004/health`
-
----
-
-## 10. Technical Debt & CP7 Integration Roadmap
-
-### Current Reference Limitations
-1. **In-Memory Repositories:** Current repositories store data in RAM. TV3 must implement PostgreSQL persistence adapters backed by SQLAlchemy or Tortoise ORM for production.
-2. **WebSocket Broadcast Authorization:** In this local reference, alert events are broadcast to active connections. In production, API Gateway / Management integration must filter alerts by farm ownership.
-3. **Synchronous Ingress:** Current event ingestion uses `/internal/v1/events/*` REST endpoints for testing.
-
-### CP7 RabbitMQ Integration Seam
-In CP7, asynchronous message queues will replace HTTP event ingress:
-```
-RabbitMQ Exchange ("iot.events", "ai.events")
-    ↓
-app/infrastructure/rabbitmq/
-    ├── connection.py    # AMQP robust connection manager
-    ├── consumer.py      # Background worker listening to queues
-    ├── topology.py      # Queue and binding declarations
-    └── mapper.py        # Maps raw AMQP JSON into Canonical Input Events
-         ↓
-NotificationService.handle_telemetry_event()
-NotificationService.handle_presence_event()
-NotificationService.handle_command_event()
-NotificationService.handle_ai_event()
-```
-The domain core, rule engine, alert lifecycle, and notification delivery pipelines **require zero changes** for RabbitMQ integration.

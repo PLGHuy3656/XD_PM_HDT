@@ -8,10 +8,14 @@ Does NOT know about FastAPI, WebSocket, RabbitMQ, FCM, Frontend, or long-term An
 """
 from __future__ import annotations
 
+import logging
+import threading
 import time
 import uuid
 from collections import deque
 from typing import Callable, Deque, List, Optional
+
+log = logging.getLogger("swiftletcare.ai.camera_pipeline")
 
 from app.config import RuntimeCameraConfig
 from app.runtime.sink import NullRuntimeSink, RuntimeEventSink
@@ -29,6 +33,8 @@ from app.schemas.canonical import (
 )
 from swiftletcare_ai.counter import LineCounter
 from swiftletcare_ai.detector import BaseDetector
+from swiftletcare_ai.frame_clean import FrameCleaner
+from swiftletcare_ai.postfilter import DetectionFilter
 from swiftletcare_ai.predator import PredatorMonitor
 from swiftletcare_ai.schemas import Detection as TV2Detection, FramePacket
 from swiftletcare_ai.snapshot import SnapshotStore, draw_detections
@@ -54,6 +60,11 @@ class CameraPipeline:
         model_version: str = "yolo26n-best",
         tracker_type: str = "bytetrack",
         max_fps: float = 0.0,
+        frame_cleaner: Optional[FrameCleaner] = None,
+        detection_filter: Optional[DetectionFilter] = None,
+        max_reconnects: int = 5,
+        reconnect_delay_s: float = 2.0,
+        count_window_s: float = 0.0,
     ) -> None:
         self.camera_config = camera_config
         self.detector = detector
@@ -68,6 +79,13 @@ class CameraPipeline:
         self.model_version = model_version
         self.tracker_type = tracker_type
         self.max_fps = max_fps
+        self.frame_cleaner = frame_cleaner
+        self.detection_filter = detection_filter
+        self.max_reconnects = max(0, int(max_reconnects))
+        self.reconnect_delay_s = max(0.01, float(reconnect_delay_s))
+        self.count_window_s = max(0.0, float(count_window_s))
+        self._stop_event = threading.Event()
+        self._count_lock = threading.Lock()
 
         # Runtime state
         self._source: Optional[FrameSource] = None
@@ -86,6 +104,7 @@ class CameraPipeline:
 
         # Counting session state
         self._window_started_at: Optional[str] = None
+        self._window_start_ts: Optional[float] = None
         self._last_emitted_entry: int = 0
         self._last_emitted_exit: int = 0
         self._last_count_report_ts: Optional[float] = None
@@ -168,23 +187,77 @@ class CameraPipeline:
             return self._emit_status(updated_at=updated_at)
         return self._build_status(updated_at=updated_at)
 
+    def stop(self) -> None:
+        """Signal the pipeline run loop to terminate gracefully."""
+        self._stop_event.set()
+
+    def reset_stop(self) -> None:
+        """Clear the stop flag prior to starting a new run."""
+        self._stop_event.clear()
+
+    def reset_counts(self) -> CountUpdate:
+        """Reset virtual line counter and window start time immediately."""
+        now_iso = epoch_to_iso8601_utc()
+        with self._count_lock:
+            self._window_started_at = now_iso
+            self._window_start_ts = self._last_frame_ts or time.time()
+            self._last_count_report_ts = self._window_start_ts
+            if self._counter is not None:
+                self._counter.reset_counts()
+            self._last_emitted_entry = 0
+            self._last_emitted_exit = 0
+
+            update = CountUpdate(
+                cameraId=self.camera_id,
+                farmId=self.farm_id,
+                zoneId=self.zone_id,
+                frameId=self._last_frame_id,
+                recordedAt=now_iso,
+                windowStartedAt=self._window_started_at,
+                entryCount=0,
+                exitCount=0,
+                netChange=0,
+                deltaEntry=0,
+                deltaExit=0,
+            )
+            self.sink.on_count(update)
+            return update
+
+    @property
+    def is_stopping(self) -> bool:
+        return self._stop_event.is_set()
+
+    def _is_live_source(self, src: Optional[FrameSource] = None) -> bool:
+        if src is not None and getattr(src, "kind", "") in ("rtsp", "mjpeg", "webcam"):
+            return True
+        st = str(getattr(self.camera_config, "source_type", "")).lower()
+        if st in ("rtsp", "mjpeg", "webcam"):
+            return True
+        raw_src = getattr(self.camera_config, "source", None)
+        if isinstance(raw_src, str) and raw_src.lower().startswith(("rtsp://", "rtsps://", "http://", "https://")):
+            return True
+        return False
+
+    def _open_frame_source(self) -> FrameSource:
+        if self._source_factory is not None:
+            src = self._source_factory(self.camera_config)
+        elif isinstance(self.camera_config.source, FrameSource):
+            src = self.camera_config.source
+        else:
+            src = open_source(
+                self.camera_id,
+                self.camera_config.source,
+                self.camera_config.source_type,
+                max_fps=self.max_fps,
+            )
+        self._source = src
+        self._source_connected = True
+        return src
+
     def open(self) -> FrameSource:
         """Open the configured FrameSource or transition to ERROR on failure."""
         try:
-            if self._source_factory is not None:
-                src = self._source_factory(self.camera_config)
-            elif isinstance(self.camera_config.source, FrameSource):
-                src = self.camera_config.source
-            else:
-                src = open_source(
-                    self.camera_id,
-                    self.camera_config.source,
-                    self.camera_config.source_type,
-                    max_fps=self.max_fps,
-                )
-            self._source = src
-            self._source_connected = True
-            return src
+            return self._open_frame_source()
         except Exception as exc:
             self._transition_to_error(
                 error_code="SOURCE_OPEN_FAILED",
@@ -204,15 +277,21 @@ class CameraPipeline:
 
     @staticmethod
     def normalize_snapshot_ref(raw_ref: Optional[str]) -> Optional[str]:
-        """Ensure raw filesystem paths are converted to safe relative snapshot URLs."""
+        """Ensure raw filesystem paths (Windows or POSIX) are converted to safe relative snapshot URLs."""
         if not raw_ref:
             return None
         cleaned = raw_ref.strip()
         if not cleaned:
             return None
-        if cleaned.startswith(("/", "http://", "https://")):
+        if (
+            cleaned.startswith(("/api/v1/ai/snapshots/", "/snapshots/", "http://", "https://"))
+            and ".." not in cleaned
+            and "\\" not in cleaned
+        ):
             return cleaned
         filename = cleaned.replace("\\", "/").rsplit("/", 1)[-1]
+        if not filename or filename in (".", ".."):
+            return None
         return f"/api/v1/ai/snapshots/{filename}"
 
     @staticmethod
@@ -272,22 +351,49 @@ class CameraPipeline:
             )
             return None
 
-        h, w = int(pkt.image.shape[0]), int(pkt.image.shape[1])
+        cleaned_img = pkt.image
+        if self.frame_cleaner is not None:
+            cleaned_img, info = self.frame_cleaner.clean(pkt.image)
+            if cleaned_img is None:
+                self._transition_to_degraded(
+                    error_code="INVALID_FRAME",
+                    error_message=f"Frame {pkt.frame_id} rejected by cleaner: {info.get('reason', 'unknown')}",
+                    updated_at=captured_at,
+                )
+                return None
+
+        h, w = int(cleaned_img.shape[0]), int(cleaned_img.shape[1])
         self._height, self._width = h, w
         self._last_frame_id = int(pkt.frame_id)
 
-        if self._counter is None:
-            self._counter = LineCounter.from_normalized(
-                self.camera_config.line,
-                pkt.image.shape,
-                inside_side=self.camera_config.inside_side,
-                min_hits=self.min_track_hits,
-            )
-            self._window_started_at = captured_at
+        with self._count_lock:
+            if self._counter is None:
+                self._counter = LineCounter.from_normalized(
+                    self.camera_config.line,
+                    cleaned_img.shape,
+                    inside_side=self.camera_config.inside_side,
+                    min_hits=self.min_track_hits,
+                )
+                self._window_started_at = captured_at
+                self._window_start_ts = pkt.timestamp
+            elif (
+                self.count_window_s > 0.0
+                and self._window_start_ts is not None
+                and (pkt.timestamp - self._window_start_ts) >= self.count_window_s
+            ):
+                self._emit_count_update(pkt.frame_id, captured_at, pkt.timestamp)
+                self._counter.reset_counts()
+                self._last_emitted_entry = 0
+                self._last_emitted_exit = 0
+                self._window_started_at = captured_at
+                self._window_start_ts = pkt.timestamp
+
+            if self._window_start_ts is None:
+                self._window_start_ts = pkt.timestamp
 
         # 1. Object Detection (Ultralytics preprocessing is encapsulated inside YoloDetector.detect)
         try:
-            raw_detections: List[TV2Detection] = self.detector.detect(pkt.image)
+            raw_detections: List[TV2Detection] = self.detector.detect(cleaned_img)
         except Exception as exc:
             self._transition_to_error(
                 error_code="INFERENCE_ERROR",
@@ -297,16 +403,19 @@ class CameraPipeline:
             )
             raise
 
+        if self.detection_filter is not None:
+            raw_detections = self.detection_filter.apply(raw_detections, cleaned_img.shape)
+
         # 2. Split swiftlets vs other classes (predators) exactly as in TV2's pipeline
         swiftlets = [d for d in raw_detections if d.cls == "swiftlet"]
         others = [d for d in raw_detections if d.cls != "swiftlet"]
 
         # 3. Track swiftlets
         try:
-            tracked_swiftlets = self.tracker.update(swiftlets, pkt.image.shape) if swiftlets else []
+            tracked_swiftlets = self.tracker.update(swiftlets, cleaned_img.shape) if swiftlets else []
             # Keep tracker internal state advancing even on empty swiftlet frames
             if not swiftlets:
-                self.tracker.update([], pkt.image.shape)
+                self.tracker.update([], cleaned_img.shape)
         except Exception as exc:
             self._transition_to_error(
                 error_code="TRACKER_ERROR",
@@ -317,7 +426,8 @@ class CameraPipeline:
             raise
 
         # 4. Update LineCounter
-        crossings = self._counter.update(tracked_swiftlets, pkt.frame_id)
+        with self._count_lock:
+            crossings = self._counter.update(tracked_swiftlets, pkt.frame_id)
 
         # 5. Evaluate PredatorMonitor
         fired_predators = self.predator_monitor.update(others, pkt.timestamp)
@@ -366,13 +476,14 @@ class CameraPipeline:
         self.sink.on_detection(det_result)
 
         # 8. Produce & emit canonical CountUpdate when crossings occur, on initial frame, or on interval
-        should_emit_count = (
-            bool(crossings)
-            or self._last_count_report_ts is None
-            or (pkt.timestamp - self._last_count_report_ts) >= self.count_report_interval_s
-        )
-        if should_emit_count:
-            self._emit_count_update(pkt.frame_id, captured_at, pkt.timestamp)
+        with self._count_lock:
+            should_emit_count = (
+                bool(crossings)
+                or self._last_count_report_ts is None
+                or (pkt.timestamp - self._last_count_report_ts) >= self.count_report_interval_s
+            )
+            if should_emit_count:
+                self._emit_count_update(pkt.frame_id, captured_at, pkt.timestamp)
 
         # 9. Produce & emit canonical AIEvent for each triggered predator alert
         for pred_det in fired_predators:
@@ -382,7 +493,7 @@ class CameraPipeline:
             if self.snapshot_store is not None:
                 try:
                     annotated = draw_detections(
-                        pkt.image,
+                        cleaned_img,
                         tracked_swiftlets + others,
                         line=(self._counter.a, self._counter.b),
                         counts=(self._counter.entry, self._counter.exit),
@@ -440,36 +551,119 @@ class CameraPipeline:
         return self._emit_status(updated_at=updated_at)
 
     def run(self, max_frames: int = 0) -> CameraRuntimeStatus:
-        """Open source, process frames up to `max_frames` (0 = all), and close cleanly."""
-        src = self.open()
+        """Process frames up to `max_frames` (0 = all), with auto-reconnect for live streams."""
+        count = 0
+        reconnect_attempts = 0
+        is_live_cfg = self._is_live_source(None)
+
         try:
-            for count, pkt in enumerate(src, start=1):
-                self.process_packet(pkt)
+            while not self._stop_event.is_set():
+                if self._source is None:
+                    try:
+                        src = self._open_frame_source()
+                    except Exception as open_exc:
+                        if (is_live_cfg or self._is_live_source(None)) and not self._stop_event.is_set():
+                            reconnect_attempts += 1
+                            if reconnect_attempts > self.max_reconnects:
+                                self._transition_to_error(
+                                    error_code="STREAM_LOST",
+                                    error_message=f"Exceeded {self.max_reconnects} reconnect retries: {open_exc}",
+                                    source_connected=False,
+                                )
+                                break
+                            self._transition_to_degraded(
+                                error_code="STREAM_RECONNECTING",
+                                error_message=f"Open failed, reconnect attempt {reconnect_attempts}/{self.max_reconnects}: {open_exc}",
+                            )
+                            delay = min(30.0, self.reconnect_delay_s * (2 ** (reconnect_attempts - 1)))
+                            if self._stop_event.wait(delay):
+                                break
+                            continue
+                        else:
+                            self._transition_to_error(
+                                error_code="SOURCE_OPEN_FAILED",
+                                error_message=str(open_exc),
+                                source_connected=False,
+                            )
+                            raise
+                else:
+                    src = self._source
+
+                is_live = self._is_live_source(src)
+
+                try:
+                    for pkt in src:
+                        if self._stop_event.is_set():
+                            break
+                        self.process_packet(pkt)
+                        count += 1
+                        reconnect_attempts = 0
+                        if max_frames > 0 and count >= max_frames:
+                            break
+                except Exception as stream_exc:
+                    if self._stop_event.is_set():
+                        break
+                    if is_live:
+                        log.warning("Stream error on camera %s: %s", self.camera_id, stream_exc)
+                    else:
+                        if self._status != "ERROR":
+                            self._transition_to_error(
+                                error_code="PIPELINE_RUNTIME_ERROR",
+                                error_message=str(stream_exc),
+                                source_connected=False,
+                            )
+                        raise
+
+                if self._stop_event.is_set():
+                    break
                 if max_frames > 0 and count >= max_frames:
                     break
 
+                if not is_live:
+                    break
+
+                reconnect_attempts += 1
+                if reconnect_attempts > self.max_reconnects:
+                    self._transition_to_error(
+                        error_code="STREAM_LOST",
+                        error_message=f"Stream dropped, gave up after {self.max_reconnects} retries",
+                        source_connected=False,
+                    )
+                    break
+
+                self._transition_to_degraded(
+                    error_code="STREAM_RECONNECTING",
+                    error_message=f"Stream dropped, reconnect attempt {reconnect_attempts}/{self.max_reconnects}",
+                )
+                if self._source is not None:
+                    try:
+                        self._source.close()
+                    except Exception:
+                        pass
+                    self._source = None
+                    self._source_connected = False
+
+                delay = min(30.0, self.reconnect_delay_s * (2 ** (reconnect_attempts - 1)))
+                if self._stop_event.wait(delay):
+                    break
+
             # Flush any un-emitted count changes before closing
-            if (
-                self._counter is not None
-                and self._last_frame_at is not None
-                and self._last_frame_ts is not None
-                and (
-                    self._counter.entry != self._last_emitted_entry
-                    or self._counter.exit != self._last_emitted_exit
-                )
-            ):
-                self._emit_count_update(
-                    self._last_frame_id,
-                    self._last_frame_at,
-                    self._last_frame_ts,
-                )
-        except Exception as exc:
-            if self._status != "ERROR":
-                self._transition_to_error(
-                    error_code="PIPELINE_RUNTIME_ERROR",
-                    error_message=str(exc),
-                    source_connected=False,
-                )
+            with self._count_lock:
+                if (
+                    self._counter is not None
+                    and self._last_frame_at is not None
+                    and self._last_frame_ts is not None
+                    and (
+                        self._counter.entry != self._last_emitted_entry
+                        or self._counter.exit != self._last_emitted_exit
+                    )
+                ):
+                    self._emit_count_update(
+                        self._last_frame_id,
+                        self._last_frame_at,
+                        self._last_frame_ts,
+                    )
+        except Exception:
             raise
         finally:
             if self._source is not None:

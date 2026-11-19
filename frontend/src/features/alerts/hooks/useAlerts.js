@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
 import { alertsApi } from '../../../api/modules/alertsApi.js'
 import { USE_MOCK } from '../../../api/config.js'
+import {
+  SERVICE_STATE,
+  classifyServiceError,
+  useRevalidateOnFocus,
+} from '../../../api/serviceStatus.js'
 import { getMockAlerts, normalizeAlert } from '../adapters/alertAdapter.js'
 
 export function useAlerts(farmId = null, filterSeverity = 'ALL') {
   const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [serviceState, setServiceState] = useState(
+    USE_MOCK ? SERVICE_STATE.AVAILABLE : SERVICE_STATE.LOADING,
+  )
 
   const fetchAlerts = useCallback(async (signal) => {
     try {
@@ -17,28 +25,36 @@ export function useAlerts(farmId = null, filterSeverity = 'ALL') {
         const mockList = getMockAlerts()
         const filtered = farmId ? mockList.filter((a) => !a.farmId || a.farmId === farmId) : mockList
         setAlerts(filtered)
+        setServiceState(filtered.length > 0 ? SERVICE_STATE.AVAILABLE : SERVICE_STATE.EMPTY)
         return
       }
 
-      // In real Gateway mode, farmId is mandatory for Farm Owner tenant isolation
       if (!farmId) {
         setAlerts([])
+        setServiceState(SERVICE_STATE.UNKNOWN)
         setLoading(false)
         return
       }
+      setAlerts([])
+      setServiceState(SERVICE_STATE.LOADING)
 
       const response = await alertsApi.getAlerts({
         params: { farmId },
         signal,
       })
       const rawList = Array.isArray(response) ? response : response?.items || response?.data || []
-      setAlerts(rawList.map(normalizeAlert))
+      const normalized = rawList.map(normalizeAlert)
+      setAlerts(normalized)
+      setError(null)
+      setServiceState(normalized.length > 0 ? SERVICE_STATE.AVAILABLE : SERVICE_STATE.EMPTY)
     } catch (err) {
       if (err?.code !== 'ABORTED') {
         if (err?.status === 403 || err?.status === 404) {
-          // Tenant boundary or no alerts
           setAlerts([])
+          setError(null)
+          setServiceState(SERVICE_STATE.EMPTY)
         } else {
+          setServiceState(classifyServiceError(err) || SERVICE_STATE.ERROR)
           setError(err?.message || 'Không thể tải danh sách cảnh báo.')
         }
       }
@@ -49,12 +65,23 @@ export function useAlerts(farmId = null, filterSeverity = 'ALL') {
 
   useEffect(() => {
     const controller = new AbortController()
-    fetchAlerts(controller.signal)
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) {
+        fetchAlerts(controller.signal)
+      }
+    })
 
     return () => {
       controller.abort()
     }
   }, [fetchAlerts])
+
+  useRevalidateOnFocus(
+    useCallback(() => {
+      fetchAlerts()
+    }, [fetchAlerts]),
+    { enabled: !USE_MOCK && Boolean(farmId) },
+  )
 
   const acknowledgeAlert = async (alertId, note = '') => {
     if (USE_MOCK) {
@@ -104,6 +131,7 @@ export function useAlerts(farmId = null, filterSeverity = 'ALL') {
     allAlerts: alerts,
     loading,
     error,
+    serviceState,
     refetch: () => fetchAlerts(),
     acknowledgeAlert,
     resolveAlert,

@@ -31,15 +31,16 @@ def _resolve_test_db_conninfo() -> str:
     direct = os.getenv("ANALYTICS_TEST_DATABASE_URL")
     if direct:
         return direct
+    pw = os.getenv("PGPASSWORD")
+    if not pw:
+        raise ValueError(
+            "ANALYTICS_TEST_DATABASE_URL or PGPASSWORD must be configured for PostgreSQL integration tests."
+        )
     host = os.getenv("PGHOST", "127.0.0.1")
     port = int(os.getenv("PGPORT", "5432"))
     user = os.getenv("PGUSER", "postgres")
-    pw = os.getenv("PGPASSWORD", "263656")
     db = os.getenv("PGTESTDB", "analytics_schema_test_db")
     return make_conninfo(host=host, port=port, user=user, password=pw, dbname=db)
-
-
-TEST_DB_URL = _resolve_test_db_conninfo()
 
 
 # -----------------------------------------------------------------------------
@@ -48,7 +49,7 @@ TEST_DB_URL = _resolve_test_db_conninfo()
 @pytest.fixture(scope="session")
 def pg_repo():
     """Provides PostgreSQL repository pointed strictly to test database."""
-    return PostgreSQLAnalyticsRepository(database_url=TEST_DB_URL, timeout_seconds=3.0)
+    return PostgreSQLAnalyticsRepository(database_url=_resolve_test_db_conninfo(), timeout_seconds=3.0)
 
 
 @pytest.fixture(scope="session", autouse=True)

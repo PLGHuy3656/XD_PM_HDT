@@ -52,7 +52,7 @@ def _resolve_safe_snapshot_path(raw_filename: str, snapshot_dir: Path) -> Path:
             "Snapshot path escapes configured snapshot directory.",
         )
 
-    if candidate.Parent if hasattr(candidate, "Parent") else candidate.parent != base_dir:
+    if candidate.parent != base_dir:
         raise_ai_error(
             400,
             INVALID_SNAPSHOT_PATH,

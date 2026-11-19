@@ -838,3 +838,126 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ========================================
+   ALERTS OVERVIEW KPI CARDS & TABS TOOLBAR
+   ======================================== */
+
+.tech-alerts-overview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.tech-alerts-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid #e6dfd3;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.tech-alerts-metric-card .metric-title {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tech-alerts-metric-card .metric-number {
+  color: #102d3f;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.tech-alerts-metric-card .metric-caption {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.tech-alerts-tabs-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  border: 1px solid #e6dfd3;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.tech-alerts-tab-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tech-alerts-tab-buttons button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid #d5dcd8;
+  border-radius: 10px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tech-alerts-tab-buttons button.active {
+  border-color: #102d3f;
+  background: #102d3f;
+  color: #fff;
+}
+
+.tech-alerts-tab-buttons .tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  font-size: 11px;
+}
+
+.tech-alerts-tab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.tech-alerts-search input {
+  min-width: 220px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid #d5dcd8;
+  border-radius: 10px;
+  background: #fff;
+  color: #102d3f;
+  font: inherit;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+  .tech-alerts-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .tech-alerts-overview {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,59 +1,66 @@
-# SwiftletCare AI Service — Local Reference Prototype (CP5.2 + CP5.3)
+# SwiftletCare AI Service (`services/ai-service`)
 
-> **OWNERSHIP & GIT SAFETY NOTICE**
-> The AI Pipeline (`ai-pipeline/`) and AI Service bounded context belong to **TV2**.
-> This `services/ai-service/` directory is a **LOCAL REFERENCE PROTOTYPE** built for contract and integration validation.
-> **DO NOT COMMIT. DO NOT PUSH.**
+Dịch vụ AI chuẩn hóa Canonical V1 cho hệ sinh thái **SwiftletCare**, kết hợp thư viện lõi thị giác máy tính (`ai-pipeline/src/swiftletcare_ai`) với hạ tầng Microservice đầy đủ (**FastAPI REST API V1**, **WebSocket V1**, **PostgreSQL `ai_db`**, **Redis Runtime/Cache**, **RabbitMQ Topic Exchange**, và **HTTP Backend Sink**).
 
-## Overview
-
-CP5.2 and CP5.3 implement the **AI Runtime Adapter, Canonical V1 Domain Model, FastAPI REST API V1, and WebSocket V1 (`/ws/ai`)** around TV2's existing `swiftletcare_ai` computer-vision pipeline:
+## 1. Kiến trúc Tổng thể
 
 ```text
-AIRuntimeManager
-  └── CameraPipeline (one per cameraId)
-        ├── FrameSource       (swiftletcare_ai.video_source)
-        ├── YoloDetector      (swiftletcare_ai.detector — encapsulates Ultralytics 640x640 letterbox + normalize)
+AIRuntimeManager (LockedDetector + PruningSnapshotStore)
+  └── CameraPipeline (mỗi cameraId một luồng xử lý độc lập)
+        ├── FrameSource       (swiftletcare_ai.video_source + Auto-reconnect exponential backoff)
+        ├── FrameCleaner      (swiftletcare_ai.frame_clean — lọc ảnh đen/hỏng, cân bằng sáng gamma)
+        ├── YoloDetector      (swiftletcare_ai.detector — YOLO26 models/best.pt)
+        ├── DetectionFilter   (swiftletcare_ai.postfilter — lọc nhiễu diện tích & cross-class IOU)
         ├── Tracker           (swiftletcare_ai.tracker — ByteTrackTracker / CentroidTracker)
-        ├── LineCounter       (swiftletcare_ai.counter)
-        ├── PredatorMonitor   (swiftletcare_ai.predator)
-        └── SnapshotStore     (swiftletcare_ai.snapshot)
+        ├── LineCounter       (swiftletcare_ai.counter — đếm chim ra/vào qua vạch ảo + cửa sổ thời gian)
+        ├── PredatorMonitor   (swiftletcare_ai.predator — xác nhận chuột/rắn qua N-frame + cooldown)
+        └── SnapshotStore     (swiftletcare_ai.snapshot — lưu bằng chứng hình ảnh JPEG)
               │
               ▼
-        RuntimeEventSink      (CompositeRuntimeSink)
-              ├── InMemoryAIRuntimeStateStore   ──► FastAPI REST API V1 (/health, /api/v1/ai/...)
-              └── WebSocketRuntimeSink          ──► AIWebSocketManager  (/ws/ai)
+        CompositeRuntimeSink
+              ├── InMemoryAIRuntimeStateStore
+              │     ├── Redis Runtime & Cache (`ai:runtime:{cameraId}`, `ai:latest:{cameraId}`)
+              │     ├── PostgreSQL Persistence (`ai_db.ai_count_updates`, `ai_db.ai_events`)
+              │     └── In-Memory Ring Buffer (Count history, recent events, live detections)
+              ├── WebSocketRuntimeSink          ──► AIWebSocketManager (/ws/ai, hỗ trợ throttle detection_max_hz)
+              ├── DomainEventPublisherRuntimeSink──► RabbitMQ Async Producer (`swiftletcare.events` -> `ai.predator.detected`)
+              ├── RabbitMQRuntimeSink           ──► RabbitMQ Topic Exchange (`swiftletcare.ai` -> `ai.predator.detected`, `ai.count.updated`)
+              └── HttpBackendSink               ──► HTTP POST Fallback (/api/ai/events, /counts, /status)
 ```
 
-## REST API V1 & WebSocket V1 Endpoints
+## 2. Danh mục REST API V1 & WebSocket V1
 
 - `GET /health` -> `{"service": "ai-service", "status": "ok"}`
+- `POST /api/v1/ai/analyze` -> Phân tích một ảnh tĩnh đơn lẻ (multipart/base64/raw bytes; hỗ trợ `annotate=true` trả về header `X-Snapshot-Url`)
 - `GET /api/v1/ai/cameras` -> `List[CameraRuntimeStatus]`
 - `GET /api/v1/ai/cameras/{cameraId}/status` -> `CameraRuntimeStatus`
-- `GET /api/v1/ai/cameras/{cameraId}/detections/latest` -> `DetectionResult`
-- `GET /api/v1/ai/cameras/{cameraId}/counts/latest` -> `CountUpdate`
-- `GET /api/v1/ai/events?cameraId=&limit=` -> `List[AIEvent]`
+- `POST /api/v1/ai/cameras/{cameraId}/start` -> Khởi chạy camera đã đăng ký hoặc truyền JSON body (`CameraStartRequest`) để khởi chạy động từ Management Service
+- `POST /api/v1/ai/cameras/{cameraId}/stop` -> Dừng luồng xử lý camera và chuyển về `OFFLINE`
+- `GET /api/v1/ai/cameras/{cameraId}/detections/latest` -> `DetectionResult` mới nhất
+- `GET /api/v1/ai/cameras/{cameraId}/counts/latest` -> `CountUpdate` mới nhất
+- `GET /api/v1/ai/cameras/{cameraId}/counts` -> Truy vấn lịch sử `CountUpdate` bền vững từ PostgreSQL
+- `GET /api/v1/ai/cameras/{cameraId}/counts/history` -> Truy vấn lịch sử `CountUpdate` theo cửa sổ đếm (`limit=20`)
+- `POST /api/v1/ai/cameras/{cameraId}/counts/reset` -> Đặt lại bộ đếm vào/ra và cửa sổ đếm về `0`
+- `GET /api/v1/ai/events?cameraId=&farmId=&limit=` -> `List[AIEvent]`
 - `GET /api/v1/ai/events/{eventId}` -> `AIEvent`
-- `GET /api/v1/ai/snapshots/{filename}` -> JPEG file response (path-traversal hardened)
-- `WS /ws/ai?cameraId=` -> Canonical V1 envelope (`detection.updated`, `count.updated`, `ai.event`, `camera.status`)
+- `GET /api/v1/ai/snapshots/{filename}` -> Phục vụ ảnh chụp bằng chứng JPEG (chống path traversal)
+- `WS /ws/ai?cameraId=` -> Kênh WebSocket V1 (`detection.updated`, `count.updated`, `ai.event`, `camera.status`)
 
-## Canonical V1 Contract Decisions
+## 3. Hướng dẫn Chạy & Kiểm thử
 
-1. **Single ISO-8601 UTC Timestamps (`...Z`):**
-   - `DetectionResult.capturedAt`
-   - `CountUpdate.recordedAt`, `CountUpdate.windowStartedAt`
-   - `AIEvent.detectedAt`
-   - `CameraRuntimeStatus.updatedAt`, `CameraRuntimeStatus.lastFrameAt`
-   - Duplicate Unix epoch `timestamp` fields are strictly forbidden.
-2. **Pixel Bounding Boxes + Frame Dimensions:**
-   - `BoundingBox`: `{"x1": float, "y1": float, "x2": float, "y2": float}` in source frame pixels.
-   - `DetectionResult.frame`: `{"width": int, "height": int}`.
-   - `bboxNormalized` and CSS percentages are excluded from backend V1 contracts.
-3. **Honest Counting Semantics (`CountUpdate`):**
-   - Exposes `entryCount`, `exitCount`, `netChange = entryCount - exitCount`, `deltaEntry >= 0`, `deltaExit >= 0`, and `windowStartedAt`.
-   - `netChange` represents movement balance within the current counting window, **not** absolute house occupancy or total bird population (`occupancy`, `currentBirdCount`, `totalBirdPopulation` are forbidden).
-4. **Immediate AI Events (`AIEvent`):**
-   - V1 supports `eventType = "PREDATOR_DETECTED"` (`class: "rat" | "snake"`).
-   - Does not emit `FLOCK_ANOMALY`, `AUDIO`, or per-bird `ENTRY`/`EXIT` event records.
-5. **Preprocessing Boundary:**
-   - No standalone `preprocessing.py` exists; letterbox resizing (`640x640`), BGR-to-RGB conversion, and `[0, 1]` normalization are performed internally by Ultralytics `YOLO.predict()` inside `YoloDetector.detect()`.
+```bash
+# 1. Chạy bộ kiểm thử tự động của AI Service
+cd services/ai-service
+pytest -q
+
+# 2. Chạy bộ kiểm thử lõi thuật toán thị giác máy tính
+cd ../../ai-pipeline
+pytest -q
+
+# 3. Chạy thử nghiệm E2E tích hợp (Synthetic + Real Model YOLO26)
+python services/ai-service/demo/run_e2e_demo.py --mode both
+
+# 4. Chạy kịch bản đo kiểm nghiệm thu (NFR Latency & Counting Accuracy)
+python services/ai-service/eval/measure_latency.py
+python services/ai-service/eval/evaluate_counting.py
+```

@@ -4,7 +4,7 @@ const actuatorMeta = {
   misting: {
     name: 'Phun sương',
     code: 'MISTING',
-    description: 'Điều chỉnh và duy trì độ ẩm trong khu vực.',
+    description: 'Duy trì độ ẩm tối ưu trong khu vực.',
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M12 3s-5 5.5-5 10a5 5 0 0 0 10 0c0-4.5-5-10-5-10Z" />
@@ -15,7 +15,7 @@ const actuatorMeta = {
   ventilation: {
     name: 'Quạt thông gió',
     code: 'VENTILATION',
-    description: 'Hỗ trợ lưu thông không khí và giảm nhiệt độ.',
+    description: 'Lưu thông không khí và giảm nhiệt độ.',
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="12" cy="12" r="2" />
@@ -29,7 +29,7 @@ const actuatorMeta = {
   heating: {
     name: 'Sưởi',
     code: 'HEATING',
-    description: 'Bổ sung nhiệt khi nhiệt độ xuống dưới ngưỡng.',
+    description: 'Bổ sung nhiệt khi nhiệt độ xuống thấp.',
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M13 3s1 3-1 5-1 4 1 5" />
@@ -42,45 +42,59 @@ const actuatorMeta = {
 }
 
 function ActuatorControlPanel({
-  actuators = {},
-  isManual = false,
+  actuators,
+  isManual,
+  disabled = false,
+  commandStatus = {},
   onActuatorChange,
-  onToggleActuator,
 }) {
-  const handleToggle = onActuatorChange || onToggleActuator
   return (
-    <section className="control-section">
-      <div className="control-section-title">
-        <span>03</span>
-        <div>
-          <small>ACTUATOR CONTROL</small>
-          <h2>Thiết bị điều khiển</h2>
-          <p>
-            Theo dõi trạng thái actuator. Điều khiển trực tiếp chỉ khả dụng
-            trong MANUAL.
-          </p>
-        </div>
-      </div>
-
+    <section className="actuator-panel" aria-label="Điều khiển thiết bị thủ công">
       <div className="actuator-grid">
         {Object.entries(actuatorMeta).map(([key, actuator]) => {
-          const isOn = actuators[key]
+          const isOn = disabled ? false : Boolean(actuators[key])
+          const cmd = commandStatus[key] || { state: 'idle' }
+          const isPending = cmd.state === 'pending'
+          const isFailed = cmd.state === 'failed'
+          const isAcked = cmd.state === 'acked'
+
+          const badgeClass = disabled
+            ? 'stopped'
+            : isPending
+              ? 'pending'
+              : isFailed
+                ? 'failed'
+                : isOn
+                  ? 'running'
+                  : 'stopped'
+
+          const badgeLabel = disabled
+            ? 'CHƯA KẾT NỐI'
+            : isPending
+              ? 'ĐANG CHỜ ACK'
+              : isFailed
+                ? 'LỖI LỆNH'
+                : isOn
+                  ? isAcked
+                    ? 'ĐANG BẬT · ACK'
+                    : 'ĐANG BẬT'
+                  : isAcked
+                    ? 'ĐANG TẮT · ACK'
+                    : 'ĐANG TẮT'
+
+          const canToggle = !disabled && isManual && !isPending
 
           return (
             <article
-              className={`actuator-card ${isOn ? 'running' : ''}`}
+              className={`actuator-card ${isOn && !disabled ? 'running' : ''}`.trim()}
               key={key}
             >
               <div className="actuator-card-top">
                 <span className="actuator-icon">{actuator.icon}</span>
 
-                <span
-                  className={`actuator-state ${
-                    isOn ? 'running' : 'stopped'
-                  }`}
-                >
+                <span className={`actuator-state ${badgeClass}`}>
                   <i />
-                  {isOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
+                  {badgeLabel}
                 </span>
               </div>
 
@@ -92,26 +106,38 @@ function ActuatorControlPanel({
                 <div>
                   <span>Điều khiển</span>
                   <strong>
-                    {isManual ? 'Thủ công' : 'Theo AUTO rule'}
+                    {disabled
+                      ? 'Chưa kết nối IoT'
+                      : isPending
+                        ? 'Đang gửi lệnh...'
+                        : isManual
+                          ? 'Thủ công (MANUAL)'
+                          : 'Khóa · Đang ở AUTO'}
                   </strong>
                 </div>
 
                 <Toggle
-                  checked={isOn}
-                  disabled={!isManual}
-                  onChange={(value) => handleToggle?.(key, value)}
+                  checked={disabled ? false : Boolean(isOn)}
+                  disabled={!canToggle}
+                  onChange={(value) => onActuatorChange?.(key, value)}
                   label={`${isOn ? 'Tắt' : 'Bật'} ${actuator.name}`}
                 />
               </div>
 
-              {!isManual && (
+              {isFailed && cmd.message ? (
+                <div className="actuator-lock-note actuator-lock-note--error">
+                  {cmd.message}
+                </div>
+              ) : (disabled || !isManual) && (
                 <div className="actuator-lock-note">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <rect x="5" y="10" width="14" height="10" rx="2" />
                     <path d="M8 10V7a4 4 0 0 1 8 0v3" />
                   </svg>
 
-                  Được điều khiển tự động bởi controller
+                  {disabled
+                    ? 'Tạm khóa do chưa kết nối IoT Service'
+                    : 'Chuyển bộ điều khiển sang MANUAL để bật/tắt'}
                 </div>
               )}
             </article>

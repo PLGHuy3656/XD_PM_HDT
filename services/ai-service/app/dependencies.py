@@ -20,6 +20,16 @@ def get_state_store(request: Request) -> InMemoryAIRuntimeStateStore:
     return request.app.state.runtime_manager.state_store
 
 
+def get_camera_registry(request: Request) -> CameraRegistry:
+    custom = getattr(request.app.state, "camera_registry", None)
+    if custom is not None:
+        return custom
+    return ManagementCameraRegistry(
+        base_url=settings.ai_management_service_url,
+        timeout_seconds=settings.ai_registry_timeout_seconds,
+    )
+
+
 def get_snapshot_dir(request: Request) -> Path:
     custom_dir = getattr(request.app.state, "snapshot_dir", None)
     if custom_dir is not None:
@@ -29,17 +39,6 @@ def get_snapshot_dir(request: Request) -> Path:
 
 def get_ws_manager(websocket: WebSocket) -> AIWebSocketManager:
     return websocket.app.state.ws_manager
-
-
-def get_camera_registry(request: Request) -> CameraRegistry:
-    """Authoritative camera registry (Management Service). Overridable in app.state for tests."""
-    registry = getattr(request.app.state, "camera_registry", None)
-    if registry is not None:
-        return registry
-    return ManagementCameraRegistry(
-        base_url=settings.ai_management_service_url,
-        timeout_seconds=settings.ai_registry_timeout_seconds,
-    )
 
 
 def is_camera_registered(

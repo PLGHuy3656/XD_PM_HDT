@@ -391,5 +391,20 @@ class TechnicianRepository:
 
         return str(assigned_id)
 
+    def unassign_technician(self, technician_id: str, farm_id: str) -> bool:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE technician_assignments
+                    SET is_active = FALSE
+                    WHERE technician_id = %s AND farm_id = %s AND is_active = TRUE;
+                    """,
+                    (technician_id, farm_id),
+                )
+                updated = cur.rowcount > 0
+                conn.commit()
+        return updated
+
 
 technician_repository = TechnicianRepository()

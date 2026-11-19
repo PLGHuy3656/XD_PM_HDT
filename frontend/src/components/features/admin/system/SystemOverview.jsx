@@ -3,9 +3,11 @@ import {
   systemServices,
   systemStatusLabels,
 } from './systemMockData'
+import { USE_MOCK } from '../../../../api/config.js'
 
-function SystemOverview({ services: propServices, alerts: propAlerts }) {
-  const currentServices = propServices || systemServices
+function SystemOverview({ services: propServices }) {
+  const currentServices = propServices && propServices.length > 0 ? propServices : (USE_MOCK ? systemServices : [])
+  const auditLogs = USE_MOCK ? systemAuditLogs : []
 
   const operationalServices = currentServices.filter(
     (service) => service.tier === 'CURRENT' || !service.tier,
@@ -45,15 +47,15 @@ function SystemOverview({ services: propServices, alerts: propAlerts }) {
 
         <article>
           <span>Audit gần đây</span>
-          <strong>{systemAuditLogs.length}</strong>
-          <small>Dữ liệu minh họa (Mock)</small>
+          <strong>{auditLogs.length}</strong>
+          <small>{USE_MOCK ? 'Dữ liệu minh họa (Mock)' : 'Chưa tích hợp API nhật ký'}</small>
         </article>
       </section>
 
       <section className="admin-system-card">
         <div className="admin-system-card__heading">
           <div>
-            <span>SYSTEM HEALTH · MOCK DEMO</span>
+            <span>{USE_MOCK ? 'SYSTEM HEALTH · MOCK DEMO' : 'SYSTEM HEALTH'}</span>
             <h2>Trạng thái hạ tầng &amp; dịch vụ</h2>
             <p>
               Phân biệt các thành phần đã triển khai thực tế và các dịch vụ thuộc kiến trúc mục tiêu của học phần.
@@ -113,21 +115,27 @@ function SystemOverview({ services: propServices, alerts: propAlerts }) {
         </div>
 
         <div className="admin-system-recent">
-          {systemAuditLogs.slice(0, 4).map((log) => (
-            <div
-              key={log.id}
-              className="admin-system-recent__item"
-            >
-              <div>
-                <strong>{log.description}</strong>
-                <span>
-                  {log.actor} · {log.target}
-                </span>
-              </div>
-
-              <time>{log.time}</time>
+          {auditLogs.length === 0 ? (
+            <div style={{ padding: '1rem 0', color: '#64748b', fontSize: '0.9rem' }}>
+              Chưa có dữ liệu nhật ký hoạt động.
             </div>
-          ))}
+          ) : (
+            auditLogs.slice(0, 4).map((log) => (
+              <div
+                key={log.id}
+                className="admin-system-recent__item"
+              >
+                <div>
+                  <strong>{log.description}</strong>
+                  <span>
+                    {log.actor} · {log.target}
+                  </span>
+                </div>
+
+                <time>{log.time}</time>
+              </div>
+            ))
+          )}
         </div>
       </section>
     </div>

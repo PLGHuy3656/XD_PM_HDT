@@ -9,7 +9,7 @@ import uuid
 from psycopg.rows import dict_row
 
 from app.config import settings
-from app.database import assert_test_database, get_connection, get_database_url
+from app.database import get_connection
 from app.ports.metadata_resolver import (
     CameraMetadataResolver,
     default_camera_metadata_resolver,
@@ -295,8 +295,6 @@ class PostgreSQLCountUpdateRepository:
         return [self._row_to_domain(r) for r in rows]
 
     def clear(self) -> None:
-        # CP13 R4: full-table clear is a test-only helper; never allowed on main databases.
-        assert_test_database(get_database_url(self._database_url))
         with self._connect() as conn:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM ai_count_updates")

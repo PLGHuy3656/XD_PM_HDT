@@ -1,10 +1,14 @@
 """Camera runtime status, latest detection, and latest count REST routes (CP5.3 Task 3, 4, 5, 6)."""
 from __future__ import annotations
 
+from dataclasses import replace
+import hmac
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Path, Query, status
+from pydantic import Field
 
+from app.config import is_internal_key_acceptable, settings
 from app.dependencies import (
     get_runtime_manager,
     get_state_store,
@@ -17,15 +21,33 @@ from app.errors import (
     ErrorResponse,
     raise_ai_error,
 )
+from app.ports.metadata_resolver import default_camera_metadata_resolver
 from app.runtime.manager import AIRuntimeManager
 from app.runtime.state_store import InMemoryAIRuntimeStateStore
 from app.schemas.canonical import (
     CameraRuntimeStatus,
+    CanonicalModel,
     CountUpdate,
     DetectionResult,
 )
 
 router = APIRouter(prefix="/api/v1/ai/cameras", tags=["AI Cameras"])
+
+
+class CountingLineSpec(CanonicalModel):
+    start: tuple[float, float] = (0.10, 0.55)
+    end: tuple[float, float] = (0.90, 0.55)
+
+
+class CameraStartRequest(CanonicalModel):
+    source: Optional[str] = Field(default=None, min_length=1)
+    sourceType: str = Field(default="auto")
+    countingLine: Optional[CountingLineSpec] = None
+    insideSide: str = Field(default="positive")
+    fps: float = Field(default=0.0, ge=0.0, le=120.0)
+    maxFrames: int = Field(default=0, ge=0)
+    farmId: Optional[str] = None
+    zoneId: Optional[str] = None
 
 
 @router.get(
@@ -39,15 +61,21 @@ def list_cameras(
 ) -> List[CameraRuntimeStatus]:
     """Return runtime status for all cameras registered in AIRuntimeManager / runtime state."""
     statuses_by_id = {s.cameraId: s for s in state_store.list_camera_statuses()}
-    if not state_store.redis_enabled:
-        for cam_id in runtime_manager.list_camera_ids():
-            if cam_id not in statuses_by_id:
-                pipeline = runtime_manager.get_pipeline(cam_id)
-                if pipeline is not None:
-                    statuses_by_id[cam_id] = pipeline.status
+    for cam_id in runtime_manager.list_camera_ids():
+        if cam_id not in statuses_by_id:
+            pipeline = runtime_manager.get_pipeline(cam_id)
+            if pipeline is not None:
+                state_store.record_status(pipeline.status)
+                statuses_by_id[cam_id] = pipeline.status
     return [statuses_by_id[k] for k in sorted(statuses_by_id.keys())]
 
 
+@router.get(
+    "/{cameraId}",
+    response_model=CameraRuntimeStatus,
+    responses={404: {"model": ErrorResponse}},
+    summary="Get runtime status for a registered AI camera (Frontend alias)",
+)
 @router.get(
     "/{cameraId}/status",
     response_model=CameraRuntimeStatus,
@@ -63,10 +91,10 @@ def get_camera_status(
     if status is not None:
         return status
 
-    if not state_store.redis_enabled:
-        pipeline = runtime_manager.get_pipeline(cameraId)
-        if pipeline is not None:
-            return pipeline.status
+    pipeline = runtime_manager.get_pipeline(cameraId)
+    if pipeline is not None:
+        state_store.record_status(pipeline.status)
+        return pipeline.status
 
     raise_ai_error(
         404,
@@ -180,3 +208,140 @@ def list_camera_counts(
         start_time=startTime,
         end_time=endTime,
     )
+
+
+def _require_camera_control_auth(
+    x_internal_service_key: Optional[str] = Header(default=None, alias="X-Internal-Service-Key"),
+) -> None:
+    """Enforce internal service-key auth on camera write operations when enabled."""
+    if not settings.ai_camera_control_require_auth:
+        return
+    configured_key = (settings.ai_internal_service_key or "").strip()
+    if not is_internal_key_acceptable(configured_key):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI camera control auth is enabled but AI_INTERNAL_SERVICE_KEY is not properly provisioned",
+        )
+    if not x_internal_service_key or not hmac.compare_digest(
+        x_internal_service_key.strip(), configured_key
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid or missing X-Internal-Service-Key for camera control operation",
+        )
+
+
+@router.post(
+    "/{cameraId}/start",
+    response_model=CameraRuntimeStatus,
+    responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+    summary="Start processing loop for a registered or dynamically provisioned AI camera",
+)
+def start_camera(
+    cameraId: str = Path(..., description="Canonical camera identifier"),
+    payload: Optional[CameraStartRequest] = Body(default=None),
+    _: None = Depends(_require_camera_control_auth),
+    runtime_manager: AIRuntimeManager = Depends(get_runtime_manager),
+) -> CameraRuntimeStatus:
+    if payload is not None and payload.source is not None:
+        line = (
+            (payload.countingLine.start, payload.countingLine.end)
+            if payload.countingLine is not None
+            else ((0.10, 0.55), (0.90, 0.55))
+        )
+        runtime_manager.prepare_camera_source(
+            camera_id=cameraId,
+            source=payload.source,
+            source_type=payload.sourceType,
+            line=line,
+            inside_side=payload.insideSide,
+            fps=payload.fps,
+            farm_id=payload.farmId,
+            zone_id=payload.zoneId,
+        )
+        return runtime_manager.start_camera(cameraId, max_frames=payload.maxFrames)
+
+    try:
+        if payload is not None and (payload.farmId is not None or payload.zoneId is not None):
+            pipeline = runtime_manager.get_pipeline(cameraId)
+            if pipeline is not None:
+                eff_farm = payload.farmId if payload.farmId is not None else pipeline.camera_config.farm_id
+                eff_zone = payload.zoneId if payload.zoneId is not None else pipeline.camera_config.zone_id
+                pipeline.camera_config = replace(
+                    pipeline.camera_config,
+                    farm_id=eff_farm,
+                    zone_id=eff_zone,
+                )
+                if eff_farm and eff_zone:
+                    default_camera_metadata_resolver.set_camera_metadata(cameraId, eff_farm, eff_zone)
+        max_frames = payload.maxFrames if payload is not None else 0
+        return runtime_manager.start_camera(cameraId, max_frames=max_frames)
+    except KeyError:
+        raise_ai_error(
+            404,
+            CAMERA_NOT_FOUND,
+            f"Camera '{cameraId}' is not registered in AI runtime.",
+        )
+
+
+@router.post(
+    "/{cameraId}/stop",
+    response_model=CameraRuntimeStatus,
+    responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+    summary="Stop processing loop for a registered AI camera",
+)
+def stop_camera(
+    cameraId: str = Path(..., description="Canonical camera identifier"),
+    _: None = Depends(_require_camera_control_auth),
+    runtime_manager: AIRuntimeManager = Depends(get_runtime_manager),
+) -> CameraRuntimeStatus:
+    try:
+        return runtime_manager.stop_camera(cameraId)
+    except KeyError:
+        raise_ai_error(
+            404,
+            CAMERA_NOT_FOUND,
+            f"Camera '{cameraId}' is not registered in AI runtime.",
+        )
+
+
+@router.post(
+    "/{cameraId}/counts/reset",
+    response_model=CountUpdate,
+    responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+    summary="Reset counting window and counts to 0 for a camera",
+)
+def reset_camera_counts(
+    cameraId: str = Path(..., description="Canonical camera identifier"),
+    _: None = Depends(_require_camera_control_auth),
+    runtime_manager: AIRuntimeManager = Depends(get_runtime_manager),
+) -> CountUpdate:
+    try:
+        return runtime_manager.reset_camera_counts(cameraId)
+    except KeyError:
+        raise_ai_error(
+            404,
+            CAMERA_NOT_FOUND,
+            f"Camera '{cameraId}' is not registered in AI runtime.",
+        )
+
+
+@router.get(
+    "/{cameraId}/counts/history",
+    response_model=List[CountUpdate],
+    responses={404: {"model": ErrorResponse}},
+    summary="Get count updates history for a camera (newest first)",
+)
+def get_count_history(
+    cameraId: str = Path(..., description="Canonical camera identifier"),
+    limit: int = Query(20, ge=1, le=100, description="Max count history records to return"),
+    runtime_manager: AIRuntimeManager = Depends(get_runtime_manager),
+    state_store: InMemoryAIRuntimeStateStore = Depends(get_state_store),
+) -> List[CountUpdate]:
+    if not is_camera_registered(cameraId, runtime_manager, state_store):
+        raise_ai_error(
+            404,
+            CAMERA_NOT_FOUND,
+            f"Camera '{cameraId}' is not registered in AI runtime.",
+        )
+    return state_store.get_count_history(cameraId, limit=limit)

@@ -114,5 +114,81 @@ class ZoneRepository:
             "device_count": row[5],
         }
 
+    def create_zone(self, farm_uuid: str, zone_code: str | None = None, name: str = "") -> dict:
+        import secrets
+        import psycopg
+
+        auto_generate = not (isinstance(zone_code, str) and zone_code.strip())
+        max_attempts = 8 if auto_generate else 1
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                for _ in range(max_attempts):
+                    candidate_code = (
+                        f"Z-{secrets.token_hex(3).upper()}"
+                        if auto_generate
+                        else zone_code.strip()
+                    )
+                    try:
+                        cur.execute(
+                            """
+                            INSERT INTO zones (farm_id, zone_code, name)
+                            VALUES (%s, %s, %s)
+                            RETURNING id;
+                            """,
+                            (farm_uuid, candidate_code, name.strip()),
+                        )
+                        new_id = str(cur.fetchone()[0])
+                        conn.commit()
+                        return self.get_zone_by_id(new_id)
+                    except psycopg.errors.UniqueViolation as exc:
+                        conn.rollback()
+                        if not auto_generate:
+                            raise ValueError(f"Zone code '{zone_code}' already exists in farm") from exc
+                    except psycopg.errors.ForeignKeyViolation as exc:
+                        conn.rollback()
+                        raise ValueError("Invalid farm_id reference") from exc
+        raise ValueError("Failed to generate unique zone_code")
+
+    def update_zone(self, zone_id: str, zone_code: str | None = None, name: str | None = None) -> dict | None:
+        import psycopg
+        existing = self.get_zone_by_id(zone_id)
+        if not existing:
+            return None
+        updates = []
+        params = []
+        if zone_code is not None:
+            updates.append("zone_code = %s")
+            params.append(zone_code.strip())
+        if name is not None:
+            updates.append("name = %s")
+            params.append(name.strip())
+        if updates:
+            updates.append("updated_at = NOW()")
+            params.append(existing["zone_id"])
+            with get_connection() as conn:
+                with conn.cursor() as cur:
+                    try:
+                        cur.execute(
+                            f"UPDATE zones SET {', '.join(updates)} WHERE id = %s;",
+                            tuple(params),
+                        )
+                        conn.commit()
+                    except psycopg.errors.UniqueViolation as exc:
+                        conn.rollback()
+                        raise ValueError(f"Zone code '{zone_code}' already exists in farm") from exc
+        return self.get_zone_by_id(existing["zone_id"])
+
+    def delete_zone(self, zone_id: str) -> bool:
+        existing = self.get_zone_by_id(zone_id)
+        if not existing:
+            return False
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM zones WHERE id = %s;", (existing["zone_id"],))
+                deleted = cur.rowcount > 0
+                conn.commit()
+        return deleted
+
 
 zone_repository = ZoneRepository()

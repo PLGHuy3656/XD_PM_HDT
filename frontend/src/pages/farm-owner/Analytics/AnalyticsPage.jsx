@@ -10,7 +10,9 @@ import AnalyticsYield from '../../../components/features/farm-owner/analytics/An
 import { LoadingSpinner, ErrorMessage } from '../../../components/common/feedback/index.js'
 
 import { useFarms } from '../../../features/farms/hooks/useFarms'
+import { formatFarmOptionLabel } from '../../../features/farms/adapters/farmAdapter.js'
 import { useAnalytics } from '../../../features/analytics/hooks/useAnalytics'
+import { USE_MOCK } from '../../../api/config.js'
 
 import './AnalyticsPage.css'
 
@@ -29,6 +31,7 @@ function AnalyticsPage() {
     analyticsData,
     loading: analyticsLoading,
     error: analyticsError,
+    unavailable,
     refetch: refetchAnalytics,
   } = useAnalytics(selectedFarmId)
 
@@ -55,7 +58,7 @@ function AnalyticsPage() {
               onChange={setSelectedFarmId}
               options={farms.map((farm) => ({
                 value: farm.id,
-                label: farm.name,
+                label: formatFarmOptionLabel(farm),
               }))}
             />
           </div>
@@ -66,15 +69,31 @@ function AnalyticsPage() {
         )}
         {analyticsError && (
           <ErrorMessage
-            title="Lỗi tải số liệu phân tích"
-            message={analyticsError}
+            variant="warning"
+            title="Chưa kết nối dịch vụ Phân tích"
+            message={
+              /upstream|503|unreachable|network/i.test(String(analyticsError))
+                ? 'Chưa kết nối dịch vụ Phân tích (Analytics Service). Dữ liệu sẽ hiển thị khi dịch vụ hoạt động trở lại.'
+                : analyticsError
+            }
             onRetry={refetchAnalytics}
           />
         )}
 
         <AnalyticsTabs activeTab={activeTab} onChange={setActiveTab} />
 
-        {analyticsLoading && !analyticsData ? (
+        {!USE_MOCK && !analyticsLoading && (!selectedFarmId || unavailable) ? (
+          <div style={{ padding: '2.5rem 1.5rem', textAlign: 'center', background: '#fffdf9', border: '1px solid #e6dfd3', borderRadius: '18px', color: '#64748b' }}>
+            <strong style={{ display: 'block', color: '#172b46', marginBottom: '6px' }}>
+              {!selectedFarmId ? 'Chưa có nhà yến được chọn' : 'Analytics Service chưa khả dụng'}
+            </strong>
+            <span style={{ fontSize: '0.9rem' }}>
+              {!selectedFarmId
+                ? 'Hãy tạo hoặc chọn một nhà yến để xem dữ liệu phân tích.'
+                : 'Dữ liệu tổng hợp môi trường, chim yến và cảnh báo sẽ hiển thị khi Analytics Service & AI/IoT hoạt động.'}
+            </span>
+          </div>
+        ) : analyticsLoading && !analyticsData ? (
           <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}>
             <LoadingSpinner size="lg" text="Đang xử lý phân tích dữ liệu..." />
           </div>

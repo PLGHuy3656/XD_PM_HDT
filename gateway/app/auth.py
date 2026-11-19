@@ -45,17 +45,26 @@ def get_token_hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+class TokenRevocationBackendError(Exception):
+    """Raised when token revocation status cannot be verified due to Redis backend failure."""
+    pass
+
+
 def is_token_revoked(token: str) -> bool:
-    """Checks whether a token has been explicitly revoked/blacklisted in Redis."""
+    """Checks whether a token has been explicitly revoked/blacklisted in Redis.
+    
+    Enforces fail-closed security: if Redis is unavailable, raises
+    TokenRevocationBackendError to prevent processing potentially revoked tokens.
+    """
     client = get_redis_client()
     if not client:
-        return False
+        raise TokenRevocationBackendError("Redis client is not configured or unavailable")
     try:
         thash = get_token_hash(token)
         return bool(client.get(f"revoked_token:{thash}"))
     except Exception as e:
-        logger.warning(f"Error checking token revocation in Redis: {e}")
-        return False
+        logger.error(f"Error checking token revocation in Redis [Fail-Closed]: {e}")
+        raise TokenRevocationBackendError(f"Redis revocation query failed: {e}") from e
 
 
 def revoke_token(token: str) -> bool:
@@ -116,12 +125,20 @@ def decode_and_verify_token(token: str) -> Dict[str, Any]:
         )
 
     # Check server-side token revocation / blacklist in Redis (FR-UAM-02)
-    if is_token_revoked(token):
+    try:
+        if is_token_revoked(token):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication token has been revoked",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    except TokenRevocationBackendError as exc:
+        logger.warning(f"Fail-closed on token revocation check: {exc}")
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication token has been revoked",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service Unavailable: Token revocation verification backend unreachable",
+            headers={"Retry-After": "5"},
+        ) from exc
 
     # Validate essential claims
     sub = payload.get("sub")

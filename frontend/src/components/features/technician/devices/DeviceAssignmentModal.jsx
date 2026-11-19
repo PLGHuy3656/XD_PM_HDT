@@ -2,42 +2,55 @@ import EnvironmentSelect from '../../../ui/Select'
 
 function DeviceAssignmentModal({
   device,
-  currentZoneName,
-  farmName,
-  zoneId,
-  zoneOptions,
+  currentZoneName = 'Chưa phân bổ Zone',
+  farmName = '',
+  zoneId = '',
+  zoneOptions = [],
+  saving = false,
+  error = '',
   onZoneChange,
   onClose,
   onConfirm,
 }) {
   if (!device) return null
 
+  const safeOptions = Array.isArray(zoneOptions) && zoneOptions.length > 0
+    ? zoneOptions
+    : [{ value: '', label: 'Chưa phân bổ Zone' }]
+
   const handleBackdropMouseDown = (event) => {
-    if (event.target === event.currentTarget) {
-      onClose()
+    if (event.target === event.currentTarget && !saving) {
+      onClose?.()
     }
   }
 
   return (
     <div
       className="tech-modal-backdrop"
+      role="presentation"
       onMouseDown={handleBackdropMouseDown}
     >
-      <section className="tech-device-modal assignment">
+      <section
+        className="tech-device-modal assignment"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Gán / đổi khu vực"
+      >
         <div className="tech-modal-header">
           <div>
-            <span>ZONE ASSIGNMENT</span>
-            <h2>Chuyển thiết bị</h2>
+            <span>DEVICE–ZONE ASSIGNMENT</span>
+            <h2>Gán / đổi khu vực</h2>
 
             <p>
-              {device.id} · {device.name}
+              {device.nodeId || device.id} · {device.name}
             </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            aria-label="Đóng chuyển khu vực"
+            disabled={saving}
+            aria-label="Đóng gán hoặc đổi khu vực"
           >
             ×
           </button>
@@ -50,19 +63,23 @@ function DeviceAssignmentModal({
         </div>
 
         <EnvironmentSelect
-          label="Chuyển sang khu vực"
-          value={zoneId}
-          options={zoneOptions}
-          onChange={onZoneChange}
+          label="Chọn khu vực lắp đặt (Zone)"
+          value={zoneId ?? ''}
+          options={safeOptions}
+          onChange={(val) => onZoneChange?.(val)}
         />
 
+        {error && (
+          <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '10px', background: '#fef2f2', color: '#b91c1c', fontSize: '12px', fontWeight: 600 }}>
+            {error}
+          </div>
+        )}
+
         <div className="tech-assignment-warning">
-          <strong>Lưu ý</strong>
+          <strong>Phạm vi phân bổ</strong>
 
           <p>
-            Đây đang là thao tác mock phía Frontend. Khi tích hợp
-            Backend, quyền Technician và việc gán Zone phải được kiểm
-            tra lại tại API.
+            Chỉ được chọn khu vực (Zone) thuộc cùng nhà yến đang phân công. Thay đổi sẽ được lưu trực tiếp vào hệ thống quản lý.
           </p>
         </div>
 
@@ -71,6 +88,7 @@ function DeviceAssignmentModal({
             type="button"
             className="tech-action-secondary"
             onClick={onClose}
+            disabled={saving}
           >
             Hủy
           </button>
@@ -79,8 +97,9 @@ function DeviceAssignmentModal({
             type="button"
             className="tech-action-primary"
             onClick={onConfirm}
+            disabled={saving}
           >
-            Xác nhận chuyển Zone
+            {saving ? 'Đang lưu...' : 'Lưu khu vực'}
           </button>
         </div>
       </section>

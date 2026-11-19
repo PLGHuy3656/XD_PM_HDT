@@ -28,6 +28,7 @@ from typing import Dict, List
 
 from fastapi.testclient import TestClient
 import numpy as np
+import pytest
 import redis
 
 from app.config import RuntimeCameraConfig, settings
@@ -49,6 +50,12 @@ from swiftletcare_ai.detector import CallableDetector
 from swiftletcare_ai.schemas import Detection as TV2Detection
 from swiftletcare_ai.snapshot import SnapshotStore
 from swiftletcare_ai.video_source import ListFrameSource
+from tests.conftest import POSTGRES_AVAILABLE, REDIS_AVAILABLE
+
+pytestmark = pytest.mark.skipif(
+    not (REDIS_AVAILABLE and POSTGRES_AVAILABLE),
+    reason="Redis (6379) and/or PostgreSQL (5432) not reachable on localhost",
+)
 
 
 class FailingRedisClient:

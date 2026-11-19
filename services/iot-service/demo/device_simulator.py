@@ -261,6 +261,26 @@ class ESP32DeviceSimulator:
                 ),
             )
 
+        elif action == "PROVISION_DEVICE":
+            farm_id = cmd.get("farmId")
+            zone_id = cmd.get("zoneId")
+            serial_number = cmd.get("serialNumber")
+            if not farm_id or not zone_id:
+                return self._publish_ack(
+                    command_id=command_id,
+                    status="FAILED",
+                    message="Missing farmId or zoneId in PROVISION_DEVICE command",
+                )
+
+            self.farm_id = farm_id
+            self.zone_id = zone_id
+            self.serial_number = serial_number or "SN-001"
+            return self._publish_ack(
+                command_id=command_id,
+                status="SUCCESS",
+                message=f"Node provisioned to {farm_id}/{zone_id}; activation ready",
+            )
+
         else:
             return self._publish_ack(
                 command_id=command_id,

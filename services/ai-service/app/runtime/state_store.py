@@ -162,6 +162,7 @@ class InMemoryAIRuntimeStateStore(BaseRuntimeSink):
     def __init__(
         self,
         max_events: int = 500,
+        max_count_history: int = 100,
         count_repository: Optional[CountUpdateRepository] = None,
         event_repository: Optional[AIEventRepository] = None,
         redis_client: Any = None,
@@ -172,7 +173,10 @@ class InMemoryAIRuntimeStateStore(BaseRuntimeSink):
     ) -> None:
         if max_events <= 0:
             raise ValueError("max_events must be > 0")
+        if max_count_history <= 0:
+            raise ValueError("max_count_history must be > 0")
         self._max_events = max_events
+        self._max_count_history = max_count_history
         self._count_repository = count_repository
         self._event_repository = event_repository
         self._redis_client = redis_client
@@ -199,6 +203,7 @@ class InMemoryAIRuntimeStateStore(BaseRuntimeSink):
         self._lock = threading.RLock()
         self._latest_detections: Dict[str, DetectionResult] = {}
         self._latest_counts: Dict[str, CountUpdate] = {}
+        self._count_history: Dict[str, Deque[CountUpdate]] = {}
         self._latest_statuses: Dict[str, CameraRuntimeStatus] = {}
         self._status_templates: Dict[str, CameraRuntimeStatus] = {}
         self._recent_events: Deque[AIEvent] = deque()
@@ -414,6 +419,13 @@ class InMemoryAIRuntimeStateStore(BaseRuntimeSink):
                 )
                 return False
 
+        with self._lock:
+            history = self._count_history.get(update.cameraId)
+            if history is None:
+                history = deque(maxlen=self._max_count_history)
+                self._count_history[update.cameraId] = history
+            history.append(update)
+
         if self._redis_enabled:
             self._atomic_merge_latest_count(update)
         else:
@@ -594,6 +606,16 @@ class InMemoryAIRuntimeStateStore(BaseRuntimeSink):
         latest = self.get_latest_count(camera_id)
         return [latest] if latest is not None else []
 
+    def get_count_history(self, camera_id: str, limit: int = 20) -> List[CountUpdate]:
+        """Return recent CountUpdate items for a camera ordered newest-first."""
+        if limit <= 0:
+            raise ValueError("limit must be > 0")
+        with self._lock:
+            history = self._count_history.get(camera_id)
+            if history:
+                return list(reversed(history))[:limit]
+        return self.list_count_updates(camera_id=camera_id, limit=limit)
+
     def get_camera_status(self, camera_id: str) -> Optional[CameraRuntimeStatus]:
         """Returns live CameraRuntimeStatus from Redis `ai:runtime:{cameraId}`.
 
@@ -754,6 +776,7 @@ class InMemoryAIRuntimeStateStore(BaseRuntimeSink):
         with self._lock:
             self._latest_detections.clear()
             self._latest_counts.clear()
+            self._count_history.clear()
             self._latest_statuses.clear()
             self._status_templates.clear()
             self._recent_events.clear()
