@@ -34,3 +34,7 @@ class DeviceUpdateRequest(BaseModel):
     firmware_version: str | None = None
     ip_address: str | None = None
     is_active: bool | None = None
+
+
+class DeviceZoneUpdateRequest(BaseModel):
+    zone_id: str | None = None

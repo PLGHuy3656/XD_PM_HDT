@@ -7,6 +7,7 @@ from app.core.dependencies import (
     require_roles,
     verify_farm_resource_access,
 )
+from app.repositories.farm_repository import farm_repository
 from app.repositories.user_repository import user_repository
 from app.schemas.zone import ZoneCreateRequest, ZoneResponse, ZoneUpdateRequest
 
@@ -68,6 +69,12 @@ def create_zone(
     farm_uuid = user_repository.resolve_farm_uuid(farm_id)
     if not farm_uuid:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Farm not found")
+    farm = farm_repository.get_farm_by_id(farm_uuid)
+    if not farm or farm.get("approval_status") != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Farm must be approved by Admin before creating zones",
+        )
     return zone_controller.create_zone(farm_uuid=farm_uuid, zone_code=payload.zone_code, name=payload.name)
 
 

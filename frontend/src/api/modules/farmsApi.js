@@ -43,6 +43,14 @@ export const farmsApi = {
     return apiClient.delete(ENDPOINTS.FARMS.DETAIL(farmId), options)
   },
 
+  async approveFarm(farmId, options = {}) {
+    return apiClient.post(`${ENDPOINTS.FARMS.DETAIL(farmId)}/approve`, {}, options)
+  },
+
+  async rejectFarm(farmId, payload, options = {}) {
+    return apiClient.post(`${ENDPOINTS.FARMS.DETAIL(farmId)}/reject`, payload, options)
+  },
+
   async createZone(farmId, payload, options = {}) {
     return apiClient.post(ENDPOINTS.FARMS.ZONES(farmId), payload, options)
   },

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../../../context/AuthContext'
+import PasswordInput from '../../../components/ui/PasswordInput'
 import './LoginPage.css'
 
 function LoginPage() {
@@ -72,34 +73,11 @@ function LoginPage() {
             <span>Nhà yến an tâm.</span>
           </h2>
 
-          <div className="login-environment">
-            <div className="environment-card">
-              <span className="environment-icon">🌡</span>
-
-              <div>
-                <strong>29.4°C</strong>
-                <span>Nhiệt độ</span>
-              </div>
-            </div>
-
-            <div className="environment-card">
-              <span className="environment-icon">💧</span>
-
-              <div>
-                <strong>82%</strong>
-                <span>Độ ẩm</span>
-              </div>
-            </div>
-
-            <div className="environment-card">
-              <span className="environment-status-dot" />
-
-              <div>
-                <strong>Ổn định</strong>
-                <span>Môi trường</span>
-              </div>
-            </div>
-          </div>
+          <p>
+            Nền tảng quản trị nhà yến thông minh: theo dõi vi khí hậu, quản lý
+            nhà yến, khu vực và thiết bị tập trung cho Chủ trại, Kỹ thuật viên
+            và Quản trị hệ thống.
+          </p>
         </div>
 
         <div className="login-curve" />
@@ -144,9 +122,8 @@ function LoginPage() {
                 Mật khẩu
               </label>
 
-              <input
+              <PasswordInput
                 id="password"
-                type="password"
                 placeholder="Mật khẩu"
                 autoComplete="current-password"
                 value={password}

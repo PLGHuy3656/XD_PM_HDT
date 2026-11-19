@@ -10,6 +10,7 @@ from app.core.dependencies import (
 from app.schemas.farm import (
     FarmCreateRequest,
     FarmDetailResponse,
+    FarmRejectRequest,
     FarmResponse,
     FarmUpdateRequest,
 )
@@ -50,13 +51,18 @@ def create_farm(
     current_user: dict = Depends(require_roles("ADMIN", "FARM_OWNER")),
 ):
     roles = current_user.get("roles") or []
-    owner_id = payload.owner_id if "ADMIN" in roles else str(current_user["id"])
+    is_admin = "ADMIN" in roles
+    owner_id = payload.owner_id if is_admin else str(current_user["id"])
+    approval_status = "APPROVED" if is_admin else "PENDING"
+    approved_by = str(current_user["id"]) if is_admin else None
     return farm_controller.create_farm(
         farm_code=payload.farm_code,
         farm_name=payload.farm_name,
         address=payload.address,
         status_val=payload.status,
         owner_id=owner_id,
+        approval_status=approval_status,
+        approved_by=approved_by,
     )
 
 
@@ -96,3 +102,35 @@ def delete_farm(
     current_user: dict = Depends(require_admin),
 ):
     return farm_controller.delete_farm(farm_id)
+
+
+@router.post(
+    "/{farm_id}/approve",
+    response_model=FarmDetailResponse,
+    summary="Approve a pending or rejected farm (Admin only)",
+)
+def approve_farm(
+    farm_id: str,
+    current_user: dict = Depends(require_admin),
+):
+    return farm_controller.approve_farm(
+        farm_id=farm_id,
+        admin_user_id=str(current_user["id"]),
+    )
+
+
+@router.post(
+    "/{farm_id}/reject",
+    response_model=FarmDetailResponse,
+    summary="Reject a pending farm with a reason (Admin only)",
+)
+def reject_farm(
+    farm_id: str,
+    payload: FarmRejectRequest,
+    current_user: dict = Depends(require_admin),
+):
+    return farm_controller.reject_farm(
+        farm_id=farm_id,
+        admin_user_id=str(current_user["id"]),
+        rejection_reason=payload.rejection_reason,
+    )

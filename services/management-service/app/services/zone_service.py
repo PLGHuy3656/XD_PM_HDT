@@ -15,14 +15,13 @@ class ZoneService:
             raise ValueError("zone_id is required")
         return self.repository.get_zone_by_id(zone_id)
 
-    def create_zone(self, farm_uuid: str, zone_code: str, name: str):
+    def create_zone(self, farm_uuid: str, zone_code: str | None = None, name: str = ""):
         if not farm_uuid:
             raise ValueError("farm_id is required")
-        if not zone_code or not zone_code.strip():
-            raise ValueError("zone_code is required")
         if not name or not name.strip():
             raise ValueError("name is required")
-        return self.repository.create_zone(farm_uuid=farm_uuid, zone_code=zone_code, name=name)
+        clean_code = zone_code.strip() if isinstance(zone_code, str) and zone_code.strip() else None
+        return self.repository.create_zone(farm_uuid=farm_uuid, zone_code=clean_code, name=name)
 
     def update_zone(self, zone_id: str, zone_code: str | None = None, name: str | None = None):
         if not zone_id:

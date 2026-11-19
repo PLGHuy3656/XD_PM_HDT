@@ -13,13 +13,14 @@ import DeviceTable from '../../../components/features/farm-owner/devices/DeviceT
 import { LoadingSpinner, ErrorMessage, EmptyState } from '../../../components/common/feedback/index.js'
 
 import { useFarms } from '../../../features/farms/hooks/useFarms'
+import { formatFarmOptionLabel } from '../../../features/farms/adapters/farmAdapter.js'
 import { useDevices } from '../../../features/devices/hooks/useDevices'
 
 import './DevicesPage.css'
 
 function SearchIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="11" cy="11" r="6" />
       <path d="m16 16 4 4" />
     </svg>
@@ -28,7 +29,7 @@ function SearchIcon() {
 
 function RefreshIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M20 7v5h-5" />
       <path d="M19 12a7 7 0 1 0-2 5" />
     </svg>
@@ -54,7 +55,7 @@ function DevicesPage() {
     updateDevice,
     deleteDevice,
     refetch: refetchDevices,
-  } = useDevices(selectedFarmId)
+  } = useDevices(selectedFarmId, { requireFarmId: true })
 
   const [zoneId, setZoneId] = useState('ALL')
   const [search, setSearch] = useState('')
@@ -195,11 +196,11 @@ function DevicesPage() {
                 }}
                 options={farms.map((farm) => ({
                   value: farm.id,
-                  label: farm.name,
+                  label: formatFarmOptionLabel(farm),
                 }))}
               />
             </div>
-            {selectedFarmId && (
+            {selectedFarmId && (selectedFarm?.approvalStatus || 'APPROVED') === 'APPROVED' && (
               <button
                 type="button"
                 className="farm-button farm-button--primary"
@@ -214,6 +215,14 @@ function DevicesPage() {
           </div>
         </header>
 
+        {selectedFarm && (selectedFarm.approvalStatus || 'APPROVED') !== 'APPROVED' && (
+          <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', borderRadius: '8px', background: '#fffbeb', color: '#92400e', border: '1px solid #fcd34d' }}>
+            {selectedFarm.approvalStatus === 'REJECTED'
+              ? `Nhà yến "${selectedFarm.name}" đã bị từ chối${selectedFarm.rejectionReason ? `: ${selectedFarm.rejectionReason}` : ''}. Không thể đăng ký thiết bị mới.`
+              : `Nhà yến "${selectedFarm.name}" đang chờ Admin phê duyệt. Chức năng đăng ký thiết bị sẽ mở khóa sau khi được duyệt.`}
+          </div>
+        )}
+
         {farmsError && (
           <ErrorMessage title="Lỗi danh sách nhà yến" message={farmsError} />
         )}
@@ -225,35 +234,35 @@ function DevicesPage() {
           />
         )}
 
-        <section className="devices-overview-grid">
-          <article className="device-metric-card">
-            <span className="metric-title">Tổng thiết bị</span>
-            <strong className="metric-number">{farmDeviceCount}</strong>
-            <small className="metric-caption">Được định danh trong nhà yến</small>
+        <section className="device-summary-grid">
+          <article className="device-summary-card">
+            <span className="device-summary-label">Tổng thiết bị</span>
+            <strong>{farmDeviceCount}</strong>
+            <small>Được định danh trong nhà yến</small>
           </article>
 
-          <article className="device-metric-card">
-            <span className="metric-title">Trực tuyến</span>
-            <strong className="metric-number metric-online">{onlineCount}</strong>
-            <small className="metric-caption">Đang kết nối bình thường</small>
+          <article className="device-summary-card">
+            <span className="device-summary-label">Trực tuyến</span>
+            <strong>{onlineCount}</strong>
+            <small>Đang kết nối bình thường</small>
           </article>
 
-          <article className="device-metric-card">
-            <span className="metric-title">Cần kiểm tra</span>
-            <strong className="metric-number metric-warning">{warningCount}</strong>
-            <small className="metric-caption">Tín hiệu yếu hoặc chập chờn</small>
+          <article className="device-summary-card">
+            <span className="device-summary-label">Cần kiểm tra</span>
+            <strong>{warningCount}</strong>
+            <small>Tín hiệu yếu hoặc chập chờn</small>
           </article>
 
-          <article className="device-metric-card">
-            <span className="metric-title">Ngoại tuyến</span>
-            <strong className="metric-number metric-offline">{offlineCount}</strong>
-            <small className="metric-caption">Mất tín hiệu trên 10 phút</small>
+          <article className="device-summary-card">
+            <span className="device-summary-label">Ngoại tuyến</span>
+            <strong>{offlineCount}</strong>
+            <small>Chưa kết nối IoT / mất tín hiệu</small>
           </article>
         </section>
 
-        <section className="devices-controls">
-          <div className="devices-filter-row">
-            <div className="devices-search">
+        <section className="device-list-section">
+          <div className="device-toolbar">
+            <div className="device-search">
               <SearchIcon />
               <input
                 type="text"
@@ -263,7 +272,7 @@ function DevicesPage() {
               />
             </div>
 
-            <div className="devices-selects">
+            <div className="devices-selects" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
               <EnvironmentSelect
                 value={zoneId}
                 onChange={setZoneId}
@@ -281,16 +290,16 @@ function DevicesPage() {
                 onChange={setStatusFilter}
                 options={statusFilters}
               />
-            </div>
 
-            <button
-              type="button"
-              className="devices-refresh-btn"
-              onClick={handleRefresh}
-            >
-              <RefreshIcon />
-              {refreshLabel}
-            </button>
+              <button
+                type="button"
+                className="device-refresh-button"
+                onClick={handleRefresh}
+              >
+                <RefreshIcon />
+                {refreshLabel}
+              </button>
+            </div>
           </div>
         </section>
 
@@ -366,7 +375,7 @@ function DevicesPage() {
             }}
           >
             <form
-              className="admin-farm-modal"
+              className="admin-farm-modal admin-farm-form"
               onSubmit={handleSaveDevice}
               onMouseDown={(e) => e.stopPropagation()}
             >
@@ -403,9 +412,9 @@ function DevicesPage() {
                   </select>
                 </label>
               )}
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setCreateOpen(false)}>Hủy</button>
-                <button type="submit" disabled={submitting}>{submitting ? 'Đang lưu...' : 'Thêm thiết bị'}</button>
+              <div className="admin-farm-modal__actions">
+                <button type="button" className="admin-farm-modal__cancel" onClick={() => setCreateOpen(false)}>Hủy</button>
+                <button type="submit" className="admin-farm-modal__save" disabled={submitting}>{submitting ? 'Đang lưu...' : 'Thêm thiết bị'}</button>
               </div>
             </form>
           </div>

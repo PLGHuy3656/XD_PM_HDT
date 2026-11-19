@@ -26,6 +26,11 @@ function SystemPage() {
     useState('overview')
   const { systemHealth, alerts, loading, error } = useAdminData()
 
+  const activeCount = (systemHealth || []).filter(
+    (s) => s.status === 'HEALTHY' || s.status === 'healthy',
+  ).length
+  const totalCount = (systemHealth || []).length
+
   return (
     <AppLayout>
       <div className="admin-system-page">
@@ -42,7 +47,13 @@ function SystemPage() {
 
           <span className="admin-system-overall-status">
             <i />
-            {error ? 'Degraded' : 'Operational'}
+            {error
+              ? 'Degraded'
+              : loading
+                ? 'Checking...'
+                : totalCount > 0
+                  ? `${activeCount}/${totalCount} Active`
+                  : 'Operational'}
           </span>
         </section>
 

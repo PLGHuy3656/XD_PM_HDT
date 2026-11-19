@@ -9,6 +9,7 @@ export function normalizeZone(raw) {
   if (!raw) return null
   return {
     id: raw.id || raw.zone_id || 'unknown-zone',
+    code: raw.zone_code || raw.code || '--',
     name: raw.name || raw.zone_name || 'Khu vực',
     farmId: raw.farmId || raw.farm_id || '',
     type: raw.type || raw.zone_type || 'FLOOR',
@@ -39,6 +40,8 @@ export function normalizeFarm(raw, isMockMode = false) {
     code: raw.code || raw.farm_code || `NM-${String(raw.id || raw.farm_id || '').slice(0, 4)}`.toUpperCase(),
     address: raw.address || raw.location || 'Chưa cập nhật địa chỉ',
     status: raw.status || 'ACTIVE',
+    approvalStatus: raw.approval_status || 'APPROVED',
+    rejectionReason: raw.rejection_reason || null,
     health: raw.health || (raw.status === 'ACTIVE' ? 'Tốt' : 'Cần kiểm tra'),
     temperature: tempVal != null ? Number(tempVal) : isMockMode ? 28.5 : null,
     humidity: humVal != null ? Number(humVal) : isMockMode ? 80 : null,
@@ -53,6 +56,13 @@ export function normalizeFarm(raw, isMockMode = false) {
     },
     zones: rawZones,
   }
+}
+
+export function formatFarmOptionLabel(farm) {
+  if (!farm) return ''
+  const name = farm.name || farm.farm_name || 'Nhà yến'
+  const code = farm.code || farm.farm_code
+  return code && code !== '--' ? `${name} (${code})` : name
 }
 
 /**

@@ -14,7 +14,9 @@ import {
 } from '../../../components/features/farm-owner/alerts/alertsMockData'
 
 import { useFarms } from '../../../features/farms/hooks/useFarms'
+import { formatFarmOptionLabel } from '../../../features/farms/adapters/farmAdapter.js'
 import { useAlerts } from '../../../features/alerts/hooks/useAlerts'
+import { USE_MOCK } from '../../../api/config.js'
 
 import './AlertsPage.css'
 
@@ -99,7 +101,7 @@ function AlertsPage() {
                 onChange={handleFarmChange}
                 options={farms.map((farm) => ({
                   value: farm.id,
-                  label: farm.name,
+                  label: formatFarmOptionLabel(farm),
                 }))}
               />
             </label>
@@ -127,8 +129,13 @@ function AlertsPage() {
         )}
         {alertsError && (
           <ErrorMessage
-            title="Lỗi tải cảnh báo"
-            message={alertsError}
+            variant="warning"
+            title="Chưa kết nối dịch vụ Cảnh báo"
+            message={
+              /upstream|503|unreachable|network/i.test(String(alertsError))
+                ? 'Chưa kết nối dịch vụ Cảnh báo (Notification Service). Vui lòng thử lại sau.'
+                : alertsError
+            }
             onRetry={refetchAlerts}
           />
         )}
@@ -151,7 +158,11 @@ function AlertsPage() {
               </h2>
 
               <span className="alerts-status-indicator">
-                {alertsLoading ? 'Đang cập nhật...' : 'Hệ thống đang giám sát'}
+                {alertsLoading
+                  ? 'Đang cập nhật...'
+                  : !USE_MOCK && alertsError
+                    ? 'Notification Service chưa khả dụng'
+                    : 'Hệ thống đang giám sát'}
               </span>
             </div>
 
@@ -159,6 +170,11 @@ function AlertsPage() {
               <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}>
                 <LoadingSpinner size="lg" text="Đang tải cảnh báo..." />
               </div>
+            ) : !USE_MOCK && alertsError && filteredAlerts.length === 0 ? (
+              <EmptyState
+                title="Chưa kết nối dịch vụ Cảnh báo (Notification Service)"
+                description="Không thể tải danh sách cảnh báo do dịch vụ thông báo hiện chưa khả dụng."
+              />
             ) : filteredAlerts.length === 0 ? (
               <EmptyState
                 title="Không có cảnh báo nào"

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.controllers.technician_controller import technician_controller
 from app.core.dependencies import get_current_user, require_admin, require_roles
+from app.repositories.farm_repository import farm_repository
 from app.repositories.user_repository import user_repository
 from app.schemas.technician import (
     AssignedFarmResponse,
@@ -164,6 +165,14 @@ def assign_technician(
     is_primary: bool = True,
     current_user: dict = Depends(require_admin),
 ):
+    farm = farm_repository.get_farm_by_id(str(farm_id))
+    if not farm:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Farm not found")
+    if farm.get("approval_status") != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Farm must be approved by Admin before assigning technicians",
+        )
     return technician_controller.assign_technician(
         str(technician_id),
         str(farm_id),

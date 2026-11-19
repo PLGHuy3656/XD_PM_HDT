@@ -10,7 +10,7 @@ import {
   normalizeCamera,
 } from '../adapters/cameraAdapter.js'
 
-export function useCameras(farmId = null, cameraId = null) {
+export function useCameras(farmId = null, cameraId = null, { requireFarmId = false } = {}) {
   const [cameras, setCameras] = useState(() => (USE_MOCK ? getMockCameras() : []))
   const [birdStats, setBirdStats] = useState(() => (USE_MOCK ? getMockBirdStats() : null))
   const [events, setEvents] = useState(() => (USE_MOCK ? getMockAiEvents() : []))
@@ -30,6 +30,16 @@ export function useCameras(farmId = null, cameraId = null) {
         setEvents(getMockAiEvents())
         return
       }
+
+      if (requireFarmId && !farmId) {
+        setCameras([])
+        setBirdStats(null)
+        setEvents([])
+        return
+      }
+      setCameras([])
+      setBirdStats(null)
+      setEvents([])
 
       // Real Mode: Query devices of type CAMERA for the farm
       const devParams = farmId ? { farm_id: farmId } : {}
@@ -82,7 +92,7 @@ export function useCameras(farmId = null, cameraId = null) {
     } finally {
       setLoading(false)
     }
-  }, [farmId, cameraId])
+  }, [farmId, cameraId, requireFarmId])
 
   useEffect(() => {
     const controller = new AbortController()

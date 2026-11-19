@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import AppLayout from '../../../components/layout/AppLayout'
 import EnvironmentSelect from '../../../components/ui/Select'
@@ -14,12 +15,14 @@ import {
 } from '../../../components/features/technician/devices/devicesMockData'
 
 import { useTechnicianData } from '../../../features/technicians/hooks/useTechnicianData'
+import { formatFarmOptionLabel } from '../../../features/farms/adapters/farmAdapter.js'
 
+import '../TechnicianWorkspace.css'
 import './DevicesPage.css'
 
 function SearchIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="11" cy="11" r="6" />
       <path d="m16 16 4 4" />
     </svg>
@@ -27,6 +30,7 @@ function SearchIcon() {
 }
 
 function TechnicianDevicesPage() {
+  const navigate = useNavigate()
   const {
     farms,
     selectedFarm,
@@ -34,9 +38,11 @@ function TechnicianDevicesPage() {
     setSelectedFarmId,
     devices,
     zones,
+    telemetryError,
     loading,
     error,
     refetch,
+    updateDeviceZone,
   } = useTechnicianData()
 
   const [zoneFilter, setZoneFilter] = useState('ALL')
@@ -47,29 +53,36 @@ function TechnicianDevicesPage() {
   const [selectedDeviceId, setSelectedDeviceId] = useState(null)
   const [assignmentDeviceId, setAssignmentDeviceId] = useState(null)
   const [assignmentZoneId, setAssignmentZoneId] = useState('')
+  const [assignmentSaving, setAssignmentSaving] = useState(false)
   const [notice, setNotice] = useState('')
+  const [actionError, setActionError] = useState('')
 
   const effectiveZones = zones.length > 0 ? zones : selectedFarm?.zones || []
 
   const zoneOptions = [
     { value: 'ALL', label: 'Tất cả khu vực' },
+    { value: 'UNASSIGNED', label: 'Chưa phân bổ Zone' },
     ...effectiveZones.map((zone) => ({
       value: zone.id,
-      label: zone.name,
+      label: `${zone.code && zone.code !== '--' ? `${zone.code} · ` : ''}${zone.name}`,
     })),
   ]
 
-  const assignmentZoneOptions = effectiveZones.map((zone) => ({
-    value: zone.id,
-    label: zone.name,
-  }))
+  const assignmentZoneOptions = [
+    { value: '', label: 'Chưa phân bổ Zone (Gỡ khỏi Zone)' },
+    ...effectiveZones.map((zone) => ({
+      value: zone.id,
+      label: `${zone.code && zone.code !== '--' ? `${zone.code} · ` : ''}${zone.name}`,
+    })),
+  ]
 
   const filteredDevices = useMemo(() => {
     const keyword = search.trim().toLowerCase()
 
     return devices.filter((device) => {
       const matchesZone =
-        zoneFilter === 'ALL' || device.zoneId === zoneFilter
+        zoneFilter === 'ALL' ||
+        (zoneFilter === 'UNASSIGNED' ? !device.isZoneAssigned : device.zoneId === zoneFilter)
 
       const matchesStatus =
         statusFilter === 'ALL' || device.status === statusFilter
@@ -80,6 +93,7 @@ function TechnicianDevicesPage() {
       const matchesSearch =
         !keyword ||
         device.id.toLowerCase().includes(keyword) ||
+        (device.nodeId && device.nodeId.toLowerCase().includes(keyword)) ||
         device.name.toLowerCase().includes(keyword) ||
         (device.typeLabel && device.typeLabel.toLowerCase().includes(keyword))
 
@@ -94,6 +108,7 @@ function TechnicianDevicesPage() {
     devices.find((device) => device.id === assignmentDeviceId) ?? null
 
   const onlineCount = devices.filter((device) => device.status === 'ONLINE').length
+  const unassignedCount = devices.filter((device) => !device.isZoneAssigned).length
   const attentionCount = devices.filter(
     (device) => device.status === 'WARNING' || device.status === 'OFFLINE',
   ).length
@@ -103,104 +118,128 @@ function TechnicianDevicesPage() {
     .filter((signal) => typeof signal === 'number')
 
   const averageRssi = averageRssiValues.length
-    ? Math.round(
+    ? `${Math.round(
         averageRssiValues.reduce((total, value) => total + value, 0) /
           averageRssiValues.length,
-      )
-    : -60
+      )} dBm`
+    : 'Chưa có'
 
-  const handleOpenAssignment = (device) => {
-    setAssignmentDeviceId(device.id)
-    setAssignmentZoneId(device.zoneId || effectiveZones[0]?.id || '')
+  const handleOpenAssignment = (deviceOrId) => {
+    const target =
+      typeof deviceOrId === 'string'
+        ? devices.find((d) => d.id === deviceOrId)
+        : deviceOrId
+    if (!target) return
+    setActionError('')
+    setAssignmentDeviceId(target.id)
+    setAssignmentZoneId(target.zoneId || '')
   }
 
   const handleCloseAssignment = () => {
     setAssignmentDeviceId(null)
     setAssignmentZoneId('')
+    setActionError('')
   }
 
-  const handleSaveAssignment = () => {
-    if (!assignmentDevice || !assignmentZoneId) {
+  const handleSaveAssignment = async () => {
+    if (!assignmentDevice) {
       return
     }
-
+    setActionError('')
+    setNotice('')
+    setAssignmentSaving(true)
+    const res = await updateDeviceZone(assignmentDevice.id, assignmentZoneId || null)
+    setAssignmentSaving(false)
+    if (!res?.success) {
+      setActionError(res?.error || 'Không thể cập nhật phân bổ khu vực cho thiết bị.')
+      return
+    }
     const targetZone = effectiveZones.find((zone) => zone.id === assignmentZoneId)
-    const targetZoneName = targetZone?.name || 'Khu vực'
-
+    const targetZoneName = targetZone?.name || 'Chưa phân bổ Zone'
     setNotice(
-      `Đã chuyển ${assignmentDevice.id} sang ${targetZoneName}. Cấu hình đã được lưu trên thiết bị.`,
+      `Đã cập nhật phân bổ khu vực cho ${assignmentDevice.name} (${assignmentDevice.nodeId}) → ${targetZoneName}.`,
     )
     handleCloseAssignment()
   }
 
   return (
     <AppLayout>
-      <div className="tech-devices-page">
-        <header className="tech-devices-hero">
-          <div>
-            <span className="tech-devices-eyebrow">TECHNICIAN WORKSPACE</span>
+      <div className="tech-ws tech-devices-page">
+        <header className="tech-ws-header">
+          <div className="tech-ws-header__copy">
+            <span className="tech-ws-eyebrow">TECHNICIAN DEVICES</span>
             <h1>Quản lý thiết bị</h1>
             <p>
-              Giám sát tình trạng phần cứng, kết nối và phân bổ khu vực lắp đặt
-              cho toàn bộ thiết bị tại các nhà yến được phân công.
+              Giám sát thiết bị đã đăng ký, trạng thái kết nối IoT và phân bổ khu vực tại nhà yến được phân công.
             </p>
           </div>
 
-          <div className="tech-devices-farm-picker">
-            <span>Nhà yến phụ trách</span>
-            <EnvironmentSelect
-              value={selectedFarmId || ''}
-              options={farms.map((farm) => ({
-                value: farm.id,
-                label: farm.name,
-              }))}
-              onChange={(nextFarmId) => {
-                setSelectedFarmId(nextFarmId)
-                setSelectedDeviceId(null)
-                setZoneFilter('ALL')
-              }}
-            />
+          <div className="tech-ws-header__actions">
+            {farms.length > 0 && (
+              <div className="tech-ws-farm-picker">
+                <span>Nhà yến phụ trách</span>
+                <EnvironmentSelect
+                  value={selectedFarmId || ''}
+                  options={farms.map((farm) => ({
+                    value: farm.id,
+                    label: formatFarmOptionLabel(farm),
+                  }))}
+                  onChange={(nextFarmId) => {
+                    setSelectedFarmId(nextFarmId)
+                    setSelectedDeviceId(null)
+                    setZoneFilter('ALL')
+                    setNotice('')
+                    setActionError('')
+                  }}
+                />
+              </div>
+            )}
+            <button
+              type="button"
+              className="tech-ws-btn tech-ws-btn--primary"
+              style={{ height: '42px' }}
+              onClick={() => navigate('/technician/installation')}
+            >
+              + Lắp đặt / Đăng ký mới
+            </button>
           </div>
         </header>
 
-        {notice && (
-          <div className="tech-devices-banner">
-            <span />
-            <p>{notice}</p>
-          </div>
-        )}
+        {notice && <div className="tech-ws-notice">{notice}</div>}
 
-        {error && (
+        {(error || actionError) && (
           <ErrorMessage
-            title="Lỗi tải danh sách thiết bị"
-            message={error}
+            title="Lỗi thao tác thiết bị"
+            message={actionError || error}
             onRetry={refetch}
           />
         )}
 
-        <section className="tech-devices-overview">
-          <article className="tech-devices-metric-card">
-            <span className="metric-title">Tổng thiết bị</span>
-            <strong className="metric-number">{devices.length}</strong>
-            <small className="metric-caption">Đang lắp đặt tại {selectedFarm?.name}</small>
+        <section className="tech-ws-kpi-grid">
+          <article className="tech-ws-kpi-card">
+            <span>Tổng thiết bị</span>
+            <strong>{devices.length}</strong>
+            <small>{selectedFarm ? `Tại ${selectedFarm.name}` : 'Chưa chọn nhà yến'}</small>
           </article>
 
-          <article className="tech-devices-metric-card">
-            <span className="metric-title">Trực tuyến</span>
-            <strong className="metric-number metric-online">{onlineCount}</strong>
-            <small className="metric-caption">Phản hồi bình thường</small>
+          <article className="tech-ws-kpi-card">
+            <span>Trực tuyến</span>
+            <strong>{telemetryError ? '—' : onlineCount}</strong>
+            <small>{telemetryError ? 'Chưa kết nối dịch vụ IoT' : 'Phản hồi bình thường'}</small>
           </article>
 
-          <article className="tech-devices-metric-card">
-            <span className="metric-title">Cần chú ý</span>
-            <strong className="metric-number metric-attention">{attentionCount}</strong>
-            <small className="metric-caption">Cảnh báo hoặc ngoại tuyến</small>
+          <article className="tech-ws-kpi-card">
+            <span>Chưa phân bổ Zone</span>
+            <strong style={{ color: unassignedCount > 0 ? '#b45309' : '#059669' }}>
+              {unassignedCount}
+            </strong>
+            <small>{attentionCount > 0 ? `${attentionCount} thiết bị cần chú ý` : 'Cần gán khu vực lắp đặt'}</small>
           </article>
 
-          <article className="tech-devices-metric-card">
-            <span className="metric-title">Tín hiệu trung bình</span>
-            <strong className="metric-number">{averageRssi} dBm</strong>
-            <small className="metric-caption">Chất lượng sóng Wi-Fi/Zigbee</small>
+          <article className="tech-ws-kpi-card">
+            <span>Tín hiệu trung bình</span>
+            <strong>{averageRssi}</strong>
+            <small>{telemetryError ? 'Chưa kết nối dịch vụ IoT' : 'Chất lượng sóng Wi-Fi/Zigbee'}</small>
           </article>
         </section>
 
@@ -256,7 +295,9 @@ function TechnicianDevicesPage() {
             ) : (
               <DeviceTable
                 devices={filteredDevices}
+                farmName={selectedFarm?.name || ''}
                 selectedDeviceId={selectedDeviceId}
+                onOpenDetail={(id) => setSelectedDeviceId(id)}
                 onSelectDevice={(device) => setSelectedDeviceId(device.id)}
                 onOpenAssignment={handleOpenAssignment}
               />
@@ -266,20 +307,32 @@ function TechnicianDevicesPage() {
           <aside className="tech-devices-side-panel">
             <DeviceDetailPanel
               device={selectedDevice}
+              zoneName={
+                selectedDevice?.isZoneAssigned
+                  ? selectedDevice.zoneName
+                  : 'Chưa phân bổ Zone'
+              }
               onClose={() => setSelectedDeviceId(null)}
-              onOpenAssignment={handleOpenAssignment}
+              onAssign={handleOpenAssignment}
             />
           </aside>
         </section>
 
         <DeviceAssignmentModal
-          open={Boolean(assignmentDevice)}
           device={assignmentDevice}
-          zones={assignmentZoneOptions}
-          selectedZoneId={assignmentZoneId}
-          onSelectZone={setAssignmentZoneId}
+          currentZoneName={
+            assignmentDevice?.isZoneAssigned
+              ? assignmentDevice.zoneName
+              : 'Chưa phân bổ Zone'
+          }
+          farmName={selectedFarm ? formatFarmOptionLabel(selectedFarm) : ''}
+          zoneId={assignmentZoneId}
+          zoneOptions={assignmentZoneOptions}
+          saving={assignmentSaving}
+          error={actionError}
+          onZoneChange={setAssignmentZoneId}
           onClose={handleCloseAssignment}
-          onSave={handleSaveAssignment}
+          onConfirm={handleSaveAssignment}
         />
       </div>
     </AppLayout>

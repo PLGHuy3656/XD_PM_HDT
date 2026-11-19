@@ -98,8 +98,13 @@ function DeviceDetailPanel({ device, onClose, onEdit, onDelete }) {
 
           <div className="admin-device-info-grid">
             <div>
-              <span>Device ID</span>
-              <strong>{device.id}</strong>
+              <span>Node ID</span>
+              <strong>{device.nodeId || device.id}</strong>
+            </div>
+
+            <div>
+              <span>Device UUID</span>
+              <strong style={{ fontSize: '0.78rem', wordBreak: 'break-all' }}>{device.deviceId || '--'}</strong>
             </div>
 
             <div>
@@ -127,26 +132,34 @@ function DeviceDetailPanel({ device, onClose, onEdit, onDelete }) {
             </div>
 
             <div>
-              <span>Khu vực</span>
-              <strong>{device.zone.name}</strong>
-              <small>{device.zone.floor}</small>
+              <span>Khu vực (Zone)</span>
+              <strong style={!device.isZoneAssigned ? { color: '#b45309' } : undefined}>
+                {device.zone.name}
+              </strong>
+              <small>{device.isZoneAssigned ? device.zone.floor : 'Chưa gán khu vực'}</small>
+            </div>
+
+            <div>
+              <span>Technician phụ trách Farm</span>
+              <strong>{device.farmTechnician?.name || 'Chưa phân công'}</strong>
+              <small>{device.farmTechnician?.email || '--'}</small>
             </div>
           </div>
         </section>
 
         <section className="admin-device-detail__section">
           <span className="admin-device-detail__label">
-            QUYỀN QUẢN TRỊ
+            QUẢN TRỊ THIẾT BỊ
           </span>
 
           <div className="admin-device-readonly-note">
-            <strong>Chế độ chỉ xem</strong>
+            <strong>Đăng ký &amp; phân bổ</strong>
 
             <p>
-              Administrator giám sát trạng thái thiết bị
-              toàn hệ thống. Cài đặt, cấu hình,
-              diagnostics và thao tác kỹ thuật được thực
-              hiện trong Technician workflow.
+              Administrator quản lý đăng ký thiết bị, cập nhật
+              thông tin và theo dõi phân bổ Farm/Zone. Việc có
+              Zone chưa đồng nghĩa thiết bị đã lắp đặt hoặc Online;
+              lắp đặt và chẩn đoán thực tế thuộc quy trình Technician.
             </p>
           </div>
         </section>

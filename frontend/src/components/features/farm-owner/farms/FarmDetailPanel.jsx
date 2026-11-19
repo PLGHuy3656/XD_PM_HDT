@@ -12,6 +12,13 @@ function FarmDetailPanel({ farm }) {
   }
 
   const technician = farm.assignedTechnician
+  const approvalStatus = farm.approvalStatus || 'APPROVED'
+  const approvalText =
+    approvalStatus === 'PENDING'
+      ? 'Chờ Admin phê duyệt'
+      : approvalStatus === 'REJECTED'
+      ? 'Bị từ chối'
+      : 'Đã phê duyệt'
 
   return (
     <section className="farm-detail">
@@ -24,37 +31,57 @@ function FarmDetailPanel({ farm }) {
           </p>
         </div>
 
-        <span className="farm-detail__active">
+        <span
+          className="farm-detail__active"
+          style={
+            approvalStatus === 'PENDING'
+              ? { background: '#fef3c7', color: '#92400e' }
+              : approvalStatus === 'REJECTED'
+              ? { background: '#fef2f2', color: '#991b1b' }
+              : undefined
+          }
+        >
           <i />
-          Đang hoạt động
+          {approvalText}
         </span>
       </div>
+
+      {approvalStatus === 'PENDING' && (
+        <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', borderRadius: '8px', background: '#fffbeb', color: '#92400e', border: '1px solid #fcd34d' }}>
+          Nhà yến đang chờ Admin phê duyệt. Các thao tác tạo khu vực, đăng ký thiết bị và điều khiển thiết bị sẽ khả dụng sau khi được duyệt.
+        </div>
+      )}
+      {approvalStatus === 'REJECTED' && (
+        <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', borderRadius: '8px', background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca' }}>
+          Nhà yến đã bị từ chối{farm.rejectionReason ? `: ${farm.rejectionReason}` : '.'}
+        </div>
+      )}
 
       <div className="farm-detail__summary">
         <article>
           <span>Khu vực</span>
-          <strong>{farm.zones.length}</strong>
+          <strong>{farm.zoneCount ?? farm.zones.length}</strong>
           <small>Đang được giám sát</small>
         </article>
 
         <article>
           <span>Thiết bị</span>
           <strong>
-            {farm.onlineDevices}/{farm.totalDevices}
+            {farm.onlineDevices ?? 0}/{farm.totalDevices ?? 0}
           </strong>
           <small>Thiết bị trực tuyến</small>
         </article>
 
         <article>
           <span>Nhiệt độ TB</span>
-          <strong>{farm.temperature}°C</strong>
-          <small>Trong ngưỡng vận hành</small>
+          <strong>{farm.temperature != null ? `${farm.temperature}°C` : '--'}</strong>
+          <small>{farm.temperature != null ? 'Trong ngưỡng vận hành' : 'Chưa có dữ liệu'}</small>
         </article>
 
         <article>
           <span>Độ ẩm TB</span>
-          <strong>{farm.humidity}%</strong>
-          <small>Mức hiện tại</small>
+          <strong>{farm.humidity != null ? `${farm.humidity}%` : '--'}</strong>
+          <small>{farm.humidity != null ? 'Mức hiện tại' : 'Chưa có dữ liệu'}</small>
         </article>
       </div>
 

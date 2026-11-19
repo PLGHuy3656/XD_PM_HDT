@@ -388,6 +388,24 @@ class DeviceRepository:
                         raise ValueError("Invalid zone_id reference") from exc
         return self.get_device_by_id(existing["device_id"])
 
+    def update_device_zone(self, device_id: str, zone_id: str | None) -> dict | None:
+        import psycopg
+        existing = self.get_device_by_id(device_id)
+        if not existing:
+            return None
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                try:
+                    cur.execute(
+                        "UPDATE devices SET zone_id = %s, updated_at = NOW() WHERE id = %s;",
+                        (zone_id, existing["device_id"]),
+                    )
+                    conn.commit()
+                except psycopg.errors.ForeignKeyViolation as exc:
+                    conn.rollback()
+                    raise ValueError("Invalid zone_id reference") from exc
+        return self.get_device_by_id(existing["device_id"])
+
     def delete_device(self, device_id: str) -> bool:
         existing = self.get_device_by_id(device_id)
         if not existing:

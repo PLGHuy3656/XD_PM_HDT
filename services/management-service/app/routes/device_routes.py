@@ -6,12 +6,15 @@ from app.core.dependencies import (
     require_roles,
     verify_farm_resource_access,
 )
+from app.repositories.device_repository import device_repository
+from app.repositories.farm_repository import farm_repository
 from app.repositories.user_repository import user_repository
 from app.repositories.zone_repository import zone_repository
 from app.schemas.device import (
     DeviceCreateRequest,
     DeviceRegistryResponse,
     DeviceUpdateRequest,
+    DeviceZoneUpdateRequest,
 )
 
 router = APIRouter(
@@ -80,16 +83,22 @@ def get_device(device_id: str, current_user: dict = Depends(get_current_user)):
     "",
     response_model=DeviceRegistryResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Register a new device in a farm (Admin or owning Farm Owner)",
+    summary="Register a new device in an approved farm (Admin, owning Farm Owner, or assigned Technician)",
 )
 def create_device(
     payload: DeviceCreateRequest,
-    current_user: dict = Depends(require_roles("ADMIN", "FARM_OWNER")),
+    current_user: dict = Depends(require_roles("ADMIN", "FARM_OWNER", "TECHNICIAN")),
 ):
     verify_farm_resource_access(current_user, payload.farm_id)
     farm_uuid = user_repository.resolve_farm_uuid(payload.farm_id)
     if not farm_uuid:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Farm not found")
+    farm = farm_repository.get_farm_by_id(farm_uuid)
+    if not farm or farm.get("approval_status") != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Farm must be approved by Admin before registering devices",
+        )
     if payload.zone_id:
         zone = zone_repository.get_zone_by_id(payload.zone_id)
         if not zone or str(zone["farm_id"]) != str(farm_uuid):
@@ -138,6 +147,42 @@ def update_device(
         ip_address=payload.ip_address,
         is_active=payload.is_active,
     )
+
+
+@router.patch(
+    "/{device_id}/zone",
+    response_model=DeviceRegistryResponse,
+    summary="Update device zone assignment (Admin, owning Farm Owner, or assigned Technician)",
+)
+def update_device_zone(
+    device_id: str,
+    payload: DeviceZoneUpdateRequest,
+    current_user: dict = Depends(require_roles("ADMIN", "FARM_OWNER", "TECHNICIAN")),
+):
+    parent_farm_id = user_repository.get_farm_id_for_device(device_id)
+    if not parent_farm_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+    verify_farm_resource_access(current_user, parent_farm_id)
+    farm = farm_repository.get_farm_by_id(str(parent_farm_id))
+    if not farm or farm.get("approval_status") != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Farm must be approved by Admin before updating device zone mapping",
+        )
+    if payload.zone_id:
+        zone = zone_repository.get_zone_by_id(payload.zone_id)
+        if not zone or str(zone["farm_id"]) != str(parent_farm_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="zone_id does not belong to device's parent farm",
+            )
+    try:
+        updated = device_repository.update_device_zone(device_id, payload.zone_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+    return updated
 
 
 @router.delete(

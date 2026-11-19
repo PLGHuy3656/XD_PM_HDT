@@ -62,6 +62,10 @@ export const devicesApi = {
     return apiClient.put(ENDPOINTS.DEVICES.DETAIL(deviceId), payload, options)
   },
 
+  async updateDeviceZone(deviceId, zoneId, options = {}) {
+    return apiClient.patch(`${ENDPOINTS.DEVICES.DETAIL(deviceId)}/zone`, { zone_id: zoneId || null }, options)
+  },
+
   async deleteDevice(deviceId, options = {}) {
     return apiClient.delete(ENDPOINTS.DEVICES.DETAIL(deviceId), options)
   },

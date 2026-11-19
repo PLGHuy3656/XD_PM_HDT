@@ -50,6 +50,10 @@ CREATE TABLE IF NOT EXISTS farms (
     name VARCHAR(255) NOT NULL,
     address TEXT,
     status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+    approval_status VARCHAR(20) NOT NULL DEFAULT 'APPROVED',
+    approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    approved_at TIMESTAMPTZ,
+    rejection_reason TEXT,
     owner_id UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

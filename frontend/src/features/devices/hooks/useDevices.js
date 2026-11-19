@@ -3,7 +3,7 @@ import { devicesApi } from '../../../api/modules/devicesApi.js'
 import { USE_MOCK } from '../../../api/config.js'
 import { getMockDevices, normalizeDevice } from '../adapters/deviceAdapter.js'
 
-export function useDevices(farmId = null) {
+export function useDevices(farmId = null, { requireFarmId = false } = {}) {
   const [devices, setDevices] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -19,6 +19,12 @@ export function useDevices(farmId = null) {
         setDevices(filtered)
         return
       }
+
+      if (requireFarmId && !farmId) {
+        setDevices([])
+        return
+      }
+      setDevices([])
 
       // Query real Gateway /api/devices with optional farm_id filter
       const options = {
@@ -37,7 +43,7 @@ export function useDevices(farmId = null) {
     } finally {
       setLoading(false)
     }
-  }, [farmId])
+  }, [farmId, requireFarmId])
 
   useEffect(() => {
     const controller = new AbortController()
