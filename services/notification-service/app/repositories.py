@@ -167,6 +167,66 @@ def notification_content(
             "danger",
         )
 
+    if event_type == "ai.predator.detected":
+        predator = data.get("predatorClass") or data.get("predator_class") or "thiên địch"
+        camera_id = data.get("cameraId") or data.get("camera_id") or "camera"
+        confidence = data.get("confidence")
+        conf_text = (
+            f" (độ tin cậy {float(confidence):.0%})"
+            if isinstance(confidence, (int, float)) and 0 <= confidence <= 1
+            else ""
+        )
+        return (
+            "AI phát hiện thiên địch",
+            f"Phát hiện {predator} từ {camera_id}{conf_text}.",
+            "danger",
+        )
+
+    if event_type == "iot.command.failed":
+        dev = data.get("deviceId") or data.get("node_id") or "Thiết bị"
+        action = data.get("action") or "lệnh điều khiển"
+        reason = data.get("reason") or "thực thi thất bại hoặc quá hạn ACK"
+        return (
+            "Lệnh điều khiển thiết bị thất bại",
+            f"{dev}: {action} — {reason}.",
+            "danger",
+        )
+
+    if event_type == "iot.device.offline":
+        dev = data.get("deviceId") or data.get("node_id") or "Thiết bị"
+        return (
+            "Thiết bị mất kết nối",
+            f"Thiết bị {dev} đã mất kết nối hoặc quá hạn heartbeat.",
+            "danger",
+        )
+
+    if event_type == "iot.device.online":
+        dev = data.get("deviceId") or data.get("node_id") or "Thiết bị"
+        return (
+            "Thiết bị kết nối trở lại",
+            f"Thiết bị {dev} đã hoạt động trực tuyến trở lại.",
+            "info",
+        )
+
+    if event_type.startswith("iot.environment.") or event_type.startswith("iot.audio."):
+        dev = data.get("deviceId") or "Thiết bị"
+        metric = data.get("metric") or "môi trường"
+        val = data.get("value")
+        unit = data.get("unit") or ""
+        recovered = event_type.endswith(".recovered")
+        val_text = f" ({val}{unit})" if val is not None else ""
+        if recovered:
+            return (
+                "Thông số môi trường đã ổn định",
+                f"{dev}: {metric}{val_text} đã trở về ngưỡng an toàn.",
+                "info",
+            )
+        return (
+            "Cảnh báo môi trường vượt ngưỡng",
+            f"{dev}: cảnh báo {metric}{val_text} vượt ngưỡng an toàn.",
+            "danger",
+        )
+
     if event_type == "management.work_request.created":
         request_id = data.get("work_request_id") or ""
         farm_name = data.get("farm_name") or "nhà yến"

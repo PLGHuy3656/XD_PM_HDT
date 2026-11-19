@@ -56,6 +56,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.include_router(router)
+app.include_router(router, prefix="/api/v1", include_in_schema=False)
 app.include_router(websocket_router)
 
 

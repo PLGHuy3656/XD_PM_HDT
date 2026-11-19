@@ -1,9 +1,15 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version VARCHAR(64) PRIMARY KEY,
+    description TEXT NOT NULL,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     event_id UUID NOT NULL,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL,
     event_type VARCHAR(150) NOT NULL,
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
@@ -22,7 +28,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
 
 CREATE TABLE IF NOT EXISTS notification_push_subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL,
     endpoint TEXT NOT NULL,
     p256dh TEXT NOT NULL,
     auth TEXT NOT NULL,
@@ -33,7 +39,7 @@ CREATE TABLE IF NOT EXISTS notification_push_subscriptions (
 
 CREATE TABLE IF NOT EXISTS notification_fcm_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL,
     token TEXT NOT NULL UNIQUE,
     platform VARCHAR(20) NOT NULL
         CHECK (platform IN ('android', 'ios', 'web')),
@@ -63,3 +69,7 @@ CREATE TABLE IF NOT EXISTS notification_deliveries (
 CREATE INDEX IF NOT EXISTS idx_notification_deliveries_due
     ON notification_deliveries (next_attempt_at, created_at)
     WHERE status IN ('pending', 'failed');
+
+INSERT INTO schema_migrations (version, description)
+VALUES ('001_initial_notification_schema', 'Initial Notification Service isolated persistence schema')
+ON CONFLICT (version) DO NOTHING;
