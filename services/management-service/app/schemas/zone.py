@@ -11,7 +11,7 @@ class ZoneResponse(BaseModel):
 
 
 class ZoneCreateRequest(BaseModel):
-    zone_code: str = Field(..., min_length=1, max_length=100)
+    zone_code: str | None = Field(default=None, max_length=100)
     name: str = Field(..., min_length=1, max_length=255)
 
 

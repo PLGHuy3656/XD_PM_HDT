@@ -30,7 +30,7 @@ class ZoneController:
                 detail=str(exc),
             ) from exc
 
-    def create_zone(self, farm_uuid: str, zone_code: str, name: str):
+    def create_zone(self, farm_uuid: str, zone_code: str | None = None, name: str = ""):
         try:
             return self.service.create_zone(farm_uuid=farm_uuid, zone_code=zone_code, name=name)
         except ValueError as exc:

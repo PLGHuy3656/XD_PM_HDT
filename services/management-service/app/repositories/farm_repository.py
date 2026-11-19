@@ -39,6 +39,8 @@ class FarmRepository:
                 f.name,
                 f.address,
                 f.status,
+                f.approval_status,
+                f.rejection_reason,
                 COUNT(DISTINCT z.id) AS zone_count,
                 COUNT(DISTINCT d.id) AS device_count
             FROM farms f
@@ -53,7 +55,9 @@ class FarmRepository:
                 f.farm_code,
                 f.name,
                 f.address,
-                f.status
+                f.status,
+                f.approval_status,
+                f.rejection_reason
             ORDER BY f.name
         """
 
@@ -69,8 +73,10 @@ class FarmRepository:
                 "farm_name": row[2],
                 "address": row[3],
                 "status": row[4] or "ACTIVE",
-                "zone_count": row[5],
-                "device_count": row[6],
+                "approval_status": row[5] or "APPROVED",
+                "rejection_reason": row[6],
+                "zone_count": row[7],
+                "device_count": row[8],
             }
             for row in rows
         ]
@@ -100,6 +106,10 @@ class FarmRepository:
                         f.name,
                         f.address,
                         f.status,
+                        f.approval_status,
+                        f.approved_by,
+                        f.approved_at,
+                        f.rejection_reason,
                         f.created_at,
                         COUNT(DISTINCT z.id) AS zone_count,
                         COUNT(DISTINCT d.id) AS device_count,
@@ -127,6 +137,10 @@ class FarmRepository:
                         f.name,
                         f.address,
                         f.status,
+                        f.approval_status,
+                        f.approved_by,
+                        f.approved_at,
+                        f.rejection_reason,
                         f.created_at,
                         t.id,
                         t.full_name,
@@ -146,44 +160,120 @@ class FarmRepository:
             "farm_name": row[2],
             "address": row[3],
             "status": row[4] or "ACTIVE",
-            "created_at": row[5].isoformat() if row[5] else None,
-            "zone_count": row[6],
-            "device_count": row[7],
-            "owner_name": row[10],
-            "owner_phone": row[11],
-            "technician_id": str(row[8]) if row[8] else None,
-            "technician_name": row[9] if row[9] else None,
+            "approval_status": row[5] or "APPROVED",
+            "approved_by": str(row[6]) if row[6] else None,
+            "approved_at": row[7].isoformat() if row[7] else None,
+            "rejection_reason": row[8],
+            "created_at": row[9].isoformat() if row[9] else None,
+            "zone_count": row[10],
+            "device_count": row[11],
+            "owner_name": row[14],
+            "owner_phone": row[15],
+            "technician_id": str(row[12]) if row[12] else None,
+            "technician_name": row[13] if row[13] else None,
         }
 
     def create_farm(
         self,
-        farm_code: str,
-        farm_name: str,
+        farm_code: str | None = None,
+        farm_name: str = "",
         address: str | None = None,
         status: str = "ACTIVE",
         owner_id: str | None = None,
+        approval_status: str = "APPROVED",
+        approved_by: str | None = None,
     ) -> dict:
+        import secrets
         import psycopg
+
+        auto_generate = not (isinstance(farm_code, str) and farm_code.strip())
+        max_attempts = 8 if auto_generate else 1
+
         with get_connection() as conn:
             with conn.cursor() as cur:
-                try:
-                    cur.execute(
-                        """
-                        INSERT INTO farms (farm_code, name, address, status, owner_id)
-                        VALUES (%s, %s, %s, %s, %s)
-                        RETURNING id;
-                        """,
-                        (farm_code.strip(), farm_name.strip(), address, status, owner_id),
+                for _ in range(max_attempts):
+                    candidate_code = (
+                        f"FARM-{secrets.token_hex(3).upper()}"
+                        if auto_generate
+                        else farm_code.strip()
                     )
-                    new_id = str(cur.fetchone()[0])
-                    conn.commit()
-                except psycopg.errors.UniqueViolation as exc:
-                    conn.rollback()
-                    raise ValueError(f"Farm code '{farm_code}' already exists") from exc
-                except psycopg.errors.ForeignKeyViolation as exc:
-                    conn.rollback()
-                    raise ValueError("Invalid owner_id reference") from exc
-        return self.get_farm_by_id(new_id)
+                    try:
+                        cur.execute(
+                            """
+                            INSERT INTO farms (
+                                farm_code, name, address, status, owner_id,
+                                approval_status, approved_by, approved_at
+                            )
+                            VALUES (
+                                %s, %s, %s, %s, %s,
+                                %s, %s, CASE WHEN %s = 'APPROVED' THEN NOW() ELSE NULL END
+                            )
+                            RETURNING id;
+                            """,
+                            (
+                                candidate_code,
+                                farm_name.strip(),
+                                address,
+                                status,
+                                owner_id,
+                                approval_status,
+                                approved_by,
+                                approval_status,
+                            ),
+                        )
+                        new_id = str(cur.fetchone()[0])
+                        conn.commit()
+                        return self.get_farm_by_id(new_id)
+                    except psycopg.errors.UniqueViolation as exc:
+                        conn.rollback()
+                        if not auto_generate:
+                            raise ValueError(f"Farm code '{farm_code}' already exists") from exc
+                    except psycopg.errors.ForeignKeyViolation as exc:
+                        conn.rollback()
+                        raise ValueError("Invalid owner_id reference") from exc
+        raise ValueError("Failed to generate unique farm_code")
+
+    def approve_farm(self, farm_id: str, admin_user_id: str) -> dict | None:
+        existing = self.get_farm_by_id(farm_id)
+        if not existing:
+            return None
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE farms
+                    SET approval_status = 'APPROVED',
+                        approved_by = %s,
+                        approved_at = NOW(),
+                        rejection_reason = NULL,
+                        updated_at = NOW()
+                    WHERE id = %s;
+                    """,
+                    (admin_user_id, existing["farm_id"]),
+                )
+                conn.commit()
+        return self.get_farm_by_id(existing["farm_id"])
+
+    def reject_farm(self, farm_id: str, admin_user_id: str, rejection_reason: str) -> dict | None:
+        existing = self.get_farm_by_id(farm_id)
+        if not existing:
+            return None
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE farms
+                    SET approval_status = 'REJECTED',
+                        approved_by = %s,
+                        approved_at = NOW(),
+                        rejection_reason = %s,
+                        updated_at = NOW()
+                    WHERE id = %s;
+                    """,
+                    (admin_user_id, rejection_reason.strip(), existing["farm_id"]),
+                )
+                conn.commit()
+        return self.get_farm_by_id(existing["farm_id"])
 
     def update_farm(
         self,

@@ -114,28 +114,41 @@ class ZoneRepository:
             "device_count": row[5],
         }
 
-    def create_zone(self, farm_uuid: str, zone_code: str, name: str) -> dict:
+    def create_zone(self, farm_uuid: str, zone_code: str | None = None, name: str = "") -> dict:
+        import secrets
         import psycopg
+
+        auto_generate = not (isinstance(zone_code, str) and zone_code.strip())
+        max_attempts = 8 if auto_generate else 1
+
         with get_connection() as conn:
             with conn.cursor() as cur:
-                try:
-                    cur.execute(
-                        """
-                        INSERT INTO zones (farm_id, zone_code, name)
-                        VALUES (%s, %s, %s)
-                        RETURNING id;
-                        """,
-                        (farm_uuid, zone_code.strip(), name.strip()),
+                for _ in range(max_attempts):
+                    candidate_code = (
+                        f"Z-{secrets.token_hex(3).upper()}"
+                        if auto_generate
+                        else zone_code.strip()
                     )
-                    new_id = str(cur.fetchone()[0])
-                    conn.commit()
-                except psycopg.errors.UniqueViolation as exc:
-                    conn.rollback()
-                    raise ValueError(f"Zone code '{zone_code}' already exists in farm") from exc
-                except psycopg.errors.ForeignKeyViolation as exc:
-                    conn.rollback()
-                    raise ValueError("Invalid farm_id reference") from exc
-        return self.get_zone_by_id(new_id)
+                    try:
+                        cur.execute(
+                            """
+                            INSERT INTO zones (farm_id, zone_code, name)
+                            VALUES (%s, %s, %s)
+                            RETURNING id;
+                            """,
+                            (farm_uuid, candidate_code, name.strip()),
+                        )
+                        new_id = str(cur.fetchone()[0])
+                        conn.commit()
+                        return self.get_zone_by_id(new_id)
+                    except psycopg.errors.UniqueViolation as exc:
+                        conn.rollback()
+                        if not auto_generate:
+                            raise ValueError(f"Zone code '{zone_code}' already exists in farm") from exc
+                    except psycopg.errors.ForeignKeyViolation as exc:
+                        conn.rollback()
+                        raise ValueError("Invalid farm_id reference") from exc
+        raise ValueError("Failed to generate unique zone_code")
 
     def update_zone(self, zone_id: str, zone_code: str | None = None, name: str | None = None) -> dict | None:
         import psycopg
