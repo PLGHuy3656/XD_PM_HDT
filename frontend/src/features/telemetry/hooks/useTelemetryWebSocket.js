@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { WS_BASE_URL, USE_MOCK } from '../../../api/config.js'
 import { getAuthToken } from '../../../api/client.js'
+import { telemetryApi } from '../../../api/modules/telemetryApi.js'
 import { normalizeTelemetry } from '../adapters/telemetryAdapter.js'
 
 export function useTelemetryWebSocket(farmId = null) {
-  const [connectionStatus, setConnectionStatus] = useState('connecting')
+  const [connectionStatus, setConnectionStatus] = useState(USE_MOCK ? 'connected' : 'connecting')
   const [latestTelemetry, setLatestTelemetry] = useState(() => normalizeTelemetry(null))
   const reconnectAttemptsRef = useRef(0)
 
   useEffect(() => {
     // If in mock mode, simulate live telemetry stream with gentle variation
     if (USE_MOCK) {
-      setConnectionStatus('connected')
       const interval = setInterval(() => {
         setLatestTelemetry((prev) => {
           const deltaT = (Math.random() - 0.5) * 0.2
@@ -30,7 +30,29 @@ export function useTelemetryWebSocket(farmId = null) {
 
     let socket = null
     let reconnectTimer = null
+    let httpInterval = null
     let stopped = false
+
+    // Authenticated farm-scoped HTTP fallback polling (3s) — never uses a hardcoded farmId
+    const fetchLatestHttp = async () => {
+      if (stopped || !farmId || !getAuthToken()) return
+      try {
+        const response = await telemetryApi.getFarmLatest(farmId)
+        if (!stopped && response) {
+          const normalized = normalizeTelemetry(response, false)
+          if (normalized && (normalized.temperature != null || normalized.humidity != null)) {
+            setLatestTelemetry(normalized)
+          }
+        }
+      } catch {
+        // Ignore transient polling errors; WebSocket / connectionStatus reflects live link state
+      }
+    }
+
+    if (farmId && getAuthToken()) {
+      fetchLatestHttp()
+      httpInterval = setInterval(fetchLatestHttp, 3000)
+    }
 
     function connect() {
       if (stopped) return
@@ -88,6 +110,7 @@ export function useTelemetryWebSocket(farmId = null) {
 
     return () => {
       stopped = true
+      if (httpInterval) clearInterval(httpInterval)
       clearTimeout(reconnectTimer)
       if (socket) {
         socket.onclose = null

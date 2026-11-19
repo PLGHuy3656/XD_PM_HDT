@@ -64,6 +64,48 @@ def list_telemetry_history(
 
 
 @router.get(
+    "/farms/{farm_id}/telemetry/latest",
+    response_model=TelemetryResponse,
+    summary="Get latest normalized telemetry for a farm",
+)
+def get_latest_farm_telemetry(
+    farm_id: str,
+    svc: TelemetryService = Depends(get_telemetry_service),
+) -> TelemetryResponse:
+    if not farm_id or not farm_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid farm_id parameter",
+        )
+    telemetry = svc.get_latest_by_farm(farm_id.strip())
+    if telemetry is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No telemetry found for farm '{farm_id}'",
+        )
+    return TelemetryResponse.from_domain(telemetry)
+
+
+@router.get(
+    "/farms/{farm_id}/telemetry",
+    response_model=list[TelemetryResponse],
+    summary="List recent telemetry history for a farm",
+)
+def list_farm_telemetry_history(
+    farm_id: str,
+    limit: int = Query(default=50, ge=1, le=500, description="Maximum records to return (1..500)"),
+    svc: TelemetryService = Depends(get_telemetry_service),
+) -> list[TelemetryResponse]:
+    if not farm_id or not farm_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid farm_id parameter",
+        )
+    records = svc.list_by_farm(farm_id.strip(), limit=limit)
+    return [TelemetryResponse.from_domain(rec) for rec in records]
+
+
+@router.get(
     "/devices/presence",
     response_model=list[PresenceResponse],
     summary="List runtime presence states for all tracked devices",
