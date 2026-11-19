@@ -70,6 +70,54 @@ class NotificationContentTests(unittest.TestCase):
         self.assertIn("Nhà yến A", content[1])
         self.assertEqual(content[2], "danger")
 
+    def test_environment_anomaly_event_is_formatted_as_a_warning(self):
+        content = notification_content(
+            "environment.anomaly_detected",
+            {
+                "metric": "Nhiệt độ",
+                "value": 38,
+                "unit": "°C",
+                "threshold": 35,
+                "farm_name": "Nhà yến A",
+            },
+            "user-id",
+        )
+
+        self.assertEqual(
+            content[0],
+            "Phát hiện dữ liệu môi trường bất thường",
+        )
+        self.assertIn("ngưỡng tham chiếu 35°C", content[1])
+        self.assertEqual(content[2], "warning")
+
+    def test_vision_flock_and_audio_anomaly_events_are_formatted(self):
+        flock = notification_content(
+            "ai.flock.anomaly_detected",
+            {
+                "label": "flock_drop",
+                "farm_name": "Nhà yến A",
+                "zone_name": "Khu 1",
+                "confidence": 0.9,
+            },
+            "user-id",
+        )
+        audio = notification_content(
+            "audio.anomaly.detected",
+            {
+                "label": "predator_sound",
+                "farm_name": "Nhà yến A",
+                "audio_rms": 0.72,
+            },
+            "user-id",
+        )
+
+        self.assertEqual(flock[2], "warning")
+        self.assertIn("flock_drop", flock[1])
+        self.assertIn("Khu 1", flock[1])
+        self.assertEqual(audio[2], "warning")
+        self.assertIn("predator_sound", audio[1])
+        self.assertIn("RMS 0.72", audio[1])
+
     def test_device_offline_and_sensor_timeout_are_danger_notifications(self):
         offline = notification_content(
             "device.offline",

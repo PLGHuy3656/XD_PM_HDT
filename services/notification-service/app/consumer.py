@@ -15,6 +15,9 @@ SUPPORTED_EVENT_TYPES = {
     "management.technician_assigned",
     "device.command.acknowledged",
     "environment.threshold_exceeded",
+    "environment.anomaly_detected",
+    "ai.flock.anomaly_detected",
+    "audio.anomaly.detected",
     "device.offline",
     "device.sensor.timeout",
     "device.actuator.failed",
@@ -199,6 +202,7 @@ async def consume_events(
             await queue.bind(exchange, routing_key="device.#")
             await queue.bind(exchange, routing_key="environment.#")
             await queue.bind(exchange, routing_key="ai.#")
+            await queue.bind(exchange, routing_key="audio.#")
             logger.info("Consuming RabbitMQ events from %s", queue_name)
 
             async with queue.iterator() as iterator:

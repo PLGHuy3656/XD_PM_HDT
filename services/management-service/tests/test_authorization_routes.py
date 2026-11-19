@@ -1,3 +1,6 @@
+from unittest.mock import MagicMock, patch
+from uuid import UUID
+
 import pytest
 from fastapi import HTTPException
 
@@ -5,7 +8,10 @@ from app.repositories.user_repository import user_repository
 from app.routes.authorization_routes import (
     authorize_device_monitoring,
     authorize_device_operation,
+    get_analytics_device_context,
+    list_analytics_device_contexts,
 )
+from app.repositories.device_repository import device_repository
 
 
 def test_admin_can_operate_device_resolved_by_node_id(monkeypatch):
@@ -158,3 +164,95 @@ def test_technician_monitor_access_uses_farm_access_rules(monkeypatch):
         )
 
     assert exc.value.status_code == 403
+
+
+def test_internal_analytics_contexts_requires_shared_service_token(
+    monkeypatch,
+):
+    contexts = [{"node_id": "node-01", "recipient_user_ids": ["owner-01"]}]
+    monkeypatch.setattr(
+        "app.routes.authorization_routes.settings.analytics_service_token",
+        "service-secret",
+    )
+    monkeypatch.setattr(
+        device_repository,
+        "list_analytics_device_contexts",
+        lambda: contexts,
+    )
+
+    assert list_analytics_device_contexts("service-secret") == contexts
+
+    with pytest.raises(HTTPException) as exc:
+        list_analytics_device_contexts("invalid")
+    assert exc.value.status_code == 401
+
+
+def test_internal_analytics_context_resolves_node_with_farm_and_zone(
+    monkeypatch,
+):
+    context = {
+        "node_id": "CAM-01",
+        "farm_id": "farm-01",
+        "zone_id": "zone-01",
+    }
+    monkeypatch.setattr(
+        "app.routes.authorization_routes.settings.analytics_service_token",
+        "service-secret",
+    )
+    monkeypatch.setattr(
+        device_repository,
+        "list_analytics_device_contexts",
+        lambda node_id: [context] if node_id == "CAM-01" else [],
+    )
+
+    assert get_analytics_device_context("CAM-01", "service-secret") == context
+
+    with pytest.raises(HTTPException) as exc:
+        get_analytics_device_context("missing", "service-secret")
+    assert exc.value.status_code == 404
+
+
+def test_analytics_device_context_repository_maps_farm_zone_and_recipients():
+    device_id = UUID("00000000-0000-4000-8000-000000000001")
+    farm_id = UUID("00000000-0000-4000-8000-000000000002")
+    zone_id = UUID("00000000-0000-4000-8000-000000000003")
+    owner_id = UUID("00000000-0000-4000-8000-000000000004")
+    cursor = MagicMock()
+    cursor.fetchall.return_value = [
+        (
+            device_id,
+            "CAM-01",
+            farm_id,
+            "FARM-01",
+            "Farm One",
+            zone_id,
+            "ZONE-01",
+            "Zone One",
+            [owner_id],
+        ),
+    ]
+    connection = MagicMock()
+    connection.cursor.return_value.__enter__.return_value = cursor
+    connection_context = MagicMock()
+    connection_context.__enter__.return_value = connection
+
+    with patch(
+        "app.repositories.device_repository.get_connection",
+        return_value=connection_context,
+    ):
+        contexts = device_repository.list_analytics_device_contexts("CAM-01")
+
+    assert contexts == [
+        {
+            "device_id": str(device_id),
+            "node_id": "CAM-01",
+            "farm_id": str(farm_id),
+            "farm_code": "FARM-01",
+            "farm_name": "Farm One",
+            "zone_id": str(zone_id),
+            "zone_code": "ZONE-01",
+            "zone_name": "Zone One",
+            "recipient_user_ids": [str(owner_id)],
+        },
+    ]
+    assert cursor.execute.call_args.args[1] == ("CAM-01",)

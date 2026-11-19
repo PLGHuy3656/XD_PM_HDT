@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 AnalyticsPeriod = Literal["1h", "6h", "24h", "7d", "30d"]
 HarvestPeriod = Literal["30d", "90d", "365d"]
+AIEventSource = Literal["vision", "audio"]
 
 
 class MetricStatistics(BaseModel):
@@ -59,6 +60,131 @@ class AICountSnapshotRequest(BaseModel):
         return self
 
 
+class AIDetection(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+        allow_inf_nan=False,
+    )
+
+    object_class: str = Field(alias="class", min_length=1, max_length=80)
+    confidence: float = Field(ge=0, le=1)
+    bbox: tuple[float, float, float, float]
+    track_id: int | None = Field(default=None, alias="trackId", ge=0)
+
+    @model_validator(mode="after")
+    def validate_bounding_box(self) -> Self:
+        x1, y1, x2, y2 = self.bbox
+        if min(x1, y1, x2, y2) < 0 or x2 <= x1 or y2 <= y1:
+            raise ValueError(
+                "bbox coordinates must be non-negative with positive "
+                "width and height"
+            )
+        return self
+
+
+class AIDetectionBatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    camera_id: str = Field(alias="cameraId", min_length=1, max_length=100)
+    timestamp: int = Field(ge=1, le=4102444800)
+    detections: list[AIDetection] = Field(min_length=1, max_length=500)
+
+
+class AIDetectionIngestResponse(BaseModel):
+    accepted: int
+    duplicate: int
+    ignored: int
+
+
+class BirdMovementPoint(BaseModel):
+    camera_id: str
+    track_id: int
+    object_class: str
+    confidence: float
+    observed_at: str
+    center_x: float
+    center_y: float
+    bbox: tuple[float, float, float, float]
+    farm_id: UUID
+    farm_name: str
+    zone_id: UUID | None
+    zone_name: str | None
+
+
+class AIVisionEventRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+        allow_inf_nan=False,
+    )
+
+    event_id: UUID | None = Field(default=None, alias="eventId")
+    camera_id: str = Field(alias="cameraId", min_length=1, max_length=100)
+    event_type: Literal["PREDATOR_DETECTED", "FLOCK_ANOMALY"] = Field(
+        alias="eventType",
+    )
+    object_class: str = Field(alias="class", min_length=1, max_length=80)
+    confidence: float = Field(ge=0, le=1)
+    timestamp: int = Field(ge=1, le=4102444800)
+    bbox: tuple[float, float, float, float] | None = None
+    snapshot: str | None = Field(default=None, max_length=2048)
+    track_id: int | None = Field(default=None, alias="trackId", ge=0)
+    detail: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_bounding_box(self) -> Self:
+        if self.bbox is not None:
+            x1, y1, x2, y2 = self.bbox
+            if min(x1, y1, x2, y2) < 0 or x2 <= x1 or y2 <= y1:
+                raise ValueError(
+                    "bbox coordinates must be non-negative with positive "
+                    "width and height"
+                )
+        return self
+
+
+class AIAudioEventRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+        allow_inf_nan=False,
+    )
+
+    event_id: UUID | None = Field(default=None, alias="eventId")
+    camera_id: str = Field(alias="cameraId", min_length=1, max_length=100)
+    event_type: Literal["AUDIO_ANOMALY"] = Field(alias="eventType")
+    label: str = Field(min_length=1, max_length=100)
+    confidence: float = Field(ge=0, le=1)
+    timestamp: int = Field(ge=1, le=4102444800)
+    audio_rms: float | None = Field(default=None, alias="audioRms", ge=0)
+    threshold: float | None = Field(default=None, ge=0)
+    detail: str | None = Field(default=None, max_length=2000)
+
+
+class AIEventIngestResponse(BaseModel):
+    event_id: UUID | None
+    accepted: bool
+    duplicate: bool
+
+
+class AIEventResponse(BaseModel):
+    id: UUID
+    source_type: Literal["vision", "audio"]
+    camera_id: str
+    event_type: str
+    label: str | None
+    confidence: float | None
+    observed_at: str
+    farm_id: UUID
+    farm_code: str
+    farm_name: str
+    zone_id: UUID | None
+    zone_code: str | None
+    zone_name: str | None
+    payload: dict
+
+
 class BirdAnalyticsPoint(BaseModel):
     timestamp: str
     entries: int
@@ -70,11 +196,20 @@ class BirdAnalyticsResponse(BaseModel):
     period: AnalyticsPeriod
     start: str
     end: str
+    camera_id: str | None = None
     camera_count: int
     entries: int
     exits: int
     net_change: int
     series: list[BirdAnalyticsPoint]
+
+
+class BirdMovementHistoryResponse(BaseModel):
+    camera_id: str
+    period: AnalyticsPeriod
+    start: str
+    end: str
+    points: list[BirdMovementPoint]
 
 
 class HarvestRecordRequest(BaseModel):

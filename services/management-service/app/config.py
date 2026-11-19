@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     service_port: int = 8001
     rabbitmq_url: str = ""
     event_exchange: str = "swiftletcare.events"
+    analytics_service_token: str = ""
 
     # Authentication & JWT Settings
     jwt_secret: str = ""

@@ -100,7 +100,10 @@ def notification_content(
             "info" if succeeded else "danger",
         )
 
-    if event_type == "environment.threshold_exceeded":
+    if event_type in {
+        "environment.threshold_exceeded",
+        "environment.anomaly_detected",
+    }:
         metric = data.get("metric") or "Thông số môi trường"
         value = data.get("value")
         unit = data.get("unit") or ""
@@ -109,11 +112,23 @@ def notification_content(
         location = data.get("zone_name") or data.get("node_id")
         location_text = f" tại {location}" if location else ""
         value_text = f" ({value}{unit})" if value is not None else ""
+        threshold_description = (
+            "ngưỡng tham chiếu"
+            if event_type == "environment.anomaly_detected"
+            else "ngưỡng cho phép"
+        )
         threshold_text = (
-            f"; ngưỡng cho phép {threshold}{unit}"
+            f"; {threshold_description} {threshold}{unit}"
             if threshold is not None
             else ""
         )
+        if event_type == "environment.anomaly_detected":
+            return (
+                "Phát hiện dữ liệu môi trường bất thường",
+                f"{metric}{value_text}{threshold_text} tại "
+                f"{farm_name}{location_text}.",
+                "warning",
+            )
         return (
             "Thông số môi trường vượt ngưỡng",
             f"{metric}{value_text}{threshold_text} tại {farm_name}{location_text}.",
@@ -165,6 +180,37 @@ def notification_content(
             "AI phát hiện mối đe dọa",
             f"Phát hiện {threat} tại {farm_name}{confidence_text}.",
             "danger",
+        )
+
+    if event_type == "ai.flock.anomaly_detected":
+        label = data.get("label") or "biến động đàn chim"
+        farm_name = data.get("farm_name") or "nhà yến"
+        zone_name = data.get("zone_name")
+        location = f", {zone_name}" if zone_name else ""
+        confidence = data.get("confidence")
+        confidence_text = (
+            f" (độ tin cậy {float(confidence):.0%})"
+            if isinstance(confidence, (int, float))
+            and 0 <= confidence <= 1
+            else ""
+        )
+        return (
+            "AI phát hiện bất thường đàn chim",
+            f"{label} tại {farm_name}{location}{confidence_text}.",
+            "warning",
+        )
+
+    if event_type == "audio.anomaly.detected":
+        label = data.get("label") or "âm thanh bất thường"
+        farm_name = data.get("farm_name") or "nhà yến"
+        zone_name = data.get("zone_name")
+        location = f", {zone_name}" if zone_name else ""
+        audio_rms = data.get("audio_rms")
+        reading = f" (RMS {audio_rms})" if audio_rms is not None else ""
+        return (
+            "Phát hiện âm thanh bất thường",
+            f"{label}{reading} tại {farm_name}{location}.",
+            "warning",
         )
 
     if event_type == "management.work_request.created":

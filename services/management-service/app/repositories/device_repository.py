@@ -3,6 +3,69 @@ from app.database import get_connection
 
 
 class DeviceRepository:
+    def list_analytics_device_contexts(
+        self,
+        node_id: str | None = None,
+    ):
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT
+                        d.id,
+                        d.node_id,
+                        d.farm_id,
+                        f.farm_code,
+                        f.name,
+                        d.zone_id,
+                        z.zone_code,
+                        z.name,
+                        ARRAY(
+                            SELECT recipients.user_id
+                            FROM (
+                                SELECT f.owner_id AS user_id
+                                UNION
+                                SELECT ta.technician_id AS user_id
+                                FROM technician_assignments AS ta
+                                WHERE ta.farm_id = f.id
+                                  AND ta.is_active = TRUE
+                            ) AS recipients
+                            WHERE recipients.user_id IS NOT NULL
+                        )
+                    FROM devices AS d
+                    JOIN farms AS f ON f.id = d.farm_id
+                    LEFT JOIN zones AS z
+                        ON z.id = d.zone_id
+                       AND z.farm_id = f.id
+                    WHERE d.is_active = TRUE
+                """
+                params = ()
+                if node_id is not None:
+                    query += " AND d.node_id = %s"
+                    params = (node_id,)
+                query += " ORDER BY d.node_id"
+                cur.execute(
+                    query,
+                    params,
+                )
+                rows = cur.fetchall()
+
+        return [
+            {
+                "device_id": str(row[0]),
+                "node_id": row[1],
+                "farm_id": str(row[2]),
+                "farm_code": row[3],
+                "farm_name": row[4],
+                "zone_id": str(row[5]) if row[5] else None,
+                "zone_code": row[6],
+                "zone_name": row[7],
+                "recipient_user_ids": [
+                    str(user_id) for user_id in row[8]
+                ],
+            }
+            for row in rows
+        ]
+
     def list_devices(
         self,
         farm_id: str | None = None,

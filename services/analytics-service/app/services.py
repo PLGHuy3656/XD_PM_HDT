@@ -6,6 +6,7 @@ from typing import Any
 from app.repository import (
     get_analytics_alerts,
     get_bird_analytics,
+    get_bird_movement_history,
     get_harvest_records,
     get_telemetry_analytics,
 )
@@ -98,11 +99,18 @@ def get_bird_analytics_data(
     node_ids: list[str],
     period: str,
     now: datetime | None = None,
+    camera_id: str | None = None,
 ) -> dict[str, Any]:
     duration, bucket = PERIODS[period]
     end = now or datetime.now(timezone.utc)
     start = end - duration
-    rows = get_bird_analytics(node_ids, start, end, bucket)
+    rows = get_bird_analytics(
+        node_ids,
+        start,
+        end,
+        bucket,
+        camera_id,
+    )
     series = [
         {
             "timestamp": row[0].isoformat(),
@@ -118,11 +126,54 @@ def get_bird_analytics_data(
         "period": period,
         "start": start.isoformat(),
         "end": end.isoformat(),
+        "camera_id": camera_id,
         "camera_count": int(rows[0][3]) if rows else 0,
         "entries": entries,
         "exits": exits,
         "net_change": entries - exits,
         "series": series,
+    }
+
+
+def get_bird_movement_history_data(
+    camera_id: str,
+    period: str,
+    track_id: int | None = None,
+    limit: int = 500,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    duration, _ = PERIODS[period]
+    end = now or datetime.now(timezone.utc)
+    start = end - duration
+    rows = get_bird_movement_history(
+        camera_id,
+        start,
+        end,
+        track_id,
+        limit,
+    )
+    return {
+        "camera_id": camera_id,
+        "period": period,
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "points": [
+            {
+                "camera_id": row[0],
+                "track_id": int(row[1]),
+                "object_class": row[2],
+                "confidence": float(row[3]),
+                "observed_at": row[4].isoformat(),
+                "center_x": float(row[5]),
+                "center_y": float(row[6]),
+                "bbox": row[7],
+                "farm_id": str(row[8]),
+                "farm_name": row[9],
+                "zone_id": str(row[10]) if row[10] else None,
+                "zone_name": row[11],
+            }
+            for row in rows
+        ],
     }
 
 
