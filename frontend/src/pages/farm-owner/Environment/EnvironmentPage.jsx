@@ -137,17 +137,25 @@ function EnvironmentPage() {
   )
   const [showZonePicker, setShowZonePicker] = useState(false)
 
+  // Synchronize comparison zone IDs and active zone without infinite loop
   useEffect(() => {
-    if (effectiveZones.length > 0) {
-      if (!zoneId || !effectiveZones.some((z) => z.id === zoneId)) {
-        setZoneId(effectiveZones[0].id)
-      }
-      setComparisonZoneIds((prev) => {
-        const valid = prev.filter((id) => effectiveZones.some((z) => z.id === id))
-        return valid.length > 0 ? valid : effectiveZones.slice(0, 2).map((z) => z.id)
-      })
+    if (effectiveZones.length === 0) return
+
+    if (!zoneId || !effectiveZones.some((z) => z.id === zoneId)) {
+      setZoneId(effectiveZones[0].id)
     }
-  }, [effectiveZones, zoneId])
+
+    setComparisonZoneIds((prev) => {
+      const valid = prev.filter((id) => effectiveZones.some((z) => z.id === id))
+      if (valid.length === 0) {
+        return effectiveZones.slice(0, 2).map((z) => z.id)
+      }
+      if (valid.length === prev.length) {
+        return prev
+      }
+      return valid
+    })
+  }, [zones, selectedFarmId])
 
   const selectedZone =
     effectiveZones.find((zone) => zone.id === zoneId) ?? effectiveZones[0] ?? {

@@ -48,7 +48,7 @@ function EnvironmentControlPage() {
     if (effectiveZones.length > 0 && (!selectedZoneId || !effectiveZones.some((z) => z.id === selectedZoneId))) {
       setSelectedZoneId(effectiveZones[0].id)
     }
-  }, [effectiveZones, selectedZoneId])
+  }, [zones, selectedFarmId, selectedZoneId])
 
   const [zoneState, setZoneState] = useState(() => {
     const state = {}
