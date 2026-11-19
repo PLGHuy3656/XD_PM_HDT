@@ -228,79 +228,10 @@ export function useAdminData() {
         await fetchData()
         return { success: true }
       } catch (err) {
-        return { success: false, error: err?.message || 'Gán kỹ thuật viên thất bại' }
+        return { success: false, error: err.message || 'Gán kỹ thuật viên thất bại' }
       }
     },
     [technicians, fetchData]
-  )
-
-  const runMutation = useCallback(
-    async (fn, fallbackError) => {
-      try {
-        await fn()
-        await fetchData()
-        return { success: true }
-      } catch (err) {
-        return { success: false, error: err?.message || fallbackError }
-      }
-    },
-    [fetchData]
-  )
-
-  const unassignTechnician = useCallback(
-    (farmId, technicianId) => {
-      if (isMockMode) {
-        setFarms((prev) => prev.map((f) => (f.id === farmId ? { ...f, technician: null } : f)))
-        return Promise.resolve({ success: true })
-      }
-      return runMutation(() => techniciansApi.unassignFarm(technicianId, farmId), 'Hủy phân công kỹ thuật viên thất bại')
-    },
-    [runMutation]
-  )
-
-  const createFarm = useCallback(
-    (payload) => runMutation(() => farmsApi.createFarm(payload), 'Tạo nhà yến thất bại'),
-    [runMutation]
-  )
-
-  const updateFarm = useCallback(
-    (farmId, payload) => runMutation(() => farmsApi.updateFarm(farmId, payload), 'Cập nhật nhà yến thất bại'),
-    [runMutation]
-  )
-
-  const deleteFarm = useCallback(
-    (farmId) => runMutation(() => farmsApi.deleteFarm(farmId), 'Xóa nhà yến thất bại'),
-    [runMutation]
-  )
-
-  const createZone = useCallback(
-    (farmId, payload) => runMutation(() => farmsApi.createZone(farmId, payload), 'Tạo khu vực thất bại'),
-    [runMutation]
-  )
-
-  const updateZone = useCallback(
-    (zoneId, payload) => runMutation(() => farmsApi.updateZone(zoneId, payload), 'Cập nhật khu vực thất bại'),
-    [runMutation]
-  )
-
-  const deleteZone = useCallback(
-    (zoneId) => runMutation(() => farmsApi.deleteZone(zoneId), 'Xóa khu vực thất bại'),
-    [runMutation]
-  )
-
-  const createDevice = useCallback(
-    (payload) => runMutation(() => devicesApi.createDevice(payload), 'Đăng ký thiết bị thất bại'),
-    [runMutation]
-  )
-
-  const updateDevice = useCallback(
-    (deviceId, payload) => runMutation(() => devicesApi.updateDevice(deviceId, payload), 'Cập nhật thiết bị thất bại'),
-    [runMutation]
-  )
-
-  const deleteDevice = useCallback(
-    (deviceId) => runMutation(() => devicesApi.deleteDevice(deviceId), 'Xóa thiết bị thất bại'),
-    [runMutation]
   )
 
   return {
@@ -314,16 +245,6 @@ export function useAdminData() {
     loading,
     error,
     assignTechnician,
-    unassignTechnician,
-    createFarm,
-    updateFarm,
-    deleteFarm,
-    createZone,
-    updateZone,
-    deleteZone,
-    createDevice,
-    updateDevice,
-    deleteDevice,
     refreshData: fetchData,
   }
 }

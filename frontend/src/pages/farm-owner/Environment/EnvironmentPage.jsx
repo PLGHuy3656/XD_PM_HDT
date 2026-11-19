@@ -68,45 +68,63 @@ function EnvironmentPage() {
   } = useTelemetry(selectedFarmId)
 
   const effectiveZones = useMemo(() => {
-    if (zones.length > 0) {
-      const baseMetrics = defaultMockFarms[0]?.zones[0]?.metrics || {}
-      return zones.map((z, idx) => {
-        const zMetrics = JSON.parse(JSON.stringify(baseMetrics))
-        if (telemetry && telemetry.temperature != null) {
-          zMetrics.temperature.value = telemetry.temperature
-          zMetrics.temperature.displayValue = `${telemetry.temperature.toFixed(1)}°C`
-        } else if (!hasData) {
-          zMetrics.temperature.displayValue = '--°C'
+    const rawZones = zones.length > 0 ? zones : defaultMockFarms[0]?.zones || []
+    const baseMetrics = defaultMockFarms[0]?.zones[0]?.metrics || {}
+    return rawZones.map((z, idx) => {
+      const zMetrics = JSON.parse(JSON.stringify(z.metrics || baseMetrics))
+      if (telemetry && telemetry.temperature != null) {
+        zMetrics.temperature.value = telemetry.temperature
+        zMetrics.temperature.displayValue = `${telemetry.temperature.toFixed(1)}°C`
+        if (Array.isArray(zMetrics.temperature.values) && zMetrics.temperature.values.length > 0) {
+          const vals = [...zMetrics.temperature.values]
+          vals[vals.length - 1] = Number(telemetry.temperature.toFixed(1))
+          zMetrics.temperature.values = vals
         }
-        if (telemetry && telemetry.humidity != null) {
-          zMetrics.humidity.value = telemetry.humidity
-          zMetrics.humidity.displayValue = `${Math.round(telemetry.humidity)}%`
-        } else if (!hasData) {
-          zMetrics.humidity.displayValue = '--%'
+      } else if (!hasData) {
+        zMetrics.temperature.displayValue = '--°C'
+      }
+      if (telemetry && telemetry.humidity != null) {
+        zMetrics.humidity.value = telemetry.humidity
+        zMetrics.humidity.displayValue = `${Math.round(telemetry.humidity)}%`
+        if (Array.isArray(zMetrics.humidity.values) && zMetrics.humidity.values.length > 0) {
+          const vals = [...zMetrics.humidity.values]
+          vals[vals.length - 1] = Math.round(telemetry.humidity)
+          zMetrics.humidity.values = vals
         }
-        if (telemetry && telemetry.co2 != null) {
-          zMetrics.co2.value = telemetry.co2
-          zMetrics.co2.displayValue = `${Math.round(telemetry.co2)} ppm`
-        } else if (!hasData) {
-          zMetrics.co2.displayValue = '-- ppm'
+      } else if (!hasData) {
+        zMetrics.humidity.displayValue = '--%'
+      }
+      if (telemetry && telemetry.co2 != null) {
+        zMetrics.co2.value = telemetry.co2
+        zMetrics.co2.displayValue = `${Math.round(telemetry.co2)} ppm`
+        if (Array.isArray(zMetrics.co2.values) && zMetrics.co2.values.length > 0) {
+          const vals = [...zMetrics.co2.values]
+          vals[vals.length - 1] = Math.round(telemetry.co2)
+          zMetrics.co2.values = vals
         }
-        if (telemetry && telemetry.light != null) {
-          zMetrics.light.value = telemetry.light
-          zMetrics.light.displayValue = `${Math.round(telemetry.light)} lux`
-        } else if (!hasData) {
-          zMetrics.light.displayValue = '-- lux'
+      } else if (!hasData) {
+        zMetrics.co2.displayValue = '-- ppm'
+      }
+      if (telemetry && telemetry.light != null) {
+        zMetrics.light.value = telemetry.light
+        zMetrics.light.displayValue = `${Math.round(telemetry.light)} lux`
+        if (Array.isArray(zMetrics.light.values) && zMetrics.light.values.length > 0) {
+          const vals = [...zMetrics.light.values]
+          vals[vals.length - 1] = Math.round(telemetry.light)
+          zMetrics.light.values = vals
         }
-        return {
-          id: z.id,
-          name: z.name,
-          node: `ENV-${String(idx + 1).padStart(2, '0')}`,
-          lastSeen: telemetry?.timestamp ? 'Vừa xong' : 'Chưa có dữ liệu',
-          status: hasData ? 'live' : 'offline',
-          metrics: zMetrics,
-        }
-      })
-    }
-    return defaultMockFarms[0]?.zones || []
+      } else if (!hasData) {
+        zMetrics.light.displayValue = '-- lux'
+      }
+      return {
+        id: z.id,
+        name: z.name,
+        node: `ENV-${String(idx + 1).padStart(2, '0')}`,
+        lastSeen: hasData ? 'Vừa xong' : 'Chưa có dữ liệu',
+        status: hasData ? 'live' : 'offline',
+        metrics: zMetrics,
+      }
+    })
   }, [zones, telemetry, hasData])
 
   const [zoneId, setZoneId] = useState(effectiveZones[0]?.id || '')

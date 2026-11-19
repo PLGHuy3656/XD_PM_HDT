@@ -1,18 +1,5 @@
 .git
 .github
-.env
-.env.*
-!.env.example
-*.env
-!*.env.example
-*.log
-*.bak
-*.zip
-scratch/
-handoff/
-handovers/
-_backup_*/
-_local_archive/
 frontend/node_modules
 frontend/dist
 **/__pycache__
@@ -25,7 +12,4 @@ frontend/dist
 .venv
 venv
 ENV
-infrastructure/mosquitto/password_file
-infrastructure/mosquitto/*password_file*
-infrastructure/mosquitto/acl_file
-infrastructure/redis/redis.conf
+*.log

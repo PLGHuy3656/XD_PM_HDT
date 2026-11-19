@@ -29,16 +29,19 @@
 #define RELAY_INACTIVE      LOW
 
 // --- 2. CẤU HÌNH ĐỊNH DANH & MQTT TOPIC TAXONOMY (CANONICAL CONTRACT V1) ---
+// Chú ý triển khai:
+// - Chạy Wokwi Simulator trên Web: đổi MQTT_BROKER_HOST thành "broker.emqx.io", WIFI_SSID thành "Wokwi-GUEST", WIFI_PASSWORD thành ""
+// - Chạy Mạch ESP32 Thật trong LAN: đổi MQTT_BROKER_HOST thành IP máy tính (ví dụ "192.168.1.50")
 #ifndef WIFI_SSID_CFG
-#define WIFI_SSID_CFG       "Wokwi-GUEST"
+#define WIFI_SSID_CFG       "YOUR_WIFI_SSID"
 #endif
 
 #ifndef WIFI_PASSWORD_CFG
-#define WIFI_PASSWORD_CFG   ""
+#define WIFI_PASSWORD_CFG   "YOUR_WIFI_PASSWORD"
 #endif
 
 #ifndef MQTT_BROKER_HOST
-#define MQTT_BROKER_HOST    "broker.emqx.io"
+#define MQTT_BROKER_HOST    "192.168.1.100"
 #endif
 
 #ifndef MQTT_BROKER_PORT
@@ -60,15 +63,15 @@ const int   MQTT_PORT       = MQTT_BROKER_PORT;
 const char* MQTT_USER       = MQTT_USER_CFG;
 const char* MQTT_PASSWORD   = MQTT_PASSWORD_CFG;
 
-// Định danh thiết bị chuẩn: SWC-NODE-001 (Canonical MQTT Contract V1)
-const char* DEVICE_ID       = "SWC-NODE-001";
+// Định danh thiết bị chuẩn: SWC-DEMO-NODE-001 (khớp với Database Nhà yến Demo 01)
+const char* DEVICE_ID       = "SWC-DEMO-NODE-001";
 
-// Cây Topic MQTT
-const char* TOPIC_TELEMETRY = "swiftlet/telemetry/SWC-NODE-001";
-const char* TOPIC_HEARTBEAT = "swiftlet/heartbeat/SWC-NODE-001";
-const char* TOPIC_COMMAND   = "swiftlet/command/SWC-NODE-001";
-const char* TOPIC_ACK       = "swiftlet/ack/SWC-NODE-001";
-const char* TOPIC_STATUS    = "swiftlet/status/SWC-NODE-001";
+// Cây Topic MQTT chuẩn
+const char* TOPIC_TELEMETRY = "swiftlet/telemetry/SWC-DEMO-NODE-001";
+const char* TOPIC_HEARTBEAT = "swiftlet/heartbeat/SWC-DEMO-NODE-001";
+const char* TOPIC_COMMAND   = "swiftlet/command/SWC-DEMO-NODE-001";
+const char* TOPIC_ACK       = "swiftlet/ack/SWC-DEMO-NODE-001";
+const char* TOPIC_STATUS    = "swiftlet/status/SWC-DEMO-NODE-001";
 
 // --- 3. CẤU TRÚC DỮ LIỆU CẢM BIẾN ---
 struct SensorData {

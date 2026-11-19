@@ -48,41 +48,10 @@ export function useDevices(farmId = null) {
     }
   }, [fetchDevices])
 
-  const runDeviceMutation = useCallback(
-    async (fn, fallbackError) => {
-      try {
-        await fn()
-        await fetchDevices()
-        return { success: true }
-      } catch (err) {
-        return { success: false, error: err?.message || fallbackError }
-      }
-    },
-    [fetchDevices]
-  )
-
-  const createDevice = useCallback(
-    (payload) => runDeviceMutation(() => devicesApi.createDevice(payload), 'Đăng ký thiết bị thất bại'),
-    [runDeviceMutation]
-  )
-
-  const updateDevice = useCallback(
-    (deviceId, payload) => runDeviceMutation(() => devicesApi.updateDevice(deviceId, payload), 'Cập nhật thiết bị thất bại'),
-    [runDeviceMutation]
-  )
-
-  const deleteDevice = useCallback(
-    (deviceId) => runDeviceMutation(() => devicesApi.deleteDevice(deviceId), 'Xóa thiết bị thất bại'),
-    [runDeviceMutation]
-  )
-
   return {
     devices,
     loading,
     error,
-    createDevice,
-    updateDevice,
-    deleteDevice,
     refetch: () => fetchDevices(),
   }
 }

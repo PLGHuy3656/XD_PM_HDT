@@ -7,6 +7,7 @@ import AutomaticRulesPanel from '../../../components/features/farm-owner/environ
 import ActuatorControlPanel from '../../../components/features/farm-owner/environment/ActuatorControlPanel'
 import { controlFarms as defaultMockFarms } from '../../../components/features/farm-owner/environment/environmentMockData'
 import { useFarms } from '../../../features/farms/hooks/useFarms'
+import { devicesApi } from '../../../api/modules/devicesApi.js'
 import './EnvironmentControlPage.css'
 
 const DEFAULT_ZONE_CONTROL_STATE = {
@@ -111,7 +112,7 @@ function EnvironmentControlPage() {
     )
   }
 
-  const updateActuator = (key, value) => {
+  const updateActuator = async (key, value) => {
     if (!isManual) return
 
     setZoneState((previous) => ({
@@ -124,6 +125,23 @@ function EnvironmentControlPage() {
         },
       },
     }))
+
+    const targetMap = {
+      misting: 'misting',
+      ventilation: 'fan',
+      heating: 'heater',
+      alarm: 'alarm',
+    }
+    const target = targetMap[key] || key
+    try {
+      await devicesApi.sendRelayCommand('SWC-DEMO-NODE-001', {
+        target,
+        state: value ? 1 : 0,
+      })
+      setRuleNotice(`Đã gửi lệnh ${value ? 'BẬT' : 'TẮT'} ${target.toUpperCase()} tới ESP32 thành công.`)
+    } catch (err) {
+      console.warn('Lỗi gửi lệnh rơ-le:', err)
+    }
   }
 
   const updateRule = (group, key, value) => {

@@ -50,8 +50,14 @@ export function useTelemetry(farmId) {
     const controller = new AbortController()
     fetchTelemetry(controller.signal)
 
+    // Auto-poll every 3 seconds for live ESP32 telemetry updates
+    const pollInterval = setInterval(() => {
+      fetchTelemetry()
+    }, 3000)
+
     return () => {
       controller.abort()
+      clearInterval(pollInterval)
     }
   }, [fetchTelemetry])
 

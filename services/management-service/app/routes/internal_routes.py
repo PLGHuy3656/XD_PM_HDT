@@ -13,12 +13,8 @@ import psycopg
 
 from app.core.service_auth import verify_internal_service
 from app.repositories.device_repository import AmbiguousDeviceIdentifierError
-from app.schemas.internal import (
-    InternalDeviceMetadataResponse,
-    InternalFarmRecipientsResponse,
-)
+from app.schemas.internal import InternalDeviceMetadataResponse
 from app.services.device_service import device_service
-from app.services.farm_service import farm_service
 
 logger = logging.getLogger("management_service.internal_routes")
 
@@ -120,21 +116,3 @@ def get_internal_device_metadata(
         )
 
     return metadata
-
-
-@router.get(
-    "/farms/{farm_id}/recipients",
-    response_model=InternalFarmRecipientsResponse,
-    summary="Get authoritative owner & assigned technicians for a farm (AUD-C-02)",
-)
-def get_internal_farm_recipients(
-    farm_id: str = Path(..., description="Canonical farm UUID or farm_code"),
-    _service_auth: Dict[str, Any] = Depends(verify_internal_service),
-):
-    recipients = farm_service.get_farm_recipients(farm_id)
-    if recipients is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Farm not found",
-        )
-    return recipients

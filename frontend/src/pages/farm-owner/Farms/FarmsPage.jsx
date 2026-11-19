@@ -5,7 +5,6 @@ import FarmDetailPanel from '../../../components/features/farm-owner/farms/FarmD
 import FarmRequestModal from '../../../components/features/farm-owner/farms/FarmRequestModal'
 import { initialFarmRequests } from '../../../components/features/farm-owner/farms/farmsMockData'
 import { useFarms } from '../../../features/farms/hooks/useFarms'
-import { USE_MOCK } from '../../../api/config.js'
 import { LoadingSpinner, ErrorMessage } from '../../../components/common/feedback/index.js'
 import './FarmsPage.css'
 
@@ -17,25 +16,15 @@ function FarmsPage() {
     setSelectedFarmId,
     loading,
     error,
-    createFarm,
-    updateFarm,
-    createZone,
-    updateZone,
-    deleteZone,
     refetch,
   } = useFarms()
 
-  const [requests, setRequests] = useState(() => (USE_MOCK ? initialFarmRequests : []))
+  const [requests, setRequests] = useState(initialFarmRequests)
   const [requestModalOpen, setRequestModalOpen] = useState(false)
-  const [farmModalMode, setFarmModalMode] = useState(null) // 'create' | 'edit' | null
-  const [farmForm, setFarmForm] = useState({ farm_code: '', farm_name: '', address: '' })
-  const [zoneForm, setZoneForm] = useState({ zone_code: '', name: '' })
-  const [editingZoneId, setEditingZoneId] = useState(null)
-  const [actionError, setActionError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
 
   const handleSubmitRequest = (form) => {
     const nextNumber = String(requests.length + 15).padStart(3, '0')
+
     const newRequest = {
       id: `REQ-2026-${nextNumber}`,
       farmName: form.farmName.trim(),
@@ -44,65 +33,9 @@ function FarmsPage() {
       submittedAt: new Intl.DateTimeFormat('vi-VN').format(new Date()),
       status: 'PENDING',
     }
+
     setRequests((current) => [newRequest, ...current])
     setRequestModalOpen(false)
-  }
-
-  const handleSaveFarm = async (event) => {
-    event.preventDefault()
-    setActionError('')
-    if (!farmForm.farm_name.trim() || (farmModalMode === 'create' && !farmForm.farm_code.trim())) {
-      setActionError('Vui lòng nhập đầy đủ mã và tên nhà yến.')
-      return
-    }
-    setSubmitting(true)
-    const res =
-      farmModalMode === 'create'
-        ? await createFarm({
-            farm_code: farmForm.farm_code.trim(),
-            farm_name: farmForm.farm_name.trim(),
-            address: farmForm.address.trim() || null,
-          })
-        : await updateFarm(selectedFarm.id, {
-            farm_name: farmForm.farm_name.trim(),
-            address: farmForm.address.trim() || null,
-          })
-    setSubmitting(false)
-    if (!res?.success) {
-      setActionError(res?.error || 'Không thể lưu nhà yến.')
-      return
-    }
-    setFarmModalMode(null)
-  }
-
-  const handleSaveZone = async (event) => {
-    event.preventDefault()
-    if (!selectedFarm) return
-    setActionError('')
-    if (!zoneForm.name.trim() || (!editingZoneId && !zoneForm.zone_code.trim())) {
-      setActionError('Vui lòng nhập đầy đủ mã và tên khu vực.')
-      return
-    }
-    setSubmitting(true)
-    const res = editingZoneId
-      ? await updateZone(editingZoneId, { name: zoneForm.name.trim() })
-      : await createZone(selectedFarm.id, { zone_code: zoneForm.zone_code.trim(), name: zoneForm.name.trim() })
-    setSubmitting(false)
-    if (!res?.success) {
-      setActionError(res?.error || 'Không thể lưu khu vực.')
-      return
-    }
-    setZoneForm({ zone_code: '', name: '' })
-    setEditingZoneId(null)
-  }
-
-  const handleDeleteZone = async (zone) => {
-    if (!window.confirm(`Xác nhận xóa khu vực "${zone.name}"?`)) return
-    setActionError('')
-    const res = await deleteZone(zone.id)
-    if (!res?.success) {
-      setActionError(res?.error || 'Không thể xóa khu vực.')
-    }
   }
 
   const totalZones = farms.reduce(
@@ -137,56 +70,20 @@ function FarmsPage() {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {USE_MOCK ? (
-              <button
-                type="button"
-                className="farm-button farm-button--primary farms-page__request-button"
-                onClick={() => setRequestModalOpen(true)}
-              >
-                <span>+</span>
-                Yêu cầu thêm nhà yến
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="farm-button farm-button--primary farms-page__request-button"
-                  onClick={() => {
-                    setActionError('')
-                    setFarmForm({ farm_code: '', farm_name: '', address: '' })
-                    setFarmModalMode('create')
-                  }}
-                >
-                  <span>+</span>
-                  Thêm nhà yến
-                </button>
-                {selectedFarm && (
-                  <button
-                    type="button"
-                    className="farm-button"
-                    onClick={() => {
-                      setActionError('')
-                      setFarmForm({
-                        farm_code: selectedFarm.code || '',
-                        farm_name: selectedFarm.name || '',
-                        address: selectedFarm.address || '',
-                      })
-                      setFarmModalMode('edit')
-                    }}
-                  >
-                    Chỉnh sửa nhà yến
-                  </button>
-                )}
-              </>
-            )}
-          </div>
+          <button
+            type="button"
+            className="farm-button farm-button--primary farms-page__request-button"
+            onClick={() => setRequestModalOpen(true)}
+          >
+            <span>+</span>
+            Yêu cầu thêm nhà yến
+          </button>
         </header>
 
-        {(error || actionError) && (
+        {error && (
           <ErrorMessage
-            title="Lỗi thao tác nhà yến"
-            message={actionError || error}
+            title="Lỗi tải danh sách nhà yến"
+            message={error}
             onRetry={refetch}
           />
         )}
@@ -257,178 +154,59 @@ function FarmsPage() {
           </>
         )}
 
-        {!USE_MOCK && selectedFarm && (
-          <section className="farm-requests">
-            <div className="farms-section-title">
-              <div>
-                <span className="farms-page__eyebrow">ZONE MANAGEMENT</span>
-                <h2>Quản lý khu vực — {selectedFarm.name}</h2>
-              </div>
+        <section className="farm-requests">
+          <div className="farms-section-title">
+            <div>
+              <span className="farms-page__eyebrow">
+                APPROVAL WORKFLOW
+              </span>
+              <h2>Yêu cầu thêm nhà yến</h2>
+              <p>
+                Theo dõi các yêu cầu đang chờ Administrator phê duyệt.
+              </p>
             </div>
-            <form onSubmit={handleSaveZone} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-              {!editingZoneId && (
-                <input
-                  value={zoneForm.zone_code}
-                  onChange={(e) => setZoneForm((z) => ({ ...z, zone_code: e.target.value }))}
-                  placeholder="Mã khu vực (VD: Z-01)"
-                />
-              )}
-              <input
-                value={zoneForm.name}
-                onChange={(e) => setZoneForm((z) => ({ ...z, name: e.target.value }))}
-                placeholder="Tên khu vực"
-              />
-              <button type="submit" className="farm-button farm-button--primary" disabled={submitting}>
-                {editingZoneId ? 'Cập nhật khu vực' : '+ Thêm khu vực'}
-              </button>
-              {editingZoneId && (
-                <button
-                  type="button"
-                  className="farm-button"
-                  onClick={() => {
-                    setEditingZoneId(null)
-                    setZoneForm({ zone_code: '', name: '' })
-                  }}
-                >
-                  Hủy
-                </button>
-              )}
-            </form>
-            {(selectedFarm.zones || []).length === 0 ? (
-              <div className="farm-requests__empty">Chưa có khu vực nào.</div>
-            ) : (
-              <div className="farm-request-table-wrap">
-                <table className="farm-request-table">
-                  <thead>
-                    <tr>
-                      <th>Mã khu vực</th>
-                      <th>Tên khu vực</th>
-                      <th>Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(selectedFarm.zones || []).map((z) => (
-                      <tr key={z.id}>
-                        <td><strong>{z.code || z.zone_code || z.id}</strong></td>
-                        <td>{z.name}</td>
-                        <td style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingZoneId(z.id)
-                              setZoneForm({ zone_code: z.code || '', name: z.name || '' })
-                            }}
-                          >
-                            Sửa
-                          </button>
-                          <button type="button" onClick={() => handleDeleteZone(z)}>Xóa</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        )}
-
-        {USE_MOCK && (
-          <section className="farm-requests">
-            <div className="farms-section-title">
-              <div>
-                <span className="farms-page__eyebrow">
-                  APPROVAL WORKFLOW
-                </span>
-                <h2>Yêu cầu thêm nhà yến</h2>
-                <p>
-                  Theo dõi các yêu cầu đang chờ Administrator phê duyệt.
-                </p>
-              </div>
-            </div>
-
-            {requests.length === 0 ? (
-              <div className="farm-requests__empty">
-                Chưa có yêu cầu nào.
-              </div>
-            ) : (
-              <div className="farm-request-table-wrap">
-                <table className="farm-request-table">
-                  <thead>
-                    <tr>
-                      <th>Mã yêu cầu</th>
-                      <th>Nhà yến</th>
-                      <th>Địa chỉ</th>
-                      <th>Ngày gửi</th>
-                      <th>Trạng thái</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {requests.map((request) => (
-                      <tr key={request.id}>
-                        <td>
-                          <strong>{request.id}</strong>
-                        </td>
-
-                        <td>{request.farmName}</td>
-                        <td>{request.address}</td>
-                        <td>{request.submittedAt}</td>
-
-                        <td>
-                          <span className="farm-request-status">
-                            Chờ duyệt
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        )}
-
-        {farmModalMode && (
-          <div className="admin-farm-modal-backdrop" onMouseDown={() => setFarmModalMode(null)}>
-            <form
-              className="admin-farm-modal"
-              onSubmit={handleSaveFarm}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <h3>{farmModalMode === 'create' ? 'Thêm nhà yến mới' : 'Chỉnh sửa nhà yến'}</h3>
-              {farmModalMode === 'create' && (
-                <label>
-                  Mã nhà yến *
-                  <input
-                    value={farmForm.farm_code}
-                    onChange={(e) => setFarmForm((f) => ({ ...f, farm_code: e.target.value }))}
-                    placeholder="VD: FARM-OWNER-01"
-                  />
-                </label>
-              )}
-              <label>
-                Tên nhà yến *
-                <input
-                  value={farmForm.farm_name}
-                  onChange={(e) => setFarmForm((f) => ({ ...f, farm_name: e.target.value }))}
-                  placeholder="Tên nhà yến"
-                />
-              </label>
-              <label>
-                Địa chỉ
-                <input
-                  value={farmForm.address}
-                  onChange={(e) => setFarmForm((f) => ({ ...f, address: e.target.value }))}
-                  placeholder="Địa chỉ"
-                />
-              </label>
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setFarmModalMode(null)}>Hủy</button>
-                <button type="submit" disabled={submitting}>{submitting ? 'Đang lưu...' : 'Lưu'}</button>
-              </div>
-            </form>
           </div>
-        )}
+
+          {requests.length === 0 ? (
+            <div className="farm-requests__empty">
+              Chưa có yêu cầu nào.
+            </div>
+          ) : (
+            <div className="farm-request-table-wrap">
+              <table className="farm-request-table">
+                <thead>
+                  <tr>
+                    <th>Mã yêu cầu</th>
+                    <th>Nhà yến</th>
+                    <th>Địa chỉ</th>
+                    <th>Ngày gửi</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {requests.map((request) => (
+                    <tr key={request.id}>
+                      <td>
+                        <strong>{request.id}</strong>
+                      </td>
+
+                      <td>{request.farmName}</td>
+                      <td>{request.address}</td>
+                      <td>{request.submittedAt}</td>
+
+                      <td>
+                        <span className="farm-request-status">
+                          Chờ duyệt
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
         <FarmRequestModal
           open={requestModalOpen}

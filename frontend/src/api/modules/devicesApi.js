@@ -53,18 +53,6 @@ export const devicesApi = {
       : ENDPOINTS.DEVICES.PRESENCE_ALL
     return apiClient.get(endpoint, options)
   },
-
-  async createDevice(payload, options = {}) {
-    return apiClient.post(ENDPOINTS.DEVICES.LIST, payload, options)
-  },
-
-  async updateDevice(deviceId, payload, options = {}) {
-    return apiClient.put(ENDPOINTS.DEVICES.DETAIL(deviceId), payload, options)
-  },
-
-  async deleteDevice(deviceId, options = {}) {
-    return apiClient.delete(ENDPOINTS.DEVICES.DETAIL(deviceId), options)
-  },
 }
 
 export default devicesApi

@@ -105,13 +105,6 @@ Các module chính của hệ thống đã được khởi tạo và đang đư�
 
 Cấu trúc chi tiết bên trong từng module được quản lý theo phạm vi kỹ thuật của thành viên phụ trách và tiếp tục được hoàn thiện trong quá trình Implementation & Integration.
 
-## Deployment Modes
-
-SwiftletCare hỗ trợ hai chế độ triển khai Docker Compose:
-
-- **Standalone Web** (`docker-compose.standalone.yml`, `.env.standalone.example`): Khởi chạy độc lập **Frontend + API Gateway + Management Service + PostgreSQL + Redis** để phát triển hoặc kiểm thử giao diện và nghiệp vụ quản lý nhà yến mà không cần các dịch vụ AI, IoT, Notification hay Analytics. Xem hướng dẫn chi tiết tại [README.standalone.md](README.standalone.md).
-- **Full Integrated** (`docker-compose.integrated.yml`, `.env.example`): Khởi chạy toàn bộ hệ thống SwiftletCare (bao gồm Management, IoT, AI, Notification, Analytics, API Gateway, Frontend, RabbitMQ, Mosquitto, PostgreSQL, Redis và Observability stack).
-
 ## Documentation
 
 Các tài liệu chính:

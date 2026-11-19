@@ -21,12 +21,6 @@ venv.bak/
 .env
 .env.*
 !.env.example
-!.env.*.example
-*.env
-!*.env.example
-*.env.docker_demo_runtime
-*.env.pre_gate*
-*.env.test_dryrun
 
 # Testing & Coverage
 .pytest_cache/
@@ -44,32 +38,19 @@ build/
 
 # Firmware & Archives
 firmware.zip
-*.zip
 
-# Logs, Backups & Temporary files
+# Logs & temporary files
 *.log
-*.bak
 logs/
 *.pid
 *.seed
-_backup_*/
-_local_archive/
-scratch/
 
-# Audit & handover directories (not to be committed)
+# Audit & scratch directories (not to be committed)
 Claude outputs/
 handoff/
-handovers/
 
 # IDE & Editor caches
-.vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# Mosquitto & Redis Broker Secrets / ACLs (Gate 5B.3 / Gate 6B Remediation)
-infrastructure/mosquitto/password_file
-infrastructure/mosquitto/*password_file*
-infrastructure/mosquitto/acl_file
-infrastructure/redis/redis.conf

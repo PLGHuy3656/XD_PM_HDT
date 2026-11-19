@@ -50,9 +50,6 @@ function DevicesPage() {
     devices,
     loading: devicesLoading,
     error: devicesError,
-    createDevice,
-    updateDevice,
-    deleteDevice,
     refetch: refetchDevices,
   } = useDevices(selectedFarmId)
 
@@ -62,11 +59,6 @@ function DevicesPage() {
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [selectedDeviceId, setSelectedDeviceId] = useState(null)
   const [refreshLabel, setRefreshLabel] = useState('Vừa xong')
-  const [createOpen, setCreateOpen] = useState(false)
-  const [editingDevice, setEditingDevice] = useState(null)
-  const [devForm, setDevForm] = useState({ node_id: '', name: '', zone_id: '', device_type: 'CONTROLLER' })
-  const [actionError, setActionError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
 
   const effectiveZones = zones.length > 0 ? zones : selectedFarm?.zones || []
 
@@ -120,53 +112,6 @@ function DevicesPage() {
     setRefreshLabel('Vừa xong')
   }
 
-  const handleSaveDevice = async (event) => {
-    event.preventDefault()
-    if (!selectedFarmId) return
-    setActionError('')
-    if (!editingDevice && !devForm.node_id.trim()) {
-      setActionError('Vui lòng nhập Node ID thiết bị.')
-      return
-    }
-    setSubmitting(true)
-    let res
-    if (editingDevice) {
-      const targetId = editingDevice.deviceId || editingDevice.deviceUuid || editingDevice.id
-      res = await updateDevice(targetId, {
-        name: devForm.name.trim() || null,
-        zone_id: devForm.zone_id || null,
-      })
-    } else {
-      const payload = {
-        node_id: devForm.node_id.trim(),
-        farm_id: selectedFarmId,
-        name: devForm.name.trim() || null,
-        device_type: devForm.device_type || 'CONTROLLER',
-      }
-      if (devForm.zone_id) payload.zone_id = devForm.zone_id
-      res = await createDevice(payload)
-    }
-    setSubmitting(false)
-    if (!res?.success) {
-      setActionError(res?.error || 'Không thể lưu thiết bị.')
-      return
-    }
-    setDevForm({ node_id: '', name: '', zone_id: '', device_type: 'CONTROLLER' })
-    setEditingDevice(null)
-    setCreateOpen(false)
-  }
-
-  const handleDeleteDevice = async (device) => {
-    if (!window.confirm(`Xác nhận xóa thiết bị "${device.name || device.id}"?`)) return
-    setActionError('')
-    const res = await deleteDevice(device.deviceId || device.deviceUuid || device.id)
-    if (!res?.success) {
-      setActionError(res?.error || 'Không thể xóa thiết bị.')
-      return
-    }
-    setSelectedDeviceId(null)
-  }
-
   return (
     <AppLayout>
       <div className="devices-page">
@@ -182,45 +127,31 @@ function DevicesPage() {
             </p>
           </div>
 
-          <div className="devices-farm-picker" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            <div>
-              <span>Nhà yến</span>
+          <div className="devices-farm-picker">
+            <span>Nhà yến</span>
 
-              <EnvironmentSelect
-                value={selectedFarmId || ''}
-                onChange={(nextId) => {
-                  setSelectedFarmId(nextId)
-                  setSelectedDeviceId(null)
-                  setZoneId('ALL')
-                }}
-                options={farms.map((farm) => ({
-                  value: farm.id,
-                  label: farm.name,
-                }))}
-              />
-            </div>
-            {selectedFarmId && (
-              <button
-                type="button"
-                className="farm-button farm-button--primary"
-                onClick={() => {
-                  setActionError('')
-                  setCreateOpen(true)
-                }}
-              >
-                + Thêm thiết bị
-              </button>
-            )}
+            <EnvironmentSelect
+              value={selectedFarmId || ''}
+              onChange={(nextId) => {
+                setSelectedFarmId(nextId)
+                setSelectedDeviceId(null)
+                setZoneId('ALL')
+              }}
+              options={farms.map((farm) => ({
+                value: farm.id,
+                label: farm.name,
+              }))}
+            />
           </div>
         </header>
 
         {farmsError && (
           <ErrorMessage title="Lỗi danh sách nhà yến" message={farmsError} />
         )}
-        {(devicesError || actionError) && (
+        {devicesError && (
           <ErrorMessage
-            title="Lỗi thao tác thiết bị"
-            message={actionError || devicesError}
+            title="Lỗi tải thiết bị"
+            message={devicesError}
             onRetry={refetchDevices}
           />
         )}
@@ -325,91 +256,8 @@ function DevicesPage() {
               getZoneName={getZoneName}
               onClose={() => setSelectedDeviceId(null)}
             />
-            {selectedDevice && (
-              <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                <button
-                  type="button"
-                  className="farm-button"
-                  onClick={() => {
-                    setActionError('')
-                    setEditingDevice(selectedDevice)
-                    setDevForm({
-                      node_id: selectedDevice.nodeId || selectedDevice.id,
-                      name: selectedDevice.name || '',
-                      zone_id: selectedDevice.zoneId && /^[0-9a-f]{8}-/i.test(selectedDevice.zoneId) ? selectedDevice.zoneId : '',
-                      device_type: selectedDevice.type || 'CONTROLLER',
-                    })
-                    setCreateOpen(true)
-                  }}
-                >
-                  Chỉnh sửa thiết bị
-                </button>
-                <button
-                  type="button"
-                  className="farm-button"
-                  style={{ borderColor: '#dc2626', color: '#dc2626' }}
-                  onClick={() => handleDeleteDevice(selectedDevice)}
-                >
-                  Xóa thiết bị
-                </button>
-              </div>
-            )}
           </aside>
         </section>
-
-        {createOpen && (
-          <div
-            className="admin-farm-modal-backdrop"
-            onMouseDown={() => {
-              setCreateOpen(false)
-              setEditingDevice(null)
-            }}
-          >
-            <form
-              className="admin-farm-modal"
-              onSubmit={handleSaveDevice}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <h3>{editingDevice ? 'Chỉnh sửa thiết bị' : 'Thêm thiết bị cho nhà yến'}</h3>
-              {!editingDevice && (
-                <label>
-                  Node ID *
-                  <input
-                    value={devForm.node_id}
-                    onChange={(e) => setDevForm((c) => ({ ...c, node_id: e.target.value }))}
-                    placeholder="VD: SWC-NODE-004"
-                  />
-                </label>
-              )}
-              <label>
-                Tên thiết bị
-                <input
-                  value={devForm.name}
-                  onChange={(e) => setDevForm((c) => ({ ...c, name: e.target.value }))}
-                  placeholder="Tên thiết bị"
-                />
-              </label>
-              {effectiveZones.length > 0 && (
-                <label>
-                  Khu vực (tùy chọn)
-                  <select
-                    value={devForm.zone_id}
-                    onChange={(e) => setDevForm((c) => ({ ...c, zone_id: e.target.value }))}
-                  >
-                    <option value="">-- Chưa gán khu vực --</option>
-                    {effectiveZones.map((z) => (
-                      <option key={z.id} value={z.id}>{z.name}</option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setCreateOpen(false)}>Hủy</button>
-                <button type="submit" disabled={submitting}>{submitting ? 'Đang lưu...' : 'Thêm thiết bị'}</button>
-              </div>
-            </form>
-          </div>
-        )}
       </div>
     </AppLayout>
   )

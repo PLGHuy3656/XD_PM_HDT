@@ -22,12 +22,10 @@ from app.repositories.postgresql_repository import PostgreSQLAnalyticsRepository
 
 def _resolve_admin_conninfo(dbname: str) -> str:
     """Helper to connect as admin for seeding/cleaning synthetic test fixtures."""
-    pw = os.getenv("PGPASSWORD")
-    if not pw:
-        raise ValueError("PGPASSWORD must be configured for PostgreSQL pipeline tests.")
     host = os.getenv("PGHOST", "127.0.0.1")
     port = int(os.getenv("PGPORT", "5432"))
     user = os.getenv("PGUSER", "postgres")
+    pw = os.getenv("PGPASSWORD", "263656")
     return make_conninfo(host=host, port=port, user=user, password=pw, dbname=dbname)
 
 

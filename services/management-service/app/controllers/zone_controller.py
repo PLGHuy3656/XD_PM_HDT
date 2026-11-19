@@ -30,28 +30,5 @@ class ZoneController:
                 detail=str(exc),
             ) from exc
 
-    def create_zone(self, farm_uuid: str, zone_code: str, name: str):
-        try:
-            return self.service.create_zone(farm_uuid=farm_uuid, zone_code=zone_code, name=name)
-        except ValueError as exc:
-            code = status.HTTP_409_CONFLICT if "already exists" in str(exc) else status.HTTP_400_BAD_REQUEST
-            raise HTTPException(status_code=code, detail=str(exc)) from exc
-
-    def update_zone(self, zone_id: str, zone_code: str | None = None, name: str | None = None):
-        try:
-            zone = self.service.update_zone(zone_id=zone_id, zone_code=zone_code, name=name)
-            if zone is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Zone not found")
-            return zone
-        except ValueError as exc:
-            code = status.HTTP_409_CONFLICT if "already exists" in str(exc) else status.HTTP_400_BAD_REQUEST
-            raise HTTPException(status_code=code, detail=str(exc)) from exc
-
-    def delete_zone(self, zone_id: str):
-        deleted = self.service.delete_zone(zone_id)
-        if not deleted:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Zone not found")
-        return {"status": "deleted", "zone_id": zone_id}
-
 
 zone_controller = ZoneController()

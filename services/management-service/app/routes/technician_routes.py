@@ -169,18 +169,3 @@ def assign_technician(
         str(farm_id),
         is_primary,
     )
-
-
-@router.delete(
-    "/{technician_id}/farms/{farm_id}/assign",
-    summary="Unassign a farm from a technician (Admin only)",
-)
-def unassign_technician(
-    technician_id: UUID,
-    farm_id: UUID,
-    current_user: dict = Depends(require_admin),
-):
-    return technician_controller.unassign_technician(
-        str(technician_id),
-        str(farm_id),
-    )

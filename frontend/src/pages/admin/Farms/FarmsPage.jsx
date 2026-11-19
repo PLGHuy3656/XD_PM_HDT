@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AppLayout from '../../../components/layout/AppLayout'
 import Select from '../../../components/ui/Select'
 import FarmTable from '../../../components/features/admin/farms/FarmTable'
@@ -7,9 +7,13 @@ import FarmEditModal from '../../../components/features/admin/farms/FarmEditModa
 import TechnicianAssignmentModal from '../../../components/features/admin/farms/TechnicianAssignmentModal'
 
 import {
+  adminFarms,
   getFarmDeviceCount,
 } from '../../../components/features/admin/farms/adminFarmsMockData'
 
+import {
+  initialAdminUsers,
+} from '../../../components/features/admin/users/usersMockData'
 import { useAdminData } from '../../../features/admin'
 
 import './FarmsPage.css'
@@ -22,32 +26,40 @@ const healthFilterOptions = [
 
 function FarmsPage() {
   const {
-    farms,
-    technicians,
-    users,
+    farms: realFarms,
+    technicians: realTechs,
     assignTechnician: apiAssignTechnician,
-    unassignTechnician: apiUnassignTechnician,
-    createFarm: apiCreateFarm,
-    updateFarm: apiUpdateFarm,
-    deleteFarm: apiDeleteFarm,
     loading,
     error,
   } = useAdminData()
 
-  const [searchTerm, setSearchTerm] = useState('')
-  const [healthFilter, setHealthFilter] = useState('ALL')
-  const [selectedFarmId, setSelectedFarmId] = useState(null)
-  const [editingFarmId, setEditingFarmId] = useState(null)
-  const [assignmentFarmId, setAssignmentFarmId] = useState(null)
-  const [createOpen, setCreateOpen] = useState(false)
-  const [createForm, setCreateForm] = useState({ farm_code: '', farm_name: '', address: '', owner_id: '' })
-  const [actionError, setActionError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const isMock = import.meta.env.VITE_USE_MOCK === 'true'
+  const [localFarms, setLocalFarms] = useState(() => (isMock ? adminFarms : []))
 
-  const owners = useMemo(
-    () => (users || []).filter((u) => u.role === 'FARM_OWNER' && u.status === 'ACTIVE'),
-    [users],
+  const farms = useMemo(() => {
+    if (realFarms && realFarms.length > 0) return realFarms
+    return localFarms
+  }, [realFarms, localFarms])
+
+  const [searchTerm, setSearchTerm] = useState('')
+  const [healthFilter, setHealthFilter] =
+    useState('ALL')
+
+  const [selectedFarmId, setSelectedFarmId] =
+    useState(null)
+
+  const [editingFarmId, setEditingFarmId] =
+    useState(null)
+
+  const [assignmentFarmId, setAssignmentFarmId] =
+    useState(null)
+
+  const defaultTechs = initialAdminUsers.filter(
+    (user) =>
+      user.role === 'TECHNICIAN' &&
+      user.status === 'ACTIVE',
   )
+  const technicians = realTechs && realTechs.length > 0 ? realTechs : defaultTechs
 
   const selectedFarm = farms.find(
     (farm) => farm.id === selectedFarmId,
@@ -103,80 +115,48 @@ function FarmsPage() {
     (farm) => farm.health === 'ATTENTION',
   ).length
 
-  async function handleSaveFarm(updatedFarm) {
-    setActionError('')
-    setSubmitting(true)
-    const res = await apiUpdateFarm(updatedFarm.id, {
-      farm_name: updatedFarm.name,
-      address: updatedFarm.address,
-      status: updatedFarm.status,
-    })
-    setSubmitting(false)
-    if (!res?.success) {
-      setActionError(res?.error || 'Không thể cập nhật nhà yến.')
-      return
-    }
+  function handleSaveFarm(updatedFarm) {
+    setLocalFarms((current) =>
+      current.map((farm) =>
+        farm.id === updatedFarm.id
+          ? updatedFarm
+          : farm,
+      ),
+    )
+
     setEditingFarmId(null)
     setSelectedFarmId(updatedFarm.id)
   }
 
-  async function handleCreateFarm(event) {
-    event.preventDefault()
-    setActionError('')
-    if (!createForm.farm_code.trim() || !createForm.farm_name.trim()) {
-      setActionError('Vui lòng nhập đầy đủ mã nhà yến và tên nhà yến.')
-      return
+  async function handleAssignTechnician(
+    farm,
+    technician,
+  ) {
+    const technicianSnapshot = {
+      id: technician.id,
+      name: technician.name,
+      email: technician.email,
+      phone: technician.phone,
+      status: 'ASSIGNED',
     }
-    setSubmitting(true)
-    const payload = {
-      farm_code: createForm.farm_code.trim(),
-      farm_name: createForm.farm_name.trim(),
-      address: createForm.address.trim() || null,
-      status: 'ACTIVE',
-    }
-    if (createForm.owner_id.trim()) {
-      payload.owner_id = createForm.owner_id.trim()
-    }
-    const res = await apiCreateFarm(payload)
-    setSubmitting(false)
-    if (!res?.success) {
-      setActionError(res?.error || 'Không thể tạo nhà yến.')
-      return
-    }
-    setCreateForm({ farm_code: '', farm_name: '', address: '', owner_id: '' })
-    setCreateOpen(false)
-  }
 
-  async function handleDeleteFarm(farm) {
-    if (!window.confirm(`Xác nhận xóa nhà yến "${farm.name}" (${farm.code})?`)) return
-    setActionError('')
-    const res = await apiDeleteFarm(farm.id)
-    if (!res?.success) {
-      setActionError(res?.error || 'Không thể xóa nhà yến.')
-      return
-    }
-    setSelectedFarmId(null)
-  }
+    setLocalFarms((current) =>
+      current.map((item) =>
+        item.id === farm.id
+          ? {
+              ...item,
+              technician: technicianSnapshot,
+            }
+          : item,
+      ),
+    )
 
-  async function handleAssignTechnician(farm, technician) {
-    setActionError('')
-    const res = await apiAssignTechnician(farm.id, technician.id)
-    if (!res?.success) {
-      setActionError(res?.error || 'Không thể phân công kỹ thuật viên.')
-      return
+    if (apiAssignTechnician) {
+      await apiAssignTechnician(farm.id, technician.id)
     }
+
     setAssignmentFarmId(null)
     setSelectedFarmId(farm.id)
-  }
-
-  async function handleUnassignTechnician(farm) {
-    if (!farm.technician?.id) return
-    if (!window.confirm(`Hủy phân công kỹ thuật viên "${farm.technician.name}" khỏi "${farm.name}"?`)) return
-    setActionError('')
-    const res = await apiUnassignTechnician(farm.id, farm.technician.id)
-    if (!res?.success) {
-      setActionError(res?.error || 'Không thể hủy phân công kỹ thuật viên.')
-    }
   }
 
 
@@ -223,29 +203,15 @@ function FarmsPage() {
         </section>
 
         <section className="admin-farms-content">
-          {(error || actionError) && (
-            <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', borderRadius: '8px', background: '#fef2f2', color: '#b91c1c' }}>
-              {actionError || error}
-            </div>
-          )}
           <div className="admin-farms-content__heading">
             <div>
               <span>FARM DIRECTORY</span>
               <h2>Danh sách nhà yến</h2>
               <p>
-                {loading ? 'Đang tải...' : `${filteredFarms.length} / ${farms.length} nhà yến`}
+                {filteredFarms.length} /{' '}
+                {farms.length} nhà yến
               </p>
             </div>
-            <button
-              type="button"
-              className="admin-farm-edit-button"
-              onClick={() => {
-                setActionError('')
-                setCreateOpen(true)
-              }}
-            >
-              + Thêm nhà yến
-            </button>
           </div>
 
           <div className="admin-farms-toolbar">
@@ -283,66 +249,10 @@ function FarmsPage() {
           onEdit={(farm) =>
             setEditingFarmId(farm.id)
           }
-          onDelete={handleDeleteFarm}
           onAssignTechnician={(farm) =>
             setAssignmentFarmId(farm.id)
           }
-          onUnassignTechnician={handleUnassignTechnician}
         />
-
-        {createOpen && (
-          <div className="admin-farm-modal-backdrop" onMouseDown={() => setCreateOpen(false)}>
-            <form
-              className="admin-farm-modal"
-              onSubmit={handleCreateFarm}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <h3>Thêm nhà yến mới</h3>
-              <label>
-                Mã nhà yến *
-                <input
-                  value={createForm.farm_code}
-                  onChange={(e) => setCreateForm((c) => ({ ...c, farm_code: e.target.value }))}
-                  placeholder="VD: FARM-03"
-                />
-              </label>
-              <label>
-                Tên nhà yến *
-                <input
-                  value={createForm.farm_name}
-                  onChange={(e) => setCreateForm((c) => ({ ...c, farm_name: e.target.value }))}
-                  placeholder="VD: Nhà yến Cần Giờ"
-                />
-              </label>
-              <label>
-                Địa chỉ
-                <input
-                  value={createForm.address}
-                  onChange={(e) => setCreateForm((c) => ({ ...c, address: e.target.value }))}
-                  placeholder="Địa chỉ nhà yến"
-                />
-              </label>
-              {owners.length > 0 && (
-                <label>
-                  Chủ nhà yến (tùy chọn)
-                  <select
-                    value={createForm.owner_id}
-                    onChange={(e) => setCreateForm((c) => ({ ...c, owner_id: e.target.value }))}
-                  >
-                    <option value="">-- Chưa gán Owner --</option>
-                    {owners.map((o) => (
-                      <option key={o.id} value={o.id}>{o.name} ({o.email})</option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setCreateOpen(false)}>Hủy</button>
-                <button type="submit" disabled={submitting}>{submitting ? 'Đang lưu...' : 'Tạo nhà yến'}</button>
-              </div>
-            </form>
-          </div>
-        )}
 
         <FarmEditModal
           farm={editingFarm}

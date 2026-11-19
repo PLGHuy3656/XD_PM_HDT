@@ -16,12 +16,19 @@ export function normalizeTelemetry(raw, isMockMode = false) {
   const co2 = metrics.co2 ?? metrics.co2_ppm
   const light = metrics.light ?? metrics.lux
 
+  const rawTime =
+    raw.receivedAt ||
+    raw.received_at ||
+    raw.timestamp ||
+    raw.recorded_at ||
+    (raw.deviceId ? new Date().toISOString() : null)
+
   return {
     temperature: temp != null ? Number(temp) : isMockMode ? 28.5 : null,
     humidity: hum != null ? Number(hum) : isMockMode ? 78 : null,
     co2: co2 != null ? Number(co2) : isMockMode ? 620 : null,
     light: light != null ? Number(light) : isMockMode ? 120 : null,
-    timestamp: raw.timestamp || raw.recorded_at || null,
+    timestamp: rawTime,
     status:
       metrics.status ||
       (temp != null ? (Number(temp) > 31 ? 'Cảnh báo' : 'Ổn định') : isMockMode ? 'Ổn định' : 'Chưa có dữ liệu'),

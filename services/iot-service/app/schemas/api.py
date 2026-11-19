@@ -29,6 +29,8 @@ class TelemetryResponse(BaseModel):
     metrics: TelemetryMetrics
     actuators: ActuatorState
     state: DeviceRuntimeState
+    farmId: str | None = None
+    zoneId: str | None = None
 
     @classmethod
     def from_domain(cls, telemetry: AcceptedTelemetry) -> "TelemetryResponse":
@@ -38,6 +40,8 @@ class TelemetryResponse(BaseModel):
             metrics=telemetry.metrics,
             actuators=telemetry.actuators,
             state=telemetry.state,
+            farmId=telemetry.farm_id,
+            zoneId=telemetry.zone_id,
         )
 
 

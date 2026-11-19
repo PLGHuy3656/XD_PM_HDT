@@ -104,44 +104,6 @@ export function useFarms() {
       }
     : null
 
-  const runFarmMutation = useCallback(
-    async (fn, fallbackError) => {
-      try {
-        await fn()
-        await fetchFarms()
-        return { success: true }
-      } catch (err) {
-        return { success: false, error: err?.message || fallbackError }
-      }
-    },
-    [fetchFarms]
-  )
-
-  const createFarm = useCallback(
-    (payload) => runFarmMutation(() => farmsApi.createFarm(payload), 'Tạo nhà yến thất bại'),
-    [runFarmMutation]
-  )
-
-  const updateFarm = useCallback(
-    (farmId, payload) => runFarmMutation(() => farmsApi.updateFarm(farmId, payload), 'Cập nhật nhà yến thất bại'),
-    [runFarmMutation]
-  )
-
-  const createZone = useCallback(
-    (farmId, payload) => runFarmMutation(() => farmsApi.createZone(farmId, payload), 'Tạo khu vực thất bại'),
-    [runFarmMutation]
-  )
-
-  const updateZone = useCallback(
-    (zoneId, payload) => runFarmMutation(() => farmsApi.updateZone(zoneId, payload), 'Cập nhật khu vực thất bại'),
-    [runFarmMutation]
-  )
-
-  const deleteZone = useCallback(
-    (zoneId) => runFarmMutation(() => farmsApi.deleteZone(zoneId), 'Xóa khu vực thất bại'),
-    [runFarmMutation]
-  )
-
   return {
     farms,
     selectedFarm: selectedFarmWithZones,
@@ -150,11 +112,6 @@ export function useFarms() {
     zones,
     loading,
     error,
-    createFarm,
-    updateFarm,
-    createZone,
-    updateZone,
-    deleteZone,
     refetch: () => fetchFarms(),
   }
 }
