@@ -996,3 +996,113 @@
     grid-column: 1 / -1;
   }
 }
+
+/* ========================================
+   ZONE MANAGEMENT FORM & TABLE ACTIONS
+   ======================================== */
+
+.zone-approval-notice {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid #fcd34d;
+  border-radius: 12px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.zone-form-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--border-warm, #e6dfd3);
+  border-radius: 14px;
+  background: #fcfaf6;
+}
+
+.zone-form-field {
+  flex: 1 1 280px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.zone-form-field label {
+  color: var(--color-navy-900);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.zone-form-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid #d5dcd8;
+  border-radius: 11px;
+  background: #fff;
+  color: var(--color-navy-900);
+  font: inherit;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.zone-form-input:focus {
+  outline: none;
+  border-color: var(--color-navy-900);
+  box-shadow: 0 0 0 3px rgba(16, 45, 63, 0.1);
+}
+
+.zone-form-hint {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.zone-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 18px;
+}
+
+.farm-table-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.farm-table-action {
+  padding: 6px 12px;
+  border: 1px solid #d5dcd8;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-navy-900);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.farm-table-action:hover {
+  background: #f3f6f4;
+}
+
+.farm-table-action--danger {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.farm-table-action--danger:hover {
+  background: #fef2f2;
+}
+
+@media (max-width: 768px) {
+  .zone-form-actions {
+    width: 100%;
+    padding-bottom: 0;
+  }
+}

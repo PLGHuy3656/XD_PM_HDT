@@ -1,213 +1,222 @@
-import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import AppLayout from '../../../components/layout/AppLayout'
-
 import DeviceStatusPanel from '../../../components/features/technician/dashboard/DeviceStatusPanel'
-import SensorHealthPanel from '../../../components/features/technician/dashboard/SensorHealthPanel'
-import ConnectivityPanel from '../../../components/features/technician/dashboard/ConnectivityPanel'
 import AlertsPanel from '../../../components/features/technician/dashboard/AlertsPanel'
-import { systemStats } from '../../../components/features/technician/dashboard/dashboardMockData'
+import { LoadingSpinner, ErrorMessage, EmptyState } from '../../../components/common/feedback/index.js'
+import EnvironmentSelect from '../../../components/ui/Select'
 
-import './DashboardPage.css'
+import { useAuth } from '../../../context/AuthContext'
+import { useTechnicianData } from '../../../features/technicians/hooks/useTechnicianData'
+import { formatFarmOptionLabel } from '../../../features/farms/adapters/farmAdapter.js'
+import { USE_MOCK } from '../../../api/config.js'
 
-function StatusDot({ status }) {
-  return <span className={`technician-status-dot ${status}`} />
-}
-
-function CollapseButton({ collapsed, onClick, label }) {
-  return (
-    <button
-      className="technician-collapse-button"
-      type="button"
-      onClick={onClick}
-      aria-label={`${collapsed ? 'Mở rộng' : 'Thu gọn'} ${label}`}
-      aria-expanded={!collapsed}
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path
-          d={collapsed ? 'M6 9l6 6 6-6' : 'M6 15l6-6 6 6'}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </button>
-  )
-}
-
-function SectionTitle({
-  eyebrow,
-  title,
-  description,
-  collapsed,
-  onToggle,
-}) {
-  return (
-    <div
-      className={`technician-section-title ${
-        collapsed ? 'technician-section-title--collapsed' : ''
-      }`}
-    >
-      <div className="technician-section-title__content">
-        <span>{eyebrow}</span>
-
-        <div className="technician-section-title__text">
-          <h2>{title}</h2>
-
-          {!collapsed && description && (
-            <p>{description}</p>
-          )}
-        </div>
-      </div>
-
-      <CollapseButton
-        collapsed={collapsed}
-        onClick={onToggle}
-        label={title}
-      />
-    </div>
-  )
-}
-
-function SystemStatCard({ item }) {
-  return (
-    <article className="technician-stat-card">
-      <div className="technician-stat-card__top">
-        <span className="technician-stat-card__icon">
-          {item.icon}
-        </span>
-
-        <span
-          className={`technician-stat-card__status technician-stat-card__status--${item.status}`}
-        >
-          <StatusDot status={item.status} />
-          {item.statusLabel}
-        </span>
-      </div>
-
-      <div className="technician-stat-card__body">
-        <span>{item.label}</span>
-        <strong>{item.value}</strong>
-        <p>{item.description}</p>
-      </div>
-    </article>
-  )
-}
+import '../TechnicianWorkspace.css'
 
 function DashboardPage() {
-  const [collapsedSections, setCollapsedSections] = useState({
-    system: false,
-    devices: false,
-    alerts: false,
-  })
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const {
+    farms,
+    selectedFarm,
+    selectedFarmId,
+    setSelectedFarmId,
+    devices,
+    zones,
+    alerts,
+    alertsError,
+    telemetryError,
+    loading,
+    error,
+    refetch,
+  } = useTechnicianData()
 
-  const toggleSection = (section) => {
-    setCollapsedSections((current) => ({
-      ...current,
-      [section]: !current[section],
-    }))
-  }
+  const techName = user?.fullName || user?.name || 'Kỹ thuật viên'
+  const unassignedCount = devices.filter((d) => !d.isZoneAssigned).length
+  const onlineCount = devices.filter((d) => d.status === 'ONLINE').length
 
   return (
     <AppLayout>
-      <div className="technician-dashboard">
-        <section className="technician-welcome">
-          <div className="technician-welcome__content">
-            <span className="technician-welcome__eyebrow">
-              NESTMATE TECHNICAL OVERVIEW
-            </span>
-
-            <h1>Tổng quan kỹ thuật</h1>
-
+      <div className="tech-ws">
+        <header className="tech-ws-header">
+          <div className="tech-ws-header__copy">
+            <span className="tech-ws-eyebrow">TECHNICIAN WORKSPACE</span>
+            <h1>Tổng quan kỹ thuật — {techName}</h1>
             <p>
-              Theo dõi trạng thái thiết bị, kết nối và sức khỏe
-              hệ thống nhà yến.
+              Quản lý thiết bị, phân bổ khu vực lắp đặt và kiểm tra trạng thái kỹ thuật tại các nhà yến được Admin phân công.
             </p>
 
-            <div className="technician-welcome__system">
-              <span>Tình trạng hệ thống</span>
-
-              <strong>
-                <StatusDot status="healthy" />
-                Hoạt động ổn định
-              </strong>
+            <div className="tech-ws-quick-links">
+              <button
+                type="button"
+                className="tech-ws-btn tech-ws-btn--primary"
+                onClick={() => navigate('/technician/devices')}
+              >
+                Thiết bị ({devices.length})
+              </button>
+              <button
+                type="button"
+                className="tech-ws-btn"
+                onClick={() => navigate('/technician/installation')}
+              >
+                Phân bổ Zone ({unassignedCount} chưa gán)
+              </button>
+              <button
+                type="button"
+                className="tech-ws-btn"
+                onClick={() => navigate('/technician/diagnostics')}
+              >
+                Chẩn đoán
+              </button>
             </div>
           </div>
 
-          <div className="technician-welcome__farm">
-            <span>NHÀ YẾN ĐANG GIÁM SÁT</span>
-
-            <button type="button">
-              <div>
-                <StatusDot status="healthy" />
-                <strong>Nhà yến Bình An</strong>
-              </div>
-
-              <span>›</span>
-            </button>
-
-            <p>Cập nhật dữ liệu gần nhất: vài giây trước</p>
-          </div>
-        </section>
-
-        <section className="technician-dashboard-section">
-          <SectionTitle
-            eyebrow="SYSTEM HEALTH"
-            title="Tình trạng hệ thống"
-            description="Tổng quan nhanh trạng thái hạ tầng kỹ thuật"
-            collapsed={collapsedSections.system}
-            onToggle={() => toggleSection('system')}
-          />
-
-          {!collapsedSections.system && (
-            <div className="technician-stats-grid">
-              {systemStats.map((item) => (
-                <SystemStatCard
-                  key={item.id}
-                  item={item}
+          <div className="tech-ws-header__actions">
+            {farms.length > 0 && (
+              <div className="tech-ws-farm-picker">
+                <span>Nhà yến phụ trách ({farms.length})</span>
+                <EnvironmentSelect
+                  value={selectedFarmId || ''}
+                  onChange={setSelectedFarmId}
+                  options={farms.map((f) => ({
+                    value: f.id,
+                    label: formatFarmOptionLabel(f),
+                  }))}
                 />
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="technician-dashboard-section">
-          <SectionTitle
-            eyebrow="DEVICE & DIAGNOSTICS"
-            title="Thiết bị & trạng thái"
-            description="Theo dõi node, sensor và kết nối hệ thống"
-            collapsed={collapsedSections.devices}
-            onToggle={() => toggleSection('devices')}
-          />
-
-          {!collapsedSections.devices && (
-            <div className="technician-main-grid">
-              <DeviceStatusPanel />
-
-              <div className="technician-side-column">
-                <SensorHealthPanel />
-                <ConnectivityPanel />
               </div>
-            </div>
-          )}
-        </section>
+            )}
+          </div>
+        </header>
 
-        <section className="technician-dashboard-section">
-          <SectionTitle
-            eyebrow="TECHNICAL ALERTS"
-            title="Cảnh báo gần đây"
-            description="Các sự kiện kỹ thuật cần Technician chú ý"
-            collapsed={collapsedSections.alerts}
-            onToggle={() => toggleSection('alerts')}
+        {error && (
+          <ErrorMessage
+            title="Lỗi tải dữ liệu kỹ thuật viên"
+            message={error}
+            onRetry={refetch}
           />
+        )}
 
-          {!collapsedSections.alerts && (
-            <section className="technician-card technician-alerts-panel">
-              <AlertsPanel />
+        {loading && farms.length === 0 ? (
+          <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}>
+            <LoadingSpinner size="lg" text="Đang tải dữ liệu kỹ thuật..." />
+          </div>
+        ) : farms.length === 0 ? (
+          <EmptyState
+            title="Chưa có nhà yến được phân công"
+            description="Liên hệ Quản trị viên (Admin) để được phân công phụ trách nhà yến."
+          />
+        ) : (
+          <>
+            <section className="tech-ws-kpi-grid">
+              <article className="tech-ws-kpi-card">
+                <span>Nhà yến phụ trách</span>
+                <strong>{farms.length}</strong>
+                <small>Đang được Admin phân công</small>
+              </article>
+
+              <article className="tech-ws-kpi-card">
+                <span>Thiết bị đã đăng ký</span>
+                <strong>{devices.length}</strong>
+                <small>
+                  {telemetryError ? 'IoT Service chưa kết nối' : `${onlineCount} trực tuyến`}
+                </small>
+              </article>
+
+              <article className="tech-ws-kpi-card">
+                <span>Chưa phân bổ Zone</span>
+                <strong style={{ color: unassignedCount > 0 ? '#b45309' : '#059669' }}>
+                  {unassignedCount}
+                </strong>
+                <small>Ưu tiên gán khu vực lắp đặt</small>
+              </article>
+
+              <article className="tech-ws-kpi-card">
+                <span>Khu vực (Zones)</span>
+                <strong>{zones.length}</strong>
+                <small>{selectedFarm?.code || '---'}</small>
+              </article>
             </section>
-          )}
-        </section>
+
+            <section className="tech-ws-grid-main">
+              <DeviceStatusPanel devices={devices} />
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <section className="tech-ws-card">
+                  <div className="tech-ws-card__head">
+                    <h3>Nhà yến được phân công</h3>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {farms.map((farm) => (
+                      <button
+                        key={farm.id}
+                        type="button"
+                        onClick={() => setSelectedFarmId(farm.id)}
+                        style={{
+                          textAlign: 'left',
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          border: farm.id === selectedFarmId ? '1.5px solid #102d3f' : '1px solid #e2e8f0',
+                          background: farm.id === selectedFarmId ? '#f8fafc' : '#fff',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <strong style={{ display: 'block', fontSize: '13px', color: '#102d3f' }}>
+                          {formatFarmOptionLabel(farm)}
+                        </strong>
+                        <small style={{ color: '#64748b', fontSize: '11px' }}>
+                          {farm.address} · {farm.zoneCount} khu vực · {farm.deviceCount} thiết bị
+                        </small>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="tech-ws-card">
+                  <div className="tech-ws-card__head">
+                    <h3>Trạng thái dịch vụ</h3>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Management Registry</span>
+                      <span className="tech-badge tech-badge--online">Đã kết nối</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>IoT Telemetry</span>
+                      <span className={`tech-badge ${telemetryError ? 'tech-badge--unknown' : 'tech-badge--online'}`}>
+                        {telemetryError ? 'Chưa kết nối' : 'Sẵn sàng'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Notification Alerts</span>
+                      <span className={`tech-badge ${alertsError ? 'tech-badge--unknown' : 'tech-badge--online'}`}>
+                        {alertsError ? 'Chưa kết nối' : 'Sẵn sàng'}
+                      </span>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="tech-ws-card">
+                  <div className="tech-ws-card__head">
+                    <h3>Cảnh báo kỹ thuật</h3>
+                    <button
+                      type="button"
+                      className="tech-ws-btn"
+                      onClick={() => navigate('/technician/alerts')}
+                    >
+                      Chi tiết ›
+                    </button>
+                  </div>
+                  {!USE_MOCK && alertsError ? (
+                    <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
+                      Dịch vụ Cảnh báo hiện chưa khả dụng. Cảnh báo kỹ thuật sẽ hiển thị khi dịch vụ hoạt động trở lại.
+                    </p>
+                  ) : (
+                    <AlertsPanel alerts={alerts} />
+                  )}
+                </section>
+              </div>
+            </section>
+          </>
+        )}
       </div>
     </AppLayout>
   )

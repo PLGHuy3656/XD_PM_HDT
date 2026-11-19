@@ -1,0 +1,120 @@
+.error-message-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4, 16px);
+  padding: 14px 18px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-md, 14px);
+  margin: var(--space-3, 12px) 0;
+  color: #991b1b;
+}
+
+.error-message-panel--warning {
+  background: #fffbeb;
+  border-color: #f4d898;
+  color: #92400e;
+}
+
+.error-message-panel--info {
+  background: #f0f6fb;
+  border-color: #c7dceb;
+  color: #1e4263;
+}
+
+.error-message-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.error-message-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: currentColor;
+}
+
+.error-message-svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.error-message-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.error-message-title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: currentColor;
+}
+
+.error-message-desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: inherit;
+  opacity: 0.9;
+  margin: 0;
+}
+
+.error-retry-btn {
+  flex-shrink: 0;
+  background: #ffffff;
+  border: 1px solid currentColor;
+  color: currentColor;
+  padding: 7px 14px;
+  border-radius: var(--radius-xs, 8px);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--transition-fast, 150ms ease), opacity var(--transition-fast, 150ms ease);
+}
+
+.error-retry-btn:hover {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.error-message-panel--danger .error-retry-btn {
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.error-message-panel--danger .error-retry-btn:hover {
+  background: #fee2e2;
+}
+
+.error-message-panel--warning .error-retry-btn {
+  border-color: #e6c16b;
+  color: #854d0e;
+}
+
+.error-message-panel--warning .error-retry-btn:hover {
+  background: #fef3c7;
+}
+
+.error-message-panel--info .error-retry-btn {
+  border-color: #9ec0da;
+  color: #1e4263;
+}
+
+.error-message-panel--info .error-retry-btn:hover {
+  background: #e2eff8;
+}
