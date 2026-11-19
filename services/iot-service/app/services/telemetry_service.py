@@ -60,6 +60,16 @@ class TelemetryService:
         """Lists recent telemetry records for a device up to limit."""
         return self.repository.list_by_device(device_id, limit=limit)
 
+    def get_latest_by_farm(self, farm_id: str) -> AcceptedTelemetry | None:
+        """Retrieves the latest accepted telemetry for a farm."""
+        return self.repository.get_latest_by_farm(farm_id)
+
+    def list_by_farm(
+        self, farm_id: str, limit: int = 50
+    ) -> list[AcceptedTelemetry]:
+        """Lists recent telemetry records for a farm up to limit."""
+        return self.repository.list_by_farm(farm_id, limit=limit)
+
     def process_message(
         self, topic_device_code: str, payload_bytes: bytes | str
     ) -> TelemetryProcessResult:

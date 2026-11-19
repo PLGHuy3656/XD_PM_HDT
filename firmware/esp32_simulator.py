@@ -27,10 +27,12 @@ except ImportError:
     print("Vui lòng chạy: pip install paho-mqtt")
     sys.exit(1)
 
-# Cấu hình thiết bị & Broker
-MQTT_BROKER = os.getenv("MQTT_BROKER_HOST", "127.0.0.1")
-MQTT_PORT   = int(os.getenv("MQTT_BROKER_PORT", "1883"))
-DEVICE_ID   = os.getenv("DEVICE_ID", "SWC-DEMO-NODE-001")
+# Cấu hình thiết bị & Broker (qua biến môi trường, không hardcode secrets)
+MQTT_BROKER   = os.getenv("MQTT_BROKER_HOST", "127.0.0.1")
+MQTT_PORT     = int(os.getenv("MQTT_BROKER_PORT", "1883"))
+MQTT_USERNAME = os.getenv("MQTT_USERNAME", "")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "")
+DEVICE_ID     = os.getenv("DEVICE_ID", "SWC-DEMO-NODE-001")
 
 TOPIC_TELEMETRY = f"swiftlet/telemetry/{DEVICE_ID}"
 TOPIC_HEARTBEAT = f"swiftlet/heartbeat/{DEVICE_ID}"
@@ -60,14 +62,26 @@ start_time = time.time()
 def on_connect(client, userdata, flags, rc, properties=None):
     if rc == 0:
         print(f"\n[OK] ESP32 ({DEVICE_ID}) da ket noi Broker thanh cong: {MQTT_BROKER}:{MQTT_PORT}")
-        # Đăng ký nhận lệnh điều khiển
+        # Chỉ đăng ký đúng topic lệnh của thiết bị này (không subscribe chéo node khác)
         client.subscribe(TOPIC_COMMAND, qos=1)
-        client.subscribe("swiftlet/command/SWC-NODE-001", qos=1)
         print(f"[SUB] Da lang nghe kenh lenh: {TOPIC_COMMAND}")
         # Thông báo online
         client.publish(TOPIC_STATUS, json.dumps({"status": "online"}), qos=1, retain=True)
     else:
         print(f"[FAIL] Ket noi MQTT that bai! Ma loi: {rc}")
+
+
+def _publish_ack(client, cmd_id: str, status_val: str, message: str):
+    ack_payload = {
+        "commandId": cmd_id,
+        "deviceId": DEVICE_ID,
+        "status": status_val,
+        "mode": state["mode"],
+        "message": message,
+    }
+    client.publish(TOPIC_ACK, json.dumps(ack_payload), qos=1)
+    print(f" -> [ACK] Da gui xac nhan {status_val} ve {TOPIC_ACK}")
+
 
 def on_message(client, userdata, msg):
     global state
@@ -90,33 +104,34 @@ def on_message(client, userdata, msg):
                 state["mode"] = "MANUAL"
                 action_str = "BAT" if relay_state else "TAT"
                 print(f" -> [THUC THI] Da {action_str} thiet bi: {target.upper()}")
-
-                # Gui ACK xac nhan ve Backend/Frontend
-                ack_payload = {
-                    "commandId": cmd_id,
-                    "deviceId": DEVICE_ID,
-                    "status": "SUCCESS",
-                    "mode": "MANUAL",
-                    "message": f"Actuator {target} switched to {relay_state}; mode changed to MANUAL"
-                }
-                client.publish(TOPIC_ACK, json.dumps(ack_payload), qos=1)
-                print(f" -> [ACK] Da gui xac nhan SUCCESS ve {TOPIC_ACK}")
+                _publish_ack(
+                    client,
+                    cmd_id,
+                    "SUCCESS",
+                    f"Actuator {target} switched to {relay_state}; mode changed to MANUAL",
+                )
+            else:
+                _publish_ack(client, cmd_id, "FAILED", f"Unsupported relay target: {target}")
 
         elif action == "UPDATE_THRESHOLDS":
             state["targetTemp"] = float(payload.get("targetTemp", 28.5))
             state["targetHum"] = float(payload.get("targetHum", 80.0))
             state["mode"] = "AUTO" if payload.get("isAutoMode", True) else "MANUAL"
             print(f" -> [THUC THI] Cap nhat nguong: TargetTemp={state['targetTemp']}C, TargetHum={state['targetHum']}%")
+            _publish_ack(client, cmd_id, "SUCCESS", "Thresholds updated successfully")
 
-            ack_payload = {
-                "commandId": cmd_id,
-                "deviceId": DEVICE_ID,
-                "status": "SUCCESS",
-                "mode": state["mode"],
-                "message": "Thresholds updated successfully"
-            }
-            client.publish(TOPIC_ACK, json.dumps(ack_payload), qos=1)
-            print(f" -> [ACK] Da gui xac nhan SUCCESS ve {TOPIC_ACK}")
+        elif action == "PROVISION_DEVICE":
+            farm_id = payload.get("farmId")
+            zone_id = payload.get("zoneId")
+            if not farm_id or not zone_id:
+                _publish_ack(client, cmd_id, "FAILED", "Missing farmId or zoneId in PROVISION_DEVICE command")
+            else:
+                state["farmId"] = farm_id
+                state["zoneId"] = zone_id
+                _publish_ack(client, cmd_id, "SUCCESS", "Device provisioned in simulator; activation ready")
+
+        else:
+            _publish_ack(client, cmd_id, "FAILED", f"Unsupported command action: {action}")
 
     except Exception as e:
         print(f"[ERROR] Loi xu ly lenh MQTT: {e}")
@@ -137,6 +152,8 @@ def main():
 
     client.on_connect = on_connect
     client.on_message = on_message
+    if MQTT_USERNAME:
+        client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD or None)
 
     # Thiet lap LWT (Last Will and Testament)
     client.will_set(TOPIC_STATUS, json.dumps({"status": "offline"}), qos=1, retain=True)

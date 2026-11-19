@@ -17,7 +17,7 @@ export function useTelemetry(farmId) {
     USE_MOCK ? SERVICE_STATE.AVAILABLE : SERVICE_STATE.LOADING,
   )
 
-  const fetchTelemetry = useCallback(async (signal) => {
+  const fetchTelemetry = useCallback(async (signal, { silent = false } = {}) => {
     if (!farmId) {
       setLoading(false)
       setTelemetry(normalizeTelemetry(null, USE_MOCK))
@@ -28,12 +28,14 @@ export function useTelemetry(farmId) {
     }
 
     try {
-      setLoading(true)
-      setError(null)
-      if (!USE_MOCK) {
-        setTelemetry(null)
-        setHasData(false)
-        setServiceState(SERVICE_STATE.LOADING)
+      if (!silent) {
+        setLoading(true)
+        setError(null)
+        if (!USE_MOCK) {
+          setTelemetry(null)
+          setHasData(false)
+          setServiceState(SERVICE_STATE.LOADING)
+        }
       }
 
       if (USE_MOCK) {
@@ -81,10 +83,21 @@ export function useTelemetry(farmId) {
       }
     })
 
+    // Background 3s polling for live ESP32 telemetry when a real farmId is selected
+    let pollInterval = null
+    if (!USE_MOCK && farmId) {
+      pollInterval = setInterval(() => {
+        if (!controller.signal.aborted) {
+          fetchTelemetry(controller.signal, { silent: true })
+        }
+      }, 3000)
+    }
+
     return () => {
       controller.abort()
+      if (pollInterval) clearInterval(pollInterval)
     }
-  }, [fetchTelemetry])
+  }, [fetchTelemetry, farmId])
 
   useRevalidateOnFocus(
     useCallback(() => {

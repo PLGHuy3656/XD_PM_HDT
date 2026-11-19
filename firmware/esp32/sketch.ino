@@ -29,6 +29,9 @@
 #define RELAY_INACTIVE      LOW
 
 // --- 2. CẤU HÌNH ĐỊNH DANH & MQTT TOPIC TAXONOMY (CANONICAL CONTRACT V1) ---
+// Chú ý triển khai:
+// - Wokwi Simulator trên Web: dùng WIFI_SSID_CFG="Wokwi-GUEST", MQTT_BROKER_HOST="broker.emqx.io"
+// - Mạch ESP32 thật trong LAN: override WIFI_SSID_CFG, WIFI_PASSWORD_CFG, MQTT_BROKER_HOST (IP LAN máy chủ), DEVICE_ID_CFG
 #ifndef WIFI_SSID_CFG
 #define WIFI_SSID_CFG       "Wokwi-GUEST"
 #endif
@@ -60,7 +63,7 @@ const int   MQTT_PORT       = MQTT_BROKER_PORT;
 const char* MQTT_USER       = MQTT_USER_CFG;
 const char* MQTT_PASSWORD   = MQTT_PASSWORD_CFG;
 
-// Định danh thiết bị chuẩn: SWC-NODE-001 (Canonical MQTT Contract V1)
+// Định danh thiết bị chuẩn: SWC-NODE-001 (Canonical MQTT Contract V1; đổi theo node_id đã đăng ký khi nạp mạch thật)
 const char* DEVICE_ID       = "SWC-NODE-001";
 
 // Cây Topic MQTT

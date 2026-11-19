@@ -123,3 +123,13 @@ def test_list_farm_telemetry_limit_validation(client):
 
     resp_excess = client.get("/api/iot/farms/farm-1/telemetry?limit=501")
     assert resp_excess.status_code == 422
+
+
+def test_unregistered_device_never_leaks_into_hardcoded_demo_farm(client):
+    """Security regression: unknown devices must not be silently mapped to a hardcoded demo farm."""
+    t_unknown = _make_sample_telemetry("ROGUE-NODE-999", farm_id=None, temp=33.0)
+    default_telemetry_repository.save(t_unknown)
+
+    resp_demo = client.get("/api/iot/farms/a18d8eee-cb1a-4b00-b375-d505eb8128d7/telemetry/latest")
+    assert resp_demo.status_code == 404
+    assert default_telemetry_repository.get_latest("ROGUE-NODE-999").farm_id is None
