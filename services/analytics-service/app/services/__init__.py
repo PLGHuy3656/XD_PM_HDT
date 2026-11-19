@@ -5,6 +5,7 @@ Re-exports PR #29 operational analytics functions alongside CP9 OLAP AnalyticsSe
 from app.repository import (
     get_analytics_alerts,
     get_bird_analytics,
+    get_bird_movement_history,
     get_harvest_records,
     get_telemetry_analytics,
 )
@@ -14,6 +15,7 @@ from app.services.operational_service import (
     PERIODS,
     get_alerts_data,
     get_bird_analytics_data,
+    get_bird_movement_history_data,
     get_harvest_analytics_data,
     get_telemetry_analytics_data,
 )
@@ -24,10 +26,12 @@ __all__ = [
     "HARVEST_PERIODS",
     "get_telemetry_analytics",
     "get_bird_analytics",
+    "get_bird_movement_history",
     "get_harvest_records",
     "get_analytics_alerts",
     "get_telemetry_analytics_data",
     "get_bird_analytics_data",
+    "get_bird_movement_history_data",
     "get_harvest_analytics_data",
     "get_alerts_data",
 ]

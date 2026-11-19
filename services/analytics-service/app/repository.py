@@ -1,3 +1,5 @@
+import hashlib
+import json
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -378,6 +380,141 @@ def get_pending_analytics_events(limit: int = 50) -> list[tuple]:
             return cur.fetchall()
 
 
+def save_ai_event(
+    *,
+    event_key: str,
+    source_event_id: UUID | None,
+    source_type: str,
+    camera_id: str,
+    event_type: str,
+    label: str,
+    confidence: float,
+    observed_at: datetime,
+    context: dict[str, Any],
+    payload: dict[str, Any],
+    notification_event: dict[str, Any],
+) -> UUID | None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO public.ai_events (
+                    event_key, source_event_id, source_type, camera_id,
+                    event_type, label, confidence, observed_at,
+                    farm_id, farm_code, farm_name, zone_id, zone_code,
+                    zone_name, payload
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s
+                )
+                ON CONFLICT DO NOTHING
+                RETURNING id
+                """,
+                (
+                    event_key,
+                    source_event_id,
+                    source_type,
+                    camera_id,
+                    event_type,
+                    label,
+                    confidence,
+                    observed_at,
+                    UUID(context["farm_id"]),
+                    context["farm_code"],
+                    context["farm_name"],
+                    UUID(context["zone_id"]) if context["zone_id"] else None,
+                    context.get("zone_code"),
+                    context.get("zone_name"),
+                    Jsonb(payload),
+                ),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+
+            cur.execute(
+                """
+                INSERT INTO public.analytics_event_outbox (
+                    event_id, event_type, payload
+                )
+                VALUES (%s, %s, %s)
+                """,
+                (
+                    UUID(notification_event["event_id"]),
+                    notification_event["event_type"],
+                    Jsonb(notification_event),
+                ),
+            )
+            return row[0]
+
+
+def get_ai_events(
+    node_ids: list[str],
+    start: datetime,
+    end: datetime,
+    source_type: str | None = None,
+    event_type: str | None = None,
+    camera_id: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+) -> list[tuple]:
+    if not node_ids:
+        return []
+
+    query = """
+        SELECT
+            id, source_type, camera_id, event_type, label, confidence,
+            observed_at, farm_id, farm_code, farm_name, zone_id, zone_code,
+            zone_name, payload
+        FROM public.ai_events
+        WHERE camera_id = ANY(%s)
+          AND observed_at >= %s
+          AND observed_at < %s
+    """
+    params: list[Any] = [node_ids, start, end]
+    if source_type is not None:
+        query += " AND source_type = %s"
+        params.append(source_type)
+    if event_type is not None:
+        query += " AND event_type = %s"
+        params.append(event_type)
+    if camera_id is not None:
+        query += " AND camera_id = %s"
+        params.append(camera_id)
+    query += " ORDER BY observed_at DESC, id DESC LIMIT %s OFFSET %s"
+    params.extend((limit, offset))
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, tuple(params))
+            return cur.fetchall()
+
+
+def get_ai_event_by_id(
+    node_ids: list[str],
+    event_id: UUID,
+) -> tuple | None:
+    if not node_ids:
+        return None
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    id, source_type, camera_id, event_type, label, confidence,
+                    observed_at, farm_id, farm_code, farm_name, zone_id,
+                    zone_code, zone_name, payload
+                FROM public.ai_events
+                WHERE id = %s
+                  AND camera_id = ANY(%s)
+                """,
+                (event_id, node_ids),
+            )
+            return cur.fetchone()
+
+
 def mark_analytics_event_published(event_id: UUID) -> None:
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -446,8 +583,15 @@ def get_bird_analytics(
     start: datetime,
     end: datetime,
     bucket: str,
+    camera_id: str | None = None,
 ) -> list[tuple]:
     if not node_ids:
+        return []
+
+    if camera_id is not None and camera_id not in node_ids:
+        return []
+    scoped_node_ids = [camera_id] if camera_id is not None else node_ids
+    if not scoped_node_ids:
         return []
 
     with get_connection() as conn:
@@ -521,8 +665,114 @@ def get_bird_analytics(
                 GROUP BY bucket, camera_counts.camera_count
                 ORDER BY bucket
                 """,
-                (node_ids, start, node_ids, start, end, bucket, start),
+                (
+                    scoped_node_ids,
+                    start,
+                    scoped_node_ids,
+                    start,
+                    end,
+                    bucket,
+                    start,
+                ),
             )
+            return cur.fetchall()
+
+
+def save_bird_track_points(
+    *,
+    camera_id: str,
+    observed_at: datetime,
+    detections: list[dict[str, Any]],
+    context: dict[str, Any],
+) -> tuple[int, int]:
+    accepted = 0
+    duplicates = 0
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            for detection in detections:
+                track_id = detection.get("track_id")
+                object_class = detection["object_class"]
+                if track_id is None or object_class.casefold() != "swiftlet":
+                    continue
+
+                bbox = detection["bbox"]
+                center_x = (bbox[0] + bbox[2]) / 2
+                center_y = (bbox[1] + bbox[3]) / 2
+                identity = json.dumps(
+                    {
+                        "camera_id": camera_id,
+                        "track_id": track_id,
+                        "observed_at": observed_at.isoformat(),
+                        "object_class": object_class,
+                        "confidence": detection["confidence"],
+                        "bbox": bbox,
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                point_key = hashlib.sha256(
+                    identity.encode("utf-8"),
+                ).hexdigest()
+                cur.execute(
+                    """
+                    INSERT INTO public.bird_track_points (
+                        point_key, camera_id, track_id, object_class,
+                        confidence, observed_at, center_x, center_y, bbox,
+                        farm_id, farm_name, zone_id, zone_name
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                            %s, %s)
+                    ON CONFLICT (point_key) DO NOTHING
+                    """,
+                    (
+                        point_key,
+                        camera_id,
+                        track_id,
+                        object_class,
+                        detection["confidence"],
+                        observed_at,
+                        center_x,
+                        center_y,
+                        Jsonb(list(bbox)),
+                        UUID(context["farm_id"]),
+                        context["farm_name"],
+                        UUID(context["zone_id"]) if context["zone_id"] else None,
+                        context.get("zone_name"),
+                    ),
+                )
+                if cur.rowcount:
+                    accepted += 1
+                else:
+                    duplicates += 1
+    return accepted, duplicates
+
+
+def get_bird_movement_history(
+    camera_id: str,
+    start: datetime,
+    end: datetime,
+    track_id: int | None = None,
+    limit: int = 500,
+) -> list[tuple]:
+    query = """
+        SELECT
+            camera_id, track_id, object_class, confidence, observed_at,
+            center_x, center_y, bbox, farm_id, farm_name, zone_id, zone_name
+        FROM public.bird_track_points
+        WHERE camera_id = %s
+          AND observed_at >= %s
+          AND observed_at < %s
+    """
+    params: list[Any] = [camera_id, start, end]
+    if track_id is not None:
+        query += " AND track_id = %s"
+        params.append(track_id)
+    query += " ORDER BY observed_at DESC, track_id LIMIT %s"
+    params.append(limit)
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, tuple(params))
             return cur.fetchall()
 
 
