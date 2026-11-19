@@ -447,7 +447,7 @@ def test_19_rapid_consecutive_reassignments_monotonic_bump(client, mock_device_r
 def test_20_static_scan_no_runtime_ddl():
     """R7-H1 Guard: Verify zero DDL statements or schema mutation helpers exist in runtime Python code."""
     from pathlib import Path
-    app_dir = Path("D:/Development/Projects/XD_PM_HDT_mgmt_worktree/services/management-service/app")
+    app_dir = Path(__file__).resolve().parent.parent / "app"
     py_files = list(app_dir.rglob("*.py"))
     assert len(py_files) > 0
 

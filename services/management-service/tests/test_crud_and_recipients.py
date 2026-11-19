@@ -110,9 +110,15 @@ def test_zone_and_device_crud_and_rbac(monkeypatch):
     from app.core import dependencies as dep_mod
 
     monkeypatch.setattr(dep_mod.user_repository, "is_farm_owned_by_user", lambda uid, fid: uid == owner_id)
+    monkeypatch.setattr(dep_mod.user_repository, "is_farm_assigned_to_technician", lambda uid, fid: False)
     monkeypatch.setattr(zr_mod.user_repository, "resolve_farm_uuid", lambda fid: farm_uuid)
     monkeypatch.setattr(dr_mod.user_repository, "resolve_farm_uuid", lambda fid: farm_uuid)
     monkeypatch.setattr(dr_mod.user_repository, "get_farm_id_for_device", lambda did: farm_uuid)
+    monkeypatch.setattr(
+        dr_mod.farm_repository,
+        "get_farm_by_id",
+        lambda fid: {"farm_id": fid, "approval_status": "APPROVED"},
+    )
     other_farm_uuid = str(uuid.uuid4())
     monkeypatch.setattr(
         dr_mod.zone_repository,

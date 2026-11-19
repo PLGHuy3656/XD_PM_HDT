@@ -142,9 +142,7 @@ function EnvironmentControlPage() {
     try {
       const dispatched = await apiClient.post(`/api/iot/devices/${liveNodeId}/commands/config`, {
         targetTemp: Number(rules.temperature?.max ?? 28.5),
-        tempDeadband: 1.5,
         targetHum: Number(rules.humidity?.min ?? 80.0),
-        humDeadband: 3.0,
         isAutoMode: targetMode === 'AUTO',
       })
       const finalCmd = await pollIoTCommandAck(dispatched.commandId)
