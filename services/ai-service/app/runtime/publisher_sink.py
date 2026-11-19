@@ -143,10 +143,12 @@ class DomainEventPublisherRuntimeSink(BaseRuntimeSink):
         height = round(max(0.0, event.bbox.y2 - event.bbox.y1), 1)
         bbox = BBoxPayload(x=x1, y=y1, width=width, height=height)
 
-        # Invariant 5: Sanitize snapshot reference (filename only, no local private paths)
+        # Invariant 5: Sanitize snapshot reference (cross-platform filename only, no local private paths)
         snapshot_ref: Optional[str] = None
         if event.snapshot:
-            snapshot_ref = Path(event.snapshot).name
+            cleaned_snap = event.snapshot.strip().replace("\\", "/").rsplit("/", 1)[-1]
+            if cleaned_snap and cleaned_snap not in (".", ".."):
+                snapshot_ref = cleaned_snap
 
         # Determine frame dimensions
         frame_w, frame_h = self._camera_dims.get(

@@ -277,15 +277,17 @@ class CameraPipeline:
 
     @staticmethod
     def normalize_snapshot_ref(raw_ref: Optional[str]) -> Optional[str]:
-        """Ensure raw filesystem paths are converted to safe relative snapshot URLs."""
+        """Ensure raw filesystem paths (Windows or POSIX) are converted to safe relative snapshot URLs."""
         if not raw_ref:
             return None
         cleaned = raw_ref.strip()
         if not cleaned:
             return None
-        if cleaned.startswith(("/", "http://", "https://")):
+        if cleaned.startswith(("/api/v1/ai/snapshots/", "/snapshots/", "http://", "https://")) and ".." not in cleaned:
             return cleaned
         filename = cleaned.replace("\\", "/").rsplit("/", 1)[-1]
+        if not filename or filename in (".", ".."):
+            return None
         return f"/api/v1/ai/snapshots/{filename}"
 
     @staticmethod

@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hmac
 from typing import List, Optional
 
-from fastapi import APIRouter, Body, Depends, Path, Query
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Path, Query, status
 from pydantic import Field
 
+from app.config import is_internal_key_acceptable, settings
 from app.dependencies import (
     get_runtime_manager,
     get_state_store,
@@ -208,15 +210,37 @@ def list_camera_counts(
     )
 
 
+def _require_camera_control_auth(
+    x_internal_service_key: Optional[str] = Header(default=None, alias="X-Internal-Service-Key"),
+) -> None:
+    """Enforce internal service-key auth on camera write operations when enabled."""
+    if not settings.ai_camera_control_require_auth:
+        return
+    configured_key = (settings.ai_internal_service_key or "").strip()
+    if not is_internal_key_acceptable(configured_key):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI camera control auth is enabled but AI_INTERNAL_SERVICE_KEY is not properly provisioned",
+        )
+    if not x_internal_service_key or not hmac.compare_digest(
+        x_internal_service_key.strip(), configured_key
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid or missing X-Internal-Service-Key for camera control operation",
+        )
+
+
 @router.post(
     "/{cameraId}/start",
     response_model=CameraRuntimeStatus,
-    responses={404: {"model": ErrorResponse}},
+    responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
     summary="Start processing loop for a registered or dynamically provisioned AI camera",
 )
 def start_camera(
     cameraId: str = Path(..., description="Canonical camera identifier"),
     payload: Optional[CameraStartRequest] = Body(default=None),
+    _: None = Depends(_require_camera_control_auth),
     runtime_manager: AIRuntimeManager = Depends(get_runtime_manager),
 ) -> CameraRuntimeStatus:
     if payload is not None and payload.source is not None:
@@ -263,11 +287,12 @@ def start_camera(
 @router.post(
     "/{cameraId}/stop",
     response_model=CameraRuntimeStatus,
-    responses={404: {"model": ErrorResponse}},
+    responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
     summary="Stop processing loop for a registered AI camera",
 )
 def stop_camera(
     cameraId: str = Path(..., description="Canonical camera identifier"),
+    _: None = Depends(_require_camera_control_auth),
     runtime_manager: AIRuntimeManager = Depends(get_runtime_manager),
 ) -> CameraRuntimeStatus:
     try:
@@ -283,11 +308,12 @@ def stop_camera(
 @router.post(
     "/{cameraId}/counts/reset",
     response_model=CountUpdate,
-    responses={404: {"model": ErrorResponse}},
+    responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
     summary="Reset counting window and counts to 0 for a camera",
 )
 def reset_camera_counts(
     cameraId: str = Path(..., description="Canonical camera identifier"),
+    _: None = Depends(_require_camera_control_auth),
     runtime_manager: AIRuntimeManager = Depends(get_runtime_manager),
 ) -> CountUpdate:
     try:

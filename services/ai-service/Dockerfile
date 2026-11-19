@@ -24,7 +24,8 @@ COPY services/ai-service/.env.example ./.env.example
 
 ENV AI_LOAD_CONFIGURED_CAMERAS=true \
     RABBITMQ_ENABLED=true \
-    AI_RUNTIME_INTERNAL_ENABLED=true
+    AI_RUNTIME_INTERNAL_ENABLED=false \
+    AI_CAMERA_CONTROL_REQUIRE_AUTH=true
 
 EXPOSE 8003
 

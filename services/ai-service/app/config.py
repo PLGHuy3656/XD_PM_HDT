@@ -186,7 +186,8 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("rabbitmq_user", "RABBITMQ_USER", "rabbitmq_default_user"),
     )
     rabbitmq_password: str = Field(
-        default="swiftlet123",
+        default="",
+        repr=False,
         validation_alias=AliasChoices(
             "rabbitmq_password",
             "RABBITMQ_PASSWORD",
@@ -202,6 +203,10 @@ class Settings(BaseSettings):
     ai_runtime_internal_enabled: bool = Field(
         default=False,
         validation_alias=AliasChoices("ai_runtime_internal_enabled", "AI_RUNTIME_INTERNAL_ENABLED"),
+    )
+    ai_camera_control_require_auth: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("ai_camera_control_require_auth", "AI_CAMERA_CONTROL_REQUIRE_AUTH"),
     )
     ai_internal_service_key: str = Field(
         default="",
