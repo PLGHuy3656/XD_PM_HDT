@@ -107,9 +107,9 @@ export function useFarms() {
   const runFarmMutation = useCallback(
     async (fn, fallbackError) => {
       try {
-        await fn()
+        const data = await fn()
         await fetchFarms()
-        return { success: true }
+        return { success: true, data }
       } catch (err) {
         return { success: false, error: err?.message || fallbackError }
       }

@@ -20,6 +20,13 @@ const healthFilterOptions = [
   { value: 'ATTENTION', label: 'Cần theo dõi' },
 ]
 
+const approvalFilterOptions = [
+  { value: 'ALL', label: 'Tất cả phê duyệt' },
+  { value: 'PENDING', label: 'Chờ duyệt' },
+  { value: 'APPROVED', label: 'Đã duyệt' },
+  { value: 'REJECTED', label: 'Từ chối' },
+]
+
 function FarmsPage() {
   const {
     farms,
@@ -30,18 +37,22 @@ function FarmsPage() {
     createFarm: apiCreateFarm,
     updateFarm: apiUpdateFarm,
     deleteFarm: apiDeleteFarm,
+    approveFarm: apiApproveFarm,
+    rejectFarm: apiRejectFarm,
     loading,
     error,
   } = useAdminData()
 
   const [searchTerm, setSearchTerm] = useState('')
   const [healthFilter, setHealthFilter] = useState('ALL')
+  const [approvalFilter, setApprovalFilter] = useState('ALL')
   const [selectedFarmId, setSelectedFarmId] = useState(null)
   const [editingFarmId, setEditingFarmId] = useState(null)
   const [assignmentFarmId, setAssignmentFarmId] = useState(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState({ farm_code: '', farm_name: '', address: '', owner_id: '' })
   const [actionError, setActionError] = useState('')
+  const [actionNotice, setActionNotice] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const owners = useMemo(
@@ -83,9 +94,13 @@ function FarmsPage() {
         healthFilter === 'ALL' ||
         farm.health === healthFilter
 
-      return matchesSearch && matchesHealth
+      const matchesApproval =
+        approvalFilter === 'ALL' ||
+        (farm.approvalStatus || 'APPROVED') === approvalFilter
+
+      return matchesSearch && matchesHealth && matchesApproval
     })
-  }, [farms, searchTerm, healthFilter])
+  }, [farms, searchTerm, healthFilter, approvalFilter])
 
   const totalZones = farms.reduce(
     (total, farm) =>
@@ -123,13 +138,13 @@ function FarmsPage() {
   async function handleCreateFarm(event) {
     event.preventDefault()
     setActionError('')
-    if (!createForm.farm_code.trim() || !createForm.farm_name.trim()) {
-      setActionError('Vui lòng nhập đầy đủ mã nhà yến và tên nhà yến.')
+    setActionNotice('')
+    if (!createForm.farm_name.trim()) {
+      setActionError('Vui lòng nhập tên nhà yến.')
       return
     }
     setSubmitting(true)
     const payload = {
-      farm_code: createForm.farm_code.trim(),
       farm_name: createForm.farm_name.trim(),
       address: createForm.address.trim() || null,
       status: 'ACTIVE',
@@ -142,6 +157,9 @@ function FarmsPage() {
     if (!res?.success) {
       setActionError(res?.error || 'Không thể tạo nhà yến.')
       return
+    }
+    if (res?.data?.farm_code) {
+      setActionNotice(`Đã tạo nhà yến "${res.data.farm_name}" — Mã nhà yến: ${res.data.farm_code}`)
     }
     setCreateForm({ farm_code: '', farm_name: '', address: '', owner_id: '' })
     setCreateOpen(false)
@@ -177,6 +195,30 @@ function FarmsPage() {
     if (!res?.success) {
       setActionError(res?.error || 'Không thể hủy phân công kỹ thuật viên.')
     }
+  }
+
+  async function handleApproveFarm(farm) {
+    if (!window.confirm(`Xác nhận phê duyệt nhà yến "${farm.name}" (${farm.code})?`)) return
+    setActionError('')
+    setActionNotice('')
+    const res = await apiApproveFarm(farm.id)
+    if (!res?.success) {
+      setActionError(res?.error || 'Không thể phê duyệt nhà yến.')
+      return
+    }
+    setActionNotice(`Đã phê duyệt nhà yến "${farm.name}".`)
+  }
+
+  async function handleRejectFarm(farm, reason) {
+    setActionError('')
+    setActionNotice('')
+    const res = await apiRejectFarm(farm.id, reason)
+    if (!res?.success) {
+      setActionError(res?.error || 'Không thể từ chối nhà yến.')
+      return false
+    }
+    setActionNotice(`Đã từ chối nhà yến "${farm.name}".`)
+    return true
   }
 
 
@@ -228,7 +270,15 @@ function FarmsPage() {
               {actionError || error}
             </div>
           )}
-          <div className="admin-farms-content__heading">
+          {actionNotice && (
+            <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', borderRadius: '8px', background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0' }}>
+              {actionNotice}
+            </div>
+          )}
+          <div
+            className="admin-farms-content__heading"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}
+          >
             <div>
               <span>FARM DIRECTORY</span>
               <h2>Danh sách nhà yến</h2>
@@ -239,6 +289,7 @@ function FarmsPage() {
             <button
               type="button"
               className="admin-farm-edit-button"
+              style={{ width: 'auto', minHeight: '40px', padding: '0 18px', marginTop: 0 }}
               onClick={() => {
                 setActionError('')
                 setCreateOpen(true)
@@ -265,6 +316,14 @@ function FarmsPage() {
                 onChange={setHealthFilter}
               />
             </div>
+
+            <div className="admin-farms-toolbar__select">
+              <Select
+                value={approvalFilter}
+                options={approvalFilterOptions}
+                onChange={setApprovalFilter}
+              />
+            </div>
           </div>
 
           <FarmTable
@@ -284,6 +343,8 @@ function FarmsPage() {
             setEditingFarmId(farm.id)
           }
           onDelete={handleDeleteFarm}
+          onApprove={handleApproveFarm}
+          onReject={handleRejectFarm}
           onAssignTechnician={(farm) =>
             setAssignmentFarmId(farm.id)
           }
@@ -293,19 +354,14 @@ function FarmsPage() {
         {createOpen && (
           <div className="admin-farm-modal-backdrop" onMouseDown={() => setCreateOpen(false)}>
             <form
-              className="admin-farm-modal"
+              className="admin-farm-modal admin-farm-form"
               onSubmit={handleCreateFarm}
               onMouseDown={(e) => e.stopPropagation()}
             >
               <h3>Thêm nhà yến mới</h3>
-              <label>
-                Mã nhà yến *
-                <input
-                  value={createForm.farm_code}
-                  onChange={(e) => setCreateForm((c) => ({ ...c, farm_code: e.target.value }))}
-                  placeholder="VD: FARM-03"
-                />
-              </label>
+              <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
+                Mã nhà yến (Farm Code) sẽ được hệ thống tự động cấp duy nhất sau khi tạo.
+              </p>
               <label>
                 Tên nhà yến *
                 <input
@@ -336,9 +392,9 @@ function FarmsPage() {
                   </select>
                 </label>
               )}
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setCreateOpen(false)}>Hủy</button>
-                <button type="submit" disabled={submitting}>{submitting ? 'Đang lưu...' : 'Tạo nhà yến'}</button>
+              <div className="admin-farm-modal__actions">
+                <button type="button" className="admin-farm-modal__cancel" onClick={() => setCreateOpen(false)}>Hủy</button>
+                <button type="submit" className="admin-farm-modal__save" disabled={submitting}>{submitting ? 'Đang lưu...' : 'Tạo nhà yến'}</button>
               </div>
             </form>
           </div>

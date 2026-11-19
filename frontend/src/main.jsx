@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 
 import { AuthProvider } from './context/AuthContext'
 import './index.css'
+import './styles/modal.css'
 import App from './App.jsx'
 
 createRoot(

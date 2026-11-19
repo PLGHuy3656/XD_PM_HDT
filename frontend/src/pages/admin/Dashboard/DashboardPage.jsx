@@ -6,6 +6,7 @@ import UserAccessPanel from '../../../components/features/admin/dashboard/UserAc
 import SystemHealthPanel from '../../../components/features/admin/dashboard/SystemHealthPanel'
 import { managementItems as defaultManagementItems } from '../../../components/features/admin/dashboard/dashboardMockData'
 import { useAdminData } from '../../../features/admin'
+import { USE_MOCK } from '../../../api/config.js'
 
 import './DashboardPage.css'
 
@@ -17,10 +18,11 @@ function DashboardPage() {
   const navigate = useNavigate()
   const { dashboardStats, loading, error } = useAdminData()
 
-  const items = dashboardStats?.managementItems || defaultManagementItems
+  const items = dashboardStats?.managementItems || (USE_MOCK ? defaultManagementItems : [])
   const roles = dashboardStats?.roles
   const recentAccounts = dashboardStats?.recentAccounts
   const services = dashboardStats?.services
+  const hasServiceData = Array.isArray(services) && services.length > 0
 
   return (
     <AppLayout>
@@ -40,11 +42,19 @@ function DashboardPage() {
           </div>
 
           <div className="admin-hero__status">
-            <StatusDot status={error ? 'attention' : 'healthy'} />
+            <StatusDot status={error ? 'attention' : (loading || !hasServiceData ? 'attention' : 'healthy')} />
 
             <div>
               <span>PLATFORM STATUS</span>
-              <strong>{error ? 'Cần kiểm tra API' : 'Hoạt động ổn định'}</strong>
+              <strong>
+                {error
+                  ? 'Cần kiểm tra API'
+                  : loading
+                    ? 'Đang kiểm tra...'
+                    : hasServiceData
+                      ? 'Hoạt động ổn định'
+                      : 'Chế độ quản trị'}
+              </strong>
             </div>
           </div>
         </section>

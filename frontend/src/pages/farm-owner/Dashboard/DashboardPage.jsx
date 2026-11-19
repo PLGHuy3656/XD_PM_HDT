@@ -18,10 +18,12 @@ import {
 
 import { useAuth } from '../../../context/AuthContext'
 import { useFarms } from '../../../features/farms/hooks/useFarms'
+import { formatFarmOptionLabel } from '../../../features/farms/adapters/farmAdapter.js'
 import { useDevices } from '../../../features/devices/hooks/useDevices'
 import { useAlerts } from '../../../features/alerts/hooks/useAlerts'
 import { useTelemetry } from '../../../features/telemetry/hooks/useTelemetry'
 import { useCameras } from '../../../features/cameras/hooks/useCameras'
+import { USE_MOCK } from '../../../api/config.js'
 
 import '../../../components/features/farm-owner/dashboard/DashboardComponents.css'
 import './DashboardPage.css'
@@ -45,8 +47,16 @@ function CameraIcon() {
 }
 
 function LiveCamera({ cameras = [] }) {
-  const effectiveCameras = cameras.length > 0 ? cameras : defaultMockCameras
+  const effectiveCameras = cameras.length > 0 ? cameras : (USE_MOCK ? defaultMockCameras : [])
   const [selectedCameraId, setSelectedCameraId] = useState(effectiveCameras[0]?.id || 'CAM-01')
+
+  if (effectiveCameras.length === 0) {
+    return (
+      <div style={{ padding: '1.5rem', color: '#64748b', textAlign: 'center' }}>
+        Chưa có camera AI nào được cấu hình cho nhà yến này.
+      </div>
+    )
+  }
 
   const selectedCamera =
     effectiveCameras.find((camera) => camera.id === selectedCameraId) ?? effectiveCameras[0]
@@ -152,13 +162,13 @@ function LiveCamera({ cameras = [] }) {
         <div className="camera-stat-grid">
           <article>
             <span>Chim vào</span>
-            <strong>{isOnline ? '128' : '—'}</strong>
+            <strong>{isOnline ? (selectedCamera.entries ?? (USE_MOCK ? '128' : '—')) : '—'}</strong>
             <small>Hôm nay</small>
           </article>
 
           <article>
             <span>Chim ra</span>
-            <strong>{isOnline ? '94' : '—'}</strong>
+            <strong>{isOnline ? (selectedCamera.exits ?? (USE_MOCK ? '94' : '—')) : '—'}</strong>
             <small>Hôm nay</small>
           </article>
         </div>
@@ -170,6 +180,14 @@ function LiveCamera({ cameras = [] }) {
 function EnvironmentPanel({ telemetry }) {
   const [selectedMetric, setSelectedMetric] = useState('temperature')
   const [hoveredPoint, setHoveredPoint] = useState(null)
+
+  if (!USE_MOCK && !telemetry) {
+    return (
+      <div style={{ padding: '1.25rem', color: '#64748b', fontSize: '0.9rem' }}>
+        Chưa có dữ liệu telemetry từ cảm biến IoT cho nhà yến này.
+      </div>
+    )
+  }
 
   const effectiveMetrics = { ...defaultMetrics }
   if (telemetry) {
@@ -361,7 +379,7 @@ function EnvironmentPanel({ telemetry }) {
   )
 }
 
-function OperationsOverview({ telemetry, devices = [], alerts = [] }) {
+function OperationsOverview({ telemetry, devices = [], alerts = [], alertsError = null }) {
   const navigate = useNavigate()
 
   const quickDevices =
@@ -374,9 +392,10 @@ function OperationsOverview({ telemetry, devices = [], alerts = [] }) {
           status: d.status === 'ONLINE' ? 'normal' : 'danger',
           value: d.firmware,
         }))
-      : mockDevices
+      : (USE_MOCK ? mockDevices : [])
 
-  const recentAlerts = alerts.length > 0 ? alerts.slice(0, 4) : mockAlerts
+  const recentAlerts =
+    alerts.length > 0 ? alerts.slice(0, 4) : (USE_MOCK ? mockAlerts : [])
 
   return (
     <div className="operations-grid">
@@ -399,9 +418,15 @@ function OperationsOverview({ telemetry, devices = [], alerts = [] }) {
         </div>
 
         <div className="quick-device-list">
-          {quickDevices.map((device) => (
-            <DeviceQuickCard key={device.id} {...device} />
-          ))}
+          {quickDevices.length === 0 ? (
+            <div style={{ padding: '0.75rem', color: '#64748b', fontSize: '0.88rem' }}>
+              Chưa có thiết bị nào trong nhà yến này.
+            </div>
+          ) : (
+            quickDevices.map((device) => (
+              <DeviceQuickCard key={device.id} {...device} />
+            ))
+          )}
         </div>
       </section>
 
@@ -422,9 +447,19 @@ function OperationsOverview({ telemetry, devices = [], alerts = [] }) {
         </div>
 
         <div className="alert-list">
-          {recentAlerts.map((alert) => (
-            <AlertItem key={alert.id} {...alert} />
-          ))}
+          {!USE_MOCK && alertsError ? (
+            <div style={{ padding: '0.75rem', color: '#64748b', fontSize: '0.88rem' }}>
+              Chưa kết nối dịch vụ Cảnh báo.
+            </div>
+          ) : recentAlerts.length === 0 ? (
+            <div style={{ padding: '0.75rem', color: '#64748b', fontSize: '0.88rem' }}>
+              Chưa có cảnh báo nào.
+            </div>
+          ) : (
+            recentAlerts.map((alert) => (
+              <AlertItem key={alert.id} {...alert} />
+            ))
+          )}
         </div>
       </section>
     </div>
@@ -441,12 +476,13 @@ function DashboardPage() {
     loading: farmsLoading,
   } = useFarms()
 
-  const { devices } = useDevices(selectedFarmId)
-  const { alerts } = useAlerts(selectedFarmId)
+  const { devices } = useDevices(selectedFarmId, { requireFarmId: true })
+  const { alerts, error: alertsError } = useAlerts(selectedFarmId)
   const { telemetry } = useTelemetry(selectedFarmId)
-  const { cameras } = useCameras(selectedFarmId)
+  const { cameras } = useCameras(selectedFarmId, null, { requireFarmId: true })
 
   const ownerName = user?.fullName || user?.name || 'Farm Owner'
+  const hasLiveSignal = Boolean(telemetry) || devices.some((d) => d.status === 'ONLINE')
 
   return (
     <AppLayout>
@@ -462,14 +498,17 @@ function DashboardPage() {
               </h1>
 
               <p>
-                Mọi thứ trong nhà yến đang được theo dõi. Các chỉ số môi trường
-                hiện ở trạng thái ổn định.
+                {hasLiveSignal || USE_MOCK
+                  ? 'Mọi thứ trong nhà yến đang được theo dõi. Các chỉ số môi trường hiện ở trạng thái ổn định.'
+                  : 'Hệ thống đang sẵn sàng. Chọn nhà yến và kết nối thiết bị IoT/AI để nhận dữ liệu thời gian thực.'}
               </p>
             </div>
 
             <div className="dashboard-system-status">
               <span>Tình trạng hệ thống</span>
-              <StatusBadge status="normal">Hoạt động ổn định</StatusBadge>
+              <StatusBadge status={hasLiveSignal || USE_MOCK ? 'normal' : 'warning'}>
+                {hasLiveSignal || USE_MOCK ? 'Hoạt động ổn định' : 'Chưa có dữ liệu telemetry'}
+              </StatusBadge>
             </div>
           </div>
 
@@ -487,7 +526,7 @@ function DashboardPage() {
                   onChange={setSelectedFarmId}
                   options={farms.map((f) => ({
                     value: f.id,
-                    label: f.name,
+                    label: formatFarmOptionLabel(f),
                   }))}
                 />
               </div>
@@ -495,7 +534,7 @@ function DashboardPage() {
 
             <p className="farm-last-update">
               Cập nhật dữ liệu gần nhất:
-              <strong> vài giây trước</strong>
+              <strong> {hasLiveSignal || USE_MOCK ? 'vài giây trước' : 'Chưa có dữ liệu'}</strong>
             </p>
           </div>
         </section>
@@ -517,6 +556,7 @@ function DashboardPage() {
             telemetry={telemetry}
             devices={devices}
             alerts={alerts}
+            alertsError={alertsError}
           />
         </SectionCard>
       </div>

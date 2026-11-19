@@ -4,54 +4,117 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--space-4, 16px);
-  padding: var(--space-4, 16px) var(--space-5, 20px);
-  background: var(--danger-subtle, #fef2f2);
-  border: 1px solid var(--danger-border, #fecaca);
-  border-radius: var(--radius-md, 8px);
+  padding: 14px 18px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-md, 14px);
   margin: var(--space-3, 12px) 0;
+  color: #991b1b;
+}
+
+.error-message-panel--warning {
+  background: #fffbeb;
+  border-color: #f4d898;
+  color: #92400e;
+}
+
+.error-message-panel--info {
+  background: #f0f6fb;
+  border-color: #c7dceb;
+  color: #1e4263;
 }
 
 .error-message-content {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3, 12px);
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
 }
 
 .error-message-icon {
-  font-size: 20px;
-  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: currentColor;
+}
+
+.error-message-svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .error-message-texts {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+  min-width: 0;
 }
 
 .error-message-title {
-  font-size: var(--font-sm, 14px);
-  font-weight: 600;
-  color: var(--danger-text, #991b1b);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: currentColor;
 }
 
 .error-message-desc {
-  font-size: var(--font-xs, 13px);
-  color: var(--danger-text, #b91c1c);
+  font-size: 13px;
+  line-height: 1.5;
+  color: inherit;
+  opacity: 0.9;
   margin: 0;
 }
 
 .error-retry-btn {
-  background: var(--danger-btn-bg, #ffffff);
-  border: 1px solid var(--danger-border, #fecaca);
-  color: var(--danger-text, #991b1b);
-  padding: var(--space-2, 6px) var(--space-3, 14px);
-  border-radius: var(--radius-sm, 6px);
-  font-size: var(--font-xs, 12px);
-  font-weight: 600;
+  flex-shrink: 0;
+  background: #ffffff;
+  border: 1px solid currentColor;
+  color: currentColor;
+  padding: 7px 14px;
+  border-radius: var(--radius-xs, 8px);
+  font-size: 12px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background var(--transition-fast, 150ms ease), opacity var(--transition-fast, 150ms ease);
 }
 
 .error-retry-btn:hover {
-  background: var(--danger-btn-hover, #fee2e2);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.error-message-panel--danger .error-retry-btn {
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.error-message-panel--danger .error-retry-btn:hover {
+  background: #fee2e2;
+}
+
+.error-message-panel--warning .error-retry-btn {
+  border-color: #e6c16b;
+  color: #854d0e;
+}
+
+.error-message-panel--warning .error-retry-btn:hover {
+  background: #fef3c7;
+}
+
+.error-message-panel--info .error-retry-btn {
+  border-color: #9ec0da;
+  color: #1e4263;
+}
+
+.error-message-panel--info .error-retry-btn:hover {
+  background: #e2eff8;
 }

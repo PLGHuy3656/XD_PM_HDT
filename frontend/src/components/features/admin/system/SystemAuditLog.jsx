@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import Select from '../../../ui/Select'
 import { systemAuditLogs } from './systemMockData'
+import { USE_MOCK } from '../../../../api/config.js'
 
 const auditCategoryOptions = [
   { value: 'ALL', label: 'Tất cả nhóm' },
@@ -14,11 +15,13 @@ function SystemAuditLog() {
   const [searchTerm, setSearchTerm] = useState('')
   const [category, setCategory] = useState('ALL')
 
+  const sourceLogs = useMemo(() => (USE_MOCK ? systemAuditLogs : []), [])
+
   const filteredLogs = useMemo(() => {
     const keyword =
       searchTerm.trim().toLowerCase()
 
-    return systemAuditLogs.filter((log) => {
+    return sourceLogs.filter((log) => {
       const matchesSearch =
         !keyword ||
         log.actor.toLowerCase().includes(keyword) ||
@@ -34,7 +37,7 @@ function SystemAuditLog() {
 
       return matchesSearch && matchesCategory
     })
-  }, [searchTerm, category])
+  }, [searchTerm, category, sourceLogs])
 
   return (
     <section className="admin-system-card">
@@ -50,7 +53,7 @@ function SystemAuditLog() {
 
         <p>
           {filteredLogs.length} /{' '}
-          {systemAuditLogs.length} bản ghi
+          {sourceLogs.length} bản ghi
         </p>
       </div>
 

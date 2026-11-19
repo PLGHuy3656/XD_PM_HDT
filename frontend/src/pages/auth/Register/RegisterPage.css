@@ -27,13 +27,13 @@
   inset: -20px;
 
   background:
+    radial-gradient(circle at 20% 20%, rgba(213, 164, 58, 0.16), transparent 45%),
     linear-gradient(
-      90deg,
-      rgba(3, 17, 42, 0.25),
-      rgba(3, 17, 42, 0.04),
-      rgba(3, 17, 42, 0.25)
-    ),
-    url('/auth-background.jpg') center / cover no-repeat;
+      135deg,
+      #0b2138 0%,
+      #102e4a 52%,
+      #183c5c 100%
+    );
 
   transform: scale(1.04);
 

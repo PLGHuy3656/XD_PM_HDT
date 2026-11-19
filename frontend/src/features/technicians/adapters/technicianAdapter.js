@@ -47,15 +47,18 @@ export function normalizeAssignedFarm(raw, isMockMode = false) {
 export function normalizeTechDevice(raw, farmName = '') {
   if (!raw) return null
 
-  const rawStatus = String(raw.status || 'OFFLINE').toUpperCase()
+  const rawStatus = String(raw.presence_status || raw.status || 'UNKNOWN').toUpperCase()
   const status = ['ONLINE', 'ACTIVE', 'HEALTHY'].includes(rawStatus)
     ? 'ONLINE'
     : ['WARNING', 'DEGRADED'].includes(rawStatus)
       ? 'WARNING'
-      : 'OFFLINE'
+      : rawStatus === 'OFFLINE'
+        ? 'OFFLINE'
+        : 'UNKNOWN'
 
-  const id = raw.id || raw.device_id || raw.node_id || 'unknown-device'
-  const name = raw.name || raw.device_name || raw.node_id || id
+  const deviceId = raw.device_id || raw.id || 'unknown-device'
+  const nodeId = raw.node_id || deviceId
+  const name = raw.name || raw.device_name || nodeId
   const rawType = String(raw.type || raw.device_type || 'SENSOR').toUpperCase()
   const type =
     rawType.includes('CAMERA')
@@ -65,29 +68,39 @@ export function normalizeTechDevice(raw, farmName = '') {
         : rawType.includes('AUDIO')
           ? 'AUDIO'
           : 'SENSOR'
-  const zoneName = raw.zone_name || raw.zoneName || 'Tầng 1'
+  const hasZone = Boolean(raw.zone_id || raw.zoneId)
+  const zoneName = hasZone ? (raw.zone_name || raw.zoneName || 'Khu vực') : 'Chưa phân bổ Zone'
   const effectiveFarmName = farmName || raw.farm_name || raw.farmName || 'Nhà yến'
 
   return {
-    id,
-    nodeId: raw.node_id || id,
+    id: deviceId,
+    deviceId,
+    nodeId,
     name,
     type,
-    typeLabel: raw.type_label || raw.typeLabel || type,
+    rawType,
+    typeLabel: raw.type_label || raw.typeLabel || rawType,
     farmId: raw.farm_id || raw.farmId || '',
     farmName: effectiveFarmName,
     zoneId: raw.zone_id || raw.zoneId || '',
     zoneName,
+    isZoneAssigned: hasZone,
     zone: `${effectiveFarmName} · ${zoneName}`,
     status,
     statusLower: status.toLowerCase(),
-    firmware: raw.firmware_version || raw.firmware || 'v1.0.0',
-    ipAddress: raw.ip_address || '---',
-    mqttStatus: raw.mqtt_status || (status === 'ONLINE' ? 'Connected' : 'Disconnected'),
-    signal: raw.rssi != null ? Number(raw.rssi) : -60,
-    lastSeen: raw.last_seen || raw.lastSeen || 'Vừa xong',
-    sensors: type === 'CAMERA' ? '0 / 0' : '2 / 2',
-    description: raw.description || `Node ${name} đang hoạt động tại ${effectiveFarmName}`,
+    firmware: raw.firmware_version || raw.firmware || '--',
+    ipAddress: raw.ip_address || '--',
+    mqttStatus:
+      raw.mqtt_status ||
+      (status === 'ONLINE'
+        ? 'Connected'
+        : status === 'UNKNOWN'
+          ? 'Chưa kết nối IoT'
+          : 'Disconnected'),
+    signal: raw.rssi != null ? Number(raw.rssi) : null,
+    lastSeen: raw.last_seen || raw.lastSeen || 'Chưa có dữ liệu',
+    sensors: status === 'ONLINE' ? (raw.sensors || '--') : 'Chưa kết nối IoT',
+    description: raw.description || `Thiết bị ${name} (${nodeId}) tại ${effectiveFarmName}`,
   }
 }
 

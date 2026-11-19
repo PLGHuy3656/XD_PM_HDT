@@ -1,276 +1,454 @@
 import { useMemo, useState } from 'react'
 
 import AppLayout from '../../../components/layout/AppLayout'
-import ConnectionVerification from '../../../components/features/technician/installation/ConnectionVerification'
-import DeviceConfiguration from '../../../components/features/technician/installation/DeviceConfiguration'
-import DeviceStep from '../../../components/features/technician/installation/DeviceStep'
-import InstallationProgress from '../../../components/features/technician/installation/InstallationProgress'
-import InstallationSummary from '../../../components/features/technician/installation/InstallationSummary'
-import LocationStep from '../../../components/features/technician/installation/LocationStep'
-import {
-  deviceTypes,
-  initialInstallation,
-  installationFarms as defaultInstallationFarms,
-  verificationItems,
-} from '../../../components/features/technician/installation/installationMockData'
+import EnvironmentSelect from '../../../components/ui/Select'
+import { LoadingSpinner, ErrorMessage, EmptyState } from '../../../components/common/feedback/index.js'
 
 import { useTechnicianData } from '../../../features/technicians/hooks/useTechnicianData'
+import { formatFarmOptionLabel } from '../../../features/farms/adapters/farmAdapter.js'
 
-import './InstallationPage.css'
+import '../TechnicianWorkspace.css'
+
+const DEVICE_TYPE_OPTIONS = [
+  { value: 'ENVIRONMENT_MONITOR', label: 'Cảm biến môi trường (ENVIRONMENT_MONITOR)' },
+  { value: 'CONTROLLER', label: 'Bộ điều khiển ESP32 (CONTROLLER)' },
+  { value: 'CAMERA', label: 'Camera AI (CAMERA)' },
+  { value: 'ACTUATOR', label: 'Thiết bị chấp hành (ACTUATOR)' },
+  { value: 'AUDIO_MONITOR', label: 'Giám sát âm thanh (AUDIO_MONITOR)' },
+]
+
+const EMPTY_REGISTER_FORM = {
+  node_id: '',
+  name: '',
+  device_type: 'ENVIRONMENT_MONITOR',
+  zone_id: '',
+}
 
 function InstallationPage() {
-  const { farms, zones, selectedFarm } = useTechnicianData()
+  const {
+    farms,
+    selectedFarm,
+    selectedFarmId,
+    setSelectedFarmId,
+    zones,
+    devices,
+    telemetryError,
+    loading,
+    error,
+    refetch,
+    createDevice,
+    updateDeviceZone,
+  } = useTechnicianData()
 
-  const effectiveFarms = useMemo(() => {
-    if (farms.length > 0) {
-      return farms.map((f) => ({
-        id: f.id,
-        name: f.name,
-        code: f.code,
-        zones:
-          zones.length > 0
-            ? zones.map((z) => ({ id: z.id, name: z.name }))
-            : [
-                { id: 'Z01', name: 'Tầng 1' },
-                { id: 'Z02', name: 'Tầng 2' },
-              ],
-      }))
-    }
-    return defaultInstallationFarms
-  }, [farms, zones])
+  const [draftZones, setDraftZones] = useState({})
+  const [savingId, setSavingId] = useState(null)
+  const [notice, setNotice] = useState('')
+  const [actionError, setActionError] = useState('')
 
-  const [currentStep, setCurrentStep] = useState(1)
+  const [registerOpen, setRegisterOpen] = useState(false)
+  const [registerForm, setRegisterForm] = useState(EMPTY_REGISTER_FORM)
+  const [registerError, setRegisterError] = useState('')
+  const [registerSubmitting, setRegisterSubmitting] = useState(false)
 
-  const [installation, setInstallation] = useState(() => ({
-    ...initialInstallation,
-    farmId: effectiveFarms[0]?.id || initialInstallation.farmId,
-    zoneId: effectiveFarms[0]?.zones?.[0]?.id || initialInstallation.zoneId,
-  }))
+  const zoneOptions = [
+    { value: '', label: 'Chưa phân bổ Zone' },
+    ...zones.map((z) => ({
+      value: z.id,
+      label: `${z.code && z.code !== '--' ? `${z.code} · ` : ''}${z.name}`,
+    })),
+  ]
 
-  const [verification, setVerification] = useState({})
-  const [confirmed, setConfirmed] = useState(false)
-
-  const activeSelectedFarm = useMemo(
+  const sortedDevices = useMemo(
     () =>
-      effectiveFarms.find((farm) => farm.id === installation.farmId) ||
-      effectiveFarms[0],
-    [effectiveFarms, installation.farmId],
+      [...devices].sort((a, b) => {
+        if (!a.isZoneAssigned && b.isZoneAssigned) return -1
+        if (a.isZoneAssigned && !b.isZoneAssigned) return 1
+        return String(a.nodeId || a.name).localeCompare(String(b.nodeId || b.name))
+      }),
+    [devices],
   )
 
-  const activeSelectedZone = activeSelectedFarm?.zones?.find(
-    (zone) => zone.id === installation.zoneId,
-  ) || activeSelectedFarm?.zones?.[0]
+  const unassignedCount = devices.filter((d) => !d.isZoneAssigned).length
 
-  const selectedDeviceType = deviceTypes.find(
-    (type) => type.id === installation.deviceType,
-  )
+  const handleOpenRegister = () => {
+    setRegisterForm(EMPTY_REGISTER_FORM)
+    setRegisterError('')
+    setRegisterOpen(true)
+  }
 
-  const verificationComplete = verificationItems.every(
-    (item) => verification[item.id],
-  )
+  const handleRegisterSubmit = async (event) => {
+    event.preventDefault()
+    if (!selectedFarmId) return
+    setRegisterError('')
+    setNotice('')
 
-  const handleChange = (field, value) => {
-    if (field === 'farmId') {
-      const nextFarm = effectiveFarms.find((farm) => farm.id === value)
-
-      setInstallation((current) => ({
-        ...current,
-        farmId: value,
-        zoneId: nextFarm?.zones?.[0]?.id ?? '',
-      }))
-
-      setVerification({})
-      setConfirmed(false)
+    const cleanNodeId = registerForm.node_id.trim()
+    const cleanName = registerForm.name.trim()
+    if (!cleanNodeId) {
+      setRegisterError('Vui lòng nhập Hardware Node ID từ nhãn thiết bị thực tế.')
+      return
+    }
+    if (!cleanName) {
+      setRegisterError('Vui lòng nhập tên thiết bị.')
       return
     }
 
-    setInstallation((current) => ({
-      ...current,
-      [field]: value,
-    }))
-
-    setConfirmed(false)
-  }
-
-  const handleToggleVerification = (id) => {
-    setVerification((current) => ({
-      ...current,
-      [id]: !current[id],
-    }))
-
-    setConfirmed(false)
-  }
-
-  const canContinue = () => {
-    if (currentStep === 1) {
-      return Boolean(installation.farmId && installation.zoneId)
-    }
-
-    if (currentStep === 2) {
-      return Boolean(
-        installation.deviceId.trim() &&
-          installation.deviceType &&
-          installation.serialNumber.trim() &&
-          installation.firmware.trim(),
-      )
-    }
-
-    if (currentStep === 3) {
-      return Boolean(
-        installation.ipAddress.trim() &&
-          installation.macAddress.trim() &&
-          installation.wifiSsid.trim(),
-      )
-    }
-
-    if (currentStep === 4) {
-      return verificationComplete
-    }
-
-    return true
-  }
-
-  const handleNext = () => {
-    if (!canContinue()) return
-    setCurrentStep((current) => Math.min(5, current + 1))
-  }
-
-  const handleBack = () => {
-    setCurrentStep((current) => Math.max(1, current - 1))
-  }
-
-  const handleConfirm = () => {
-    setConfirmed(true)
-  }
-
-  const handleReset = () => {
-    setInstallation({
-      ...initialInstallation,
-      farmId: effectiveFarms[0]?.id || initialInstallation.farmId,
-      zoneId: effectiveFarms[0]?.zones?.[0]?.id || initialInstallation.zoneId,
+    setRegisterSubmitting(true)
+    const res = await createDevice({
+      node_id: cleanNodeId,
+      name: cleanName,
+      device_type: registerForm.device_type,
+      farm_id: selectedFarmId,
+      zone_id: registerForm.zone_id || null,
     })
-    setVerification({})
-    setConfirmed(false)
-    setCurrentStep(1)
+    setRegisterSubmitting(false)
+
+    if (!res?.success) {
+      setRegisterError(res?.error || 'Không thể đăng ký thiết bị mới.')
+      return
+    }
+
+    const assignedZone = zones.find((z) => z.id === registerForm.zone_id)
+    setNotice(
+      `Đã đăng ký thiết bị "${cleanName}" (Node ID: ${cleanNodeId}) tại ${selectedFarm?.name || 'nhà yến'} — ${assignedZone ? `Zone: ${assignedZone.name}` : 'Chưa phân bổ Zone'}.`,
+    )
+    setRegisterOpen(false)
+    setRegisterForm(EMPTY_REGISTER_FORM)
+  }
+
+  const handleSaveZone = async (device) => {
+    const nextZoneId =
+      draftZones[device.id] !== undefined ? draftZones[device.id] : device.zoneId || ''
+    setSavingId(device.id)
+    setActionError('')
+    setNotice('')
+    const res = await updateDeviceZone(device.id, nextZoneId || null)
+    setSavingId(null)
+    if (!res?.success) {
+      setActionError(res?.error || 'Không thể cập nhật phân bổ khu vực cho thiết bị.')
+      return
+    }
+    const targetZone = zones.find((z) => z.id === nextZoneId)
+    setNotice(
+      `Đã lưu phân bổ khu vực cho ${device.name} (${device.nodeId}) → ${targetZone ? targetZone.name : 'Chưa phân bổ Zone'}.`,
+    )
   }
 
   return (
     <AppLayout>
-      <div className="installation-page">
-        <header className="installation-hero">
-          <div>
-            <span className="installation-eyebrow">TECHNICIAN WORKSPACE</span>
-            <h1>Lắp đặt thiết bị</h1>
+      <div className="tech-ws">
+        <header className="tech-ws-header">
+          <div className="tech-ws-header__copy">
+            <span className="tech-ws-eyebrow">TECHNICIAN INSTALLATION & MAPPING</span>
+            <h1>Lắp đặt & Đăng ký thiết bị</h1>
             <p>
-              Quy trình chuẩn hóa từng bước để cài đặt, cấu hình và xác thực
-              thiết bị IoT tại các nhà yến được phân công.
+              Đăng ký thiết bị phần cứng mới vào nhà yến được phân công và quản lý phân bổ khu vực (Zone).
             </p>
+          </div>
+
+          <div className="tech-ws-header__actions">
+            {farms.length > 0 && (
+              <div className="tech-ws-farm-picker">
+                <span>Nhà yến phụ trách</span>
+                <EnvironmentSelect
+                  value={selectedFarmId || ''}
+                  onChange={(nextId) => {
+                    setSelectedFarmId(nextId)
+                    setDraftZones({})
+                    setNotice('')
+                    setActionError('')
+                  }}
+                  options={farms.map((farm) => ({
+                    value: farm.id,
+                    label: formatFarmOptionLabel(farm),
+                  }))}
+                />
+              </div>
+            )}
+
+            {selectedFarmId && (
+              <button
+                type="button"
+                className="tech-ws-btn tech-ws-btn--primary"
+                style={{ height: '42px' }}
+                onClick={handleOpenRegister}
+              >
+                + Đăng ký thiết bị
+              </button>
+            )}
           </div>
         </header>
 
-        <InstallationProgress currentStep={currentStep} />
+        {notice && <div className="tech-ws-notice">{notice}</div>}
 
-        <div className="installation-workspace">
-          <section className="installation-main-panel">
-            {currentStep === 1 && (
-              <LocationStep
-                farms={effectiveFarms}
-                selectedFarmId={installation.farmId}
-                selectedZoneId={installation.zoneId}
-                onChange={handleChange}
-              />
-            )}
+        {(error || actionError) && (
+          <ErrorMessage
+            title="Lỗi thao tác lắp đặt"
+            message={actionError || error}
+            onRetry={refetch}
+          />
+        )}
 
-            {currentStep === 2 && (
-              <DeviceStep
-                deviceTypes={deviceTypes}
-                formData={installation}
-                onChange={handleChange}
-              />
-            )}
+        {telemetryError && (
+          <ErrorMessage
+            variant="warning"
+            title="Chưa kết nối dịch vụ IoT"
+            message="Đăng ký thiết bị lưu thông tin vào hệ thống quản lý và chỉ chuyển trạng thái trực tuyến khi nhận heartbeat MQTT thực tế từ IoT Service."
+            onRetry={refetch}
+          />
+        )}
 
-            {currentStep === 3 && (
-              <DeviceConfiguration
-                formData={installation}
-                onChange={handleChange}
-              />
-            )}
+        {loading && farms.length === 0 ? (
+          <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}>
+            <LoadingSpinner size="lg" text="Đang tải dữ liệu lắp đặt..." />
+          </div>
+        ) : farms.length === 0 ? (
+          <EmptyState
+            title="Chưa có nhà yến được phân công"
+            description="Admin cần phân công bạn vào một nhà yến đã được phê duyệt để đăng ký và phân bổ thiết bị."
+          />
+        ) : (
+          <>
+            <section className="tech-ws-kpi-grid">
+              <article className="tech-ws-kpi-card">
+                <span>Nhà yến đang chọn</span>
+                <strong style={{ fontSize: '16px' }}>{selectedFarm?.name || '--'}</strong>
+                <small>{selectedFarm?.code || '---'}</small>
+              </article>
+              <article className="tech-ws-kpi-card">
+                <span>Khu vực khả dụng</span>
+                <strong>{zones.length}</strong>
+                <small>Zones thuộc nhà yến</small>
+              </article>
+              <article className="tech-ws-kpi-card">
+                <span>Thiết bị đã đăng ký</span>
+                <strong>{devices.length}</strong>
+                <small>Trong hệ thống quản lý</small>
+              </article>
+              <article className="tech-ws-kpi-card">
+                <span>Chưa phân bổ Zone</span>
+                <strong style={{ color: unassignedCount > 0 ? '#b45309' : '#059669' }}>
+                  {unassignedCount}
+                </strong>
+                <small>Ưu tiên gán khu vực</small>
+              </article>
+            </section>
 
-            {currentStep === 4 && (
-              <ConnectionVerification
-                items={verificationItems}
-                verification={verification}
-                onToggle={handleToggleVerification}
-              />
-            )}
-
-            {currentStep === 5 && (
-              <InstallationSummary
-                installation={installation}
-                farm={activeSelectedFarm}
-                zone={activeSelectedZone}
-                deviceType={selectedDeviceType}
-                confirmed={confirmed}
-                onConfirm={handleConfirm}
-                onReset={handleReset}
-              />
-            )}
-
-            {currentStep < 5 && (
-              <div className="installation-nav-buttons">
-                {currentStep > 1 && (
-                  <button
-                    type="button"
-                    className="install-button install-button--secondary"
-                    onClick={handleBack}
-                  >
-                    Quay lại
-                  </button>
-                )}
-
+            <section className="tech-ws-card" style={{ marginBottom: '16px' }}>
+              <div className="tech-ws-card__head" style={{ marginBottom: 0 }}>
+                <div>
+                  <span className="tech-ws-eyebrow">01 · DEVICE REGISTRATION</span>
+                  <h2>Đăng ký thiết bị phần cứng mới</h2>
+                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#64748b' }}>
+                    Nhập Hardware Node ID thực tế trên thiết bị ESP32/Camera để gắn vào nhà yến {selectedFarm ? formatFarmOptionLabel(selectedFarm) : ''}. Có thể gán Zone ngay hoặc để Chưa phân bổ.
+                  </p>
+                </div>
                 <button
                   type="button"
-                  className="install-button install-button--primary"
-                  disabled={!canContinue()}
-                  onClick={handleNext}
+                  className="tech-ws-btn tech-ws-btn--primary"
+                  onClick={handleOpenRegister}
                 >
-                  {currentStep === 4 ? 'Xem lại cấu hình' : 'Tiếp tục'}
+                  + Đăng ký thiết bị
                 </button>
               </div>
+            </section>
+
+            {sortedDevices.length === 0 ? (
+              <EmptyState
+                title="Chưa có thiết bị nào trong nhà yến này"
+                description="Bấm '+ Đăng ký thiết bị' ở trên để đăng ký thiết bị phần cứng đầu tiên vào nhà yến."
+              />
+            ) : (
+              <section className="tech-ws-card">
+                <div className="tech-ws-card__head">
+                  <div>
+                    <span className="tech-ws-eyebrow">02 · DEVICE–ZONE ASSIGNMENT</span>
+                    <h2>Phân bổ & thay đổi khu vực lắp đặt</h2>
+                  </div>
+                </div>
+                <div className="tech-ws-table-wrap">
+                  <table className="tech-ws-table">
+                    <thead>
+                      <tr>
+                        <th>Thiết bị & Node ID</th>
+                        <th>Loại</th>
+                        <th>Trạng thái Zone</th>
+                        <th style={{ minWidth: '220px' }}>Chọn khu vực (Zone)</th>
+                        <th>Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedDevices.map((device) => {
+                        const currentDraft =
+                          draftZones[device.id] !== undefined
+                            ? draftZones[device.id]
+                            : device.zoneId || ''
+                        const isDirty = currentDraft !== (device.zoneId || '')
+                        return (
+                          <tr key={device.id}>
+                            <td>
+                              <strong style={{ display: 'block', color: '#102d3f' }}>
+                                {device.nodeId || device.id}
+                              </strong>
+                              <small style={{ color: '#64748b', display: 'block' }}>{device.name}</small>
+                              <small className="tech-ws-truncate" title={device.deviceId} style={{ color: '#94a3b8', fontSize: '11px' }}>
+                                UUID: {device.deviceId}
+                              </small>
+                            </td>
+                            <td>{device.typeLabel}</td>
+                            <td>
+                              <span
+                                className={`tech-badge ${
+                                  device.isZoneAssigned ? 'tech-badge--online' : 'tech-badge--warning'
+                                }`}
+                              >
+                                {device.isZoneAssigned ? device.zoneName : 'Chưa phân bổ Zone'}
+                              </span>
+                            </td>
+                            <td>
+                              <EnvironmentSelect
+                                value={currentDraft}
+                                options={zoneOptions}
+                                onChange={(val) =>
+                                  setDraftZones((prev) => ({ ...prev, [device.id]: val }))
+                                }
+                              />
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="tech-ws-btn tech-ws-btn--primary"
+                                disabled={!isDirty || savingId === device.id}
+                                onClick={() => handleSaveZone(device)}
+                              >
+                                {savingId === device.id ? 'Đang lưu...' : 'Lưu Zone'}
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
             )}
-          </section>
+          </>
+        )}
 
-          <aside className="installation-side-panel">
-            <div className="installation-context-card">
-              <h3>Thông tin triển khai</h3>
-
-              <div className="installation-context-row">
-                <span>Nhà yến</span>
-                <strong>{activeSelectedFarm?.name ?? 'Chưa chọn'}</strong>
+        {registerOpen && (
+          <div
+            className="tech-ws-modal-backdrop"
+            role="presentation"
+            onMouseDown={() => !registerSubmitting && setRegisterOpen(false)}
+          >
+            <div
+              className="tech-ws-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Đăng ký thiết bị mới"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="tech-ws-modal__head">
+                <div>
+                  <span className="tech-ws-eyebrow">DEVICE REGISTRATION</span>
+                  <h2>Đăng ký thiết bị mới</h2>
+                </div>
+                <button
+                  type="button"
+                  className="tech-ws-modal__close"
+                  onClick={() => setRegisterOpen(false)}
+                  disabled={registerSubmitting}
+                  aria-label="Đóng"
+                >
+                  ×
+                </button>
               </div>
 
-              <div className="installation-context-row">
-                <span>Khu vực</span>
-                <strong>{activeSelectedZone?.name ?? 'Chưa chọn'}</strong>
-              </div>
+              <form className="tech-ws-form" onSubmit={handleRegisterSubmit}>
+                <div className="tech-ws-form__field">
+                  <label>Nhà yến được phân công</label>
+                  <input
+                    className="tech-ws-form__input"
+                    value={selectedFarm ? formatFarmOptionLabel(selectedFarm) : ''}
+                    disabled
+                  />
+                </div>
 
-              <div className="installation-context-row">
-                <span>Loại thiết bị</span>
-                <strong>{selectedDeviceType?.name ?? 'Chưa chọn'}</strong>
-              </div>
+                <div className="tech-ws-form__field">
+                  <label htmlFor="tech-reg-node-id">Hardware Node ID *</label>
+                  <input
+                    id="tech-reg-node-id"
+                    className="tech-ws-form__input"
+                    value={registerForm.node_id}
+                    onChange={(e) => setRegisterForm((f) => ({ ...f, node_id: e.target.value }))}
+                    placeholder="Ví dụ: ESP32-NODE-01 hoặc CAM-03"
+                    disabled={registerSubmitting}
+                  />
+                  <span className="tech-ws-form__hint">
+                    Nhập chính xác định danh phần cứng/MQTT trên thiết bị thực tế (duy nhất toàn hệ thống).
+                  </span>
+                </div>
 
-              <div className="installation-context-row">
-                <span>Mã thiết bị</span>
-                <strong>{installation.deviceId || 'Chưa nhập'}</strong>
-              </div>
+                <div className="tech-ws-form__field">
+                  <label htmlFor="tech-reg-name">Tên thiết bị *</label>
+                  <input
+                    id="tech-reg-name"
+                    className="tech-ws-form__input"
+                    value={registerForm.name}
+                    onChange={(e) => setRegisterForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Ví dụ: Cảm biến môi trường Tầng 1"
+                    disabled={registerSubmitting}
+                  />
+                </div>
 
-              <div className="installation-context-row">
-                <span>Bước hiện tại</span>
-                <strong>Bước {currentStep} / 5</strong>
-              </div>
+                <div className="tech-ws-form__field">
+                  <label>Loại thiết bị *</label>
+                  <EnvironmentSelect
+                    value={registerForm.device_type}
+                    options={DEVICE_TYPE_OPTIONS}
+                    onChange={(val) => setRegisterForm((f) => ({ ...f, device_type: val }))}
+                  />
+                </div>
+
+                <div className="tech-ws-form__field">
+                  <label>Khu vực lắp đặt (Zone)</label>
+                  <EnvironmentSelect
+                    value={registerForm.zone_id}
+                    options={zoneOptions}
+                    onChange={(val) => setRegisterForm((f) => ({ ...f, zone_id: val }))}
+                  />
+                  <span className="tech-ws-form__hint">
+                    Có thể để &quot;Chưa phân bổ Zone&quot; và gán sau khi lắp đặt thực tế.
+                  </span>
+                </div>
+
+                {registerError && (
+                  <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#fef2f2', color: '#b91c1c', fontSize: '12px', fontWeight: 600 }}>
+                    {registerError}
+                  </div>
+                )}
+
+                <div className="tech-ws-modal__actions">
+                  <button
+                    type="button"
+                    className="tech-ws-btn"
+                    onClick={() => setRegisterOpen(false)}
+                    disabled={registerSubmitting}
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    className="tech-ws-btn tech-ws-btn--primary"
+                    disabled={registerSubmitting}
+                  >
+                    {registerSubmitting ? 'Đang đăng ký...' : 'Xác nhận đăng ký'}
+                  </button>
+                </div>
+              </form>
             </div>
-          </aside>
-        </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   )

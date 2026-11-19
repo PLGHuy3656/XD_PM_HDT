@@ -64,12 +64,16 @@ export function useAdminData() {
 
     try {
       // 1. Parallel fetch top-level resources
+      let alertsOk = true
       const [rawFarms, rawDevices, rawTechs, healthData, rawAlerts, rawUsers] = await Promise.all([
         farmsApi.getFarms(),
         devicesApi.getDevices(),
         techniciansApi.getTechnicians(),
-        systemApi.getHealth().catch(() => ({ status: 'ok', service: 'api-gateway' })),
-        alertsApi.getAlerts().catch(() => []),
+        systemApi.getHealth().catch(() => null),
+        alertsApi.getAlerts().catch(() => {
+          alertsOk = false
+          return []
+        }),
         usersApi.getUsers().catch(() => null),
       ])
 
@@ -157,8 +161,11 @@ export function useAdminData() {
         }))
       }
 
-      // 8. Normalize system services
-      const normalizedServices = normalizeSystemServices(healthData)
+      // 8. Normalize system services honestly from live probes
+      const normalizedServices = normalizeSystemServices(healthData, {
+        managementOk: true,
+        alertsOk,
+      })
 
       setFarms(normalizedFarms)
       setDevices(normalizedDevices)
@@ -192,9 +199,9 @@ export function useAdminData() {
       farms,
       devices,
       users,
-      healthData: { status: 'ok' },
+      services: systemHealth,
     })
-  }, [farms, devices, users])
+  }, [farms, devices, users, systemHealth])
 
   // Action: Assign technician to farm
   const assignTechnician = useCallback(
@@ -237,9 +244,9 @@ export function useAdminData() {
   const runMutation = useCallback(
     async (fn, fallbackError) => {
       try {
-        await fn()
+        const data = await fn()
         await fetchData()
-        return { success: true }
+        return { success: true, data }
       } catch (err) {
         return { success: false, error: err?.message || fallbackError }
       }
@@ -270,6 +277,20 @@ export function useAdminData() {
 
   const deleteFarm = useCallback(
     (farmId) => runMutation(() => farmsApi.deleteFarm(farmId), 'Xóa nhà yến thất bại'),
+    [runMutation]
+  )
+
+  const approveFarm = useCallback(
+    (farmId) => runMutation(() => farmsApi.approveFarm(farmId), 'Phê duyệt nhà yến thất bại'),
+    [runMutation]
+  )
+
+  const rejectFarm = useCallback(
+    (farmId, rejectionReason) =>
+      runMutation(
+        () => farmsApi.rejectFarm(farmId, { rejection_reason: rejectionReason }),
+        'Từ chối nhà yến thất bại'
+      ),
     [runMutation]
   )
 
@@ -318,6 +339,8 @@ export function useAdminData() {
     createFarm,
     updateFarm,
     deleteFarm,
+    approveFarm,
+    rejectFarm,
     createZone,
     updateZone,
     deleteZone,

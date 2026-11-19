@@ -205,7 +205,7 @@ function DevicesPage() {
 
           <div className="admin-devices-readonly">
             <i />
-            Admin · Read only
+            Quản lý &amp; Đăng ký
           </div>
         </section>
 
@@ -314,7 +314,7 @@ function DevicesPage() {
               farm_id: device.farm?.id || '',
               zone_id: device.zone?.id && /^[0-9a-f]{8}-/i.test(device.zone.id) ? device.zone.id : '',
               name: device.name || '',
-              device_type: device.type || 'CONTROLLER',
+              device_type: device.rawType || 'ENVIRONMENT_MONITOR',
             })
             setCreateOpen(true)
           }}
@@ -330,7 +330,7 @@ function DevicesPage() {
             }}
           >
             <form
-              className="admin-farm-modal"
+              className="admin-farm-modal admin-farm-form"
               onSubmit={handleSaveDevice}
               onMouseDown={(e) => e.stopPropagation()}
             >
@@ -344,6 +344,18 @@ function DevicesPage() {
                       onChange={(e) => setDevForm((c) => ({ ...c, node_id: e.target.value }))}
                       placeholder="VD: SWC-NODE-003"
                     />
+                  </label>
+                  <label>
+                    Loại thiết bị *
+                    <select
+                      value={devForm.device_type}
+                      onChange={(e) => setDevForm((c) => ({ ...c, device_type: e.target.value }))}
+                    >
+                      <option value="ENVIRONMENT_MONITOR">Cảm biến môi trường (ENVIRONMENT_MONITOR)</option>
+                      <option value="CAMERA">Camera AI (CAMERA)</option>
+                      <option value="ACTUATOR">Thiết bị điều khiển (ACTUATOR)</option>
+                      <option value="AUDIO_MONITOR">Cảm biến âm thanh (AUDIO_MONITOR)</option>
+                    </select>
                   </label>
                   <label>
                     Nhà yến *
@@ -381,9 +393,9 @@ function DevicesPage() {
                   </select>
                 </label>
               )}
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setCreateOpen(false)}>Hủy</button>
-                <button type="submit" disabled={submitting}>{submitting ? 'Đang lưu...' : 'Đăng ký'}</button>
+              <div className="admin-farm-modal__actions">
+                <button type="button" className="admin-farm-modal__cancel" onClick={() => setCreateOpen(false)}>Hủy</button>
+                <button type="submit" className="admin-farm-modal__save" disabled={submitting}>{submitting ? 'Đang lưu...' : 'Đăng ký'}</button>
               </div>
             </form>
           </div>

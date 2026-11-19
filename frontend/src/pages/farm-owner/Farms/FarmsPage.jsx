@@ -6,7 +6,7 @@ import FarmRequestModal from '../../../components/features/farm-owner/farms/Farm
 import { initialFarmRequests } from '../../../components/features/farm-owner/farms/farmsMockData'
 import { useFarms } from '../../../features/farms/hooks/useFarms'
 import { USE_MOCK } from '../../../api/config.js'
-import { LoadingSpinner, ErrorMessage } from '../../../components/common/feedback/index.js'
+import { LoadingSpinner, ErrorMessage, EmptyState } from '../../../components/common/feedback/index.js'
 import './FarmsPage.css'
 
 function FarmsPage() {
@@ -32,6 +32,7 @@ function FarmsPage() {
   const [zoneForm, setZoneForm] = useState({ zone_code: '', name: '' })
   const [editingZoneId, setEditingZoneId] = useState(null)
   const [actionError, setActionError] = useState('')
+  const [actionNotice, setActionNotice] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const handleSubmitRequest = (form) => {
@@ -51,15 +52,15 @@ function FarmsPage() {
   const handleSaveFarm = async (event) => {
     event.preventDefault()
     setActionError('')
-    if (!farmForm.farm_name.trim() || (farmModalMode === 'create' && !farmForm.farm_code.trim())) {
-      setActionError('Vui lòng nhập đầy đủ mã và tên nhà yến.')
+    setActionNotice('')
+    if (!farmForm.farm_name.trim()) {
+      setActionError('Vui lòng nhập tên nhà yến.')
       return
     }
     setSubmitting(true)
     const res =
       farmModalMode === 'create'
         ? await createFarm({
-            farm_code: farmForm.farm_code.trim(),
             farm_name: farmForm.farm_name.trim(),
             address: farmForm.address.trim() || null,
           })
@@ -72,6 +73,15 @@ function FarmsPage() {
       setActionError(res?.error || 'Không thể lưu nhà yến.')
       return
     }
+    if (farmModalMode === 'create' && res?.data?.farm_code) {
+      const approvalMsg =
+        res?.data?.approval_status === 'PENDING'
+          ? ' — Trạng thái: Chờ Admin phê duyệt'
+          : ''
+      setActionNotice(
+        `Đã đăng ký nhà yến "${res.data.farm_name}" — Mã nhà yến: ${res.data.farm_code}${approvalMsg}`,
+      )
+    }
     setFarmModalMode(null)
   }
 
@@ -79,18 +89,22 @@ function FarmsPage() {
     event.preventDefault()
     if (!selectedFarm) return
     setActionError('')
-    if (!zoneForm.name.trim() || (!editingZoneId && !zoneForm.zone_code.trim())) {
-      setActionError('Vui lòng nhập đầy đủ mã và tên khu vực.')
+    setActionNotice('')
+    if (!zoneForm.name.trim()) {
+      setActionError('Vui lòng nhập tên khu vực.')
       return
     }
     setSubmitting(true)
     const res = editingZoneId
       ? await updateZone(editingZoneId, { name: zoneForm.name.trim() })
-      : await createZone(selectedFarm.id, { zone_code: zoneForm.zone_code.trim(), name: zoneForm.name.trim() })
+      : await createZone(selectedFarm.id, { name: zoneForm.name.trim() })
     setSubmitting(false)
     if (!res?.success) {
       setActionError(res?.error || 'Không thể lưu khu vực.')
       return
+    }
+    if (!editingZoneId && res?.data?.zone_code) {
+      setActionNotice(`Đã tạo khu vực "${res.data.name}" — Mã khu vực: ${res.data.zone_code}`)
     }
     setZoneForm({ zone_code: '', name: '' })
     setEditingZoneId(null)
@@ -190,6 +204,11 @@ function FarmsPage() {
             onRetry={refetch}
           />
         )}
+        {actionNotice && (
+          <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', borderRadius: '10px', background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0' }}>
+            {actionNotice}
+          </div>
+        )}
 
         {loading && farms.length === 0 ? (
           <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}>
@@ -265,37 +284,51 @@ function FarmsPage() {
                 <h2>Quản lý khu vực — {selectedFarm.name}</h2>
               </div>
             </div>
-            <form onSubmit={handleSaveZone} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-              {!editingZoneId && (
-                <input
-                  value={zoneForm.zone_code}
-                  onChange={(e) => setZoneForm((z) => ({ ...z, zone_code: e.target.value }))}
-                  placeholder="Mã khu vực (VD: Z-01)"
-                />
-              )}
-              <input
-                value={zoneForm.name}
-                onChange={(e) => setZoneForm((z) => ({ ...z, name: e.target.value }))}
-                placeholder="Tên khu vực"
-              />
-              <button type="submit" className="farm-button farm-button--primary" disabled={submitting}>
-                {editingZoneId ? 'Cập nhật khu vực' : '+ Thêm khu vực'}
-              </button>
-              {editingZoneId && (
-                <button
-                  type="button"
-                  className="farm-button"
-                  onClick={() => {
-                    setEditingZoneId(null)
-                    setZoneForm({ zone_code: '', name: '' })
-                  }}
-                >
-                  Hủy
-                </button>
-              )}
-            </form>
+            {(selectedFarm.approvalStatus || 'APPROVED') !== 'APPROVED' ? (
+              <div className="zone-approval-notice">
+                {selectedFarm.approvalStatus === 'REJECTED'
+                  ? `Nhà yến đã bị từ chối${selectedFarm.rejectionReason ? `: ${selectedFarm.rejectionReason}` : ''}. Không thể thêm khu vực mới.`
+                  : 'Nhà yến đang chờ Admin phê duyệt. Chức năng tạo khu vực sẽ mở khóa sau khi được duyệt.'}
+              </div>
+            ) : (
+              <form className="zone-form-card" onSubmit={handleSaveZone}>
+                <div className="zone-form-field">
+                  <label htmlFor="owner-zone-name">Tên khu vực *</label>
+                  <input
+                    id="owner-zone-name"
+                    className="zone-form-input"
+                    value={zoneForm.name}
+                    onChange={(e) => setZoneForm((z) => ({ ...z, name: e.target.value }))}
+                    placeholder="Ví dụ: Tầng 1 - Khu làm tổ"
+                  />
+                  <small className="zone-form-hint">
+                    Mã khu vực (Z-XXXXXX) sẽ được hệ thống tự động cấp duy nhất.
+                  </small>
+                </div>
+                <div className="zone-form-actions">
+                  <button type="submit" className="farm-button farm-button--primary" disabled={submitting}>
+                    {submitting ? 'Đang lưu...' : editingZoneId ? 'Cập nhật khu vực' : '+ Thêm khu vực'}
+                  </button>
+                  {editingZoneId && (
+                    <button
+                      type="button"
+                      className="farm-button farm-button--secondary"
+                      onClick={() => {
+                        setEditingZoneId(null)
+                        setZoneForm({ zone_code: '', name: '' })
+                      }}
+                    >
+                      Hủy
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
             {(selectedFarm.zones || []).length === 0 ? (
-              <div className="farm-requests__empty">Chưa có khu vực nào.</div>
+              <EmptyState
+                title="Chưa có khu vực nào"
+                description="Thêm khu vực đầu tiên để phân vùng cảm biến và thiết bị trong nhà yến."
+              />
             ) : (
               <div className="farm-request-table-wrap">
                 <table className="farm-request-table">
@@ -311,17 +344,26 @@ function FarmsPage() {
                       <tr key={z.id}>
                         <td><strong>{z.code || z.zone_code || z.id}</strong></td>
                         <td>{z.name}</td>
-                        <td style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingZoneId(z.id)
-                              setZoneForm({ zone_code: z.code || '', name: z.name || '' })
-                            }}
-                          >
-                            Sửa
-                          </button>
-                          <button type="button" onClick={() => handleDeleteZone(z)}>Xóa</button>
+                        <td>
+                          <div className="farm-table-actions">
+                            <button
+                              type="button"
+                              className="farm-table-action"
+                              onClick={() => {
+                                setEditingZoneId(z.id)
+                                setZoneForm({ zone_code: z.code || '', name: z.name || '' })
+                              }}
+                            >
+                              Sửa
+                            </button>
+                            <button
+                              type="button"
+                              className="farm-table-action farm-table-action--danger"
+                              onClick={() => handleDeleteZone(z)}
+                            >
+                              Xóa
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -391,20 +433,15 @@ function FarmsPage() {
         {farmModalMode && (
           <div className="admin-farm-modal-backdrop" onMouseDown={() => setFarmModalMode(null)}>
             <form
-              className="admin-farm-modal"
+              className="admin-farm-modal admin-farm-form"
               onSubmit={handleSaveFarm}
               onMouseDown={(e) => e.stopPropagation()}
             >
               <h3>{farmModalMode === 'create' ? 'Thêm nhà yến mới' : 'Chỉnh sửa nhà yến'}</h3>
               {farmModalMode === 'create' && (
-                <label>
-                  Mã nhà yến *
-                  <input
-                    value={farmForm.farm_code}
-                    onChange={(e) => setFarmForm((f) => ({ ...f, farm_code: e.target.value }))}
-                    placeholder="VD: FARM-OWNER-01"
-                  />
-                </label>
+                <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
+                  Mã nhà yến (Farm Code) sẽ được hệ thống tự động cấp duy nhất sau khi tạo.
+                </p>
               )}
               <label>
                 Tên nhà yến *
@@ -422,9 +459,9 @@ function FarmsPage() {
                   placeholder="Địa chỉ"
                 />
               </label>
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setFarmModalMode(null)}>Hủy</button>
-                <button type="submit" disabled={submitting}>{submitting ? 'Đang lưu...' : 'Lưu'}</button>
+              <div className="admin-farm-modal__actions">
+                <button type="button" className="admin-farm-modal__cancel" onClick={() => setFarmModalMode(null)}>Hủy</button>
+                <button type="submit" className="admin-farm-modal__save" disabled={submitting}>{submitting ? 'Đang lưu...' : 'Lưu'}</button>
               </div>
             </form>
           </div>

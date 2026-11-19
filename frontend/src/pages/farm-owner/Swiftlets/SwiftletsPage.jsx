@@ -16,7 +16,9 @@ import {
 } from '../../../components/features/farm-owner/swiftlets/swiftletsMockData'
 
 import { useFarms } from '../../../features/farms/hooks/useFarms'
+import { formatFarmOptionLabel } from '../../../features/farms/adapters/farmAdapter.js'
 import { useCameras } from '../../../features/cameras/hooks/useCameras'
+import { USE_MOCK } from '../../../api/config.js'
 
 import './SwiftletsPage.css'
 
@@ -50,7 +52,7 @@ function SwiftletsPage() {
     loading: camerasLoading,
     error: camerasError,
     refetch: refetchCameras,
-  } = useCameras(selectedFarmId, selectedCameraId)
+  } = useCameras(selectedFarmId, selectedCameraId, { requireFarmId: true })
 
   const effectiveZones = zones.length > 0 ? zones : selectedFarm?.zones || []
 
@@ -65,7 +67,19 @@ function SwiftletsPage() {
     cameras[0] ||
     FALLBACK_CAMERA
 
-  const effectiveBirdStats = birdStats || defaultMockStats
+  const effectiveBirdStats =
+    birdStats ||
+    (USE_MOCK
+      ? defaultMockStats
+      : {
+          totalCount: '—',
+          entries: '—',
+          exits: '—',
+          returnRate: '—',
+          activeNests: '—',
+          unavailable: true,
+          noCamera: cameras.length === 0,
+        })
 
   function updateCamera(nextCameraId) {
     setSelectedCameraId(nextCameraId)
@@ -103,12 +117,14 @@ function SwiftletsPage() {
             </p>
           </div>
 
-          <div className="swiftlets-ai-status">
+          <div className={`swiftlets-ai-status ${cameras.length === 0 || selectedCamera.status !== 'ONLINE' ? 'offline' : ''}`}>
             <span>
               <i />
-              {selectedCamera.status === 'ONLINE'
-                ? 'Edge AI đang hoạt động'
-                : 'Camera ngoại tuyến'}
+              {cameras.length === 0
+                ? 'Chưa có camera AI'
+                : selectedCamera.status === 'ONLINE'
+                  ? 'Edge AI đang hoạt động'
+                  : 'Camera ngoại tuyến'}
             </span>
           </div>
         </header>
@@ -118,8 +134,13 @@ function SwiftletsPage() {
         )}
         {camerasError && (
           <ErrorMessage
-            title="Lỗi tải dữ liệu camera"
-            message={camerasError}
+            variant="warning"
+            title="Chưa kết nối dịch vụ Camera AI"
+            message={
+              /upstream|503|unreachable|network/i.test(String(camerasError))
+                ? 'Chưa kết nối dịch vụ AI Vision / Camera. Dữ liệu đếm chim sẽ hiển thị khi dịch vụ hoạt động trở lại.'
+                : camerasError
+            }
             onRetry={refetchCameras}
           />
         )}
@@ -132,7 +153,7 @@ function SwiftletsPage() {
               onChange={handleFarmChange}
               options={farms.map((farm) => ({
                 value: farm.id,
-                label: farm.name,
+                label: formatFarmOptionLabel(farm),
               }))}
             />
           </label>
@@ -179,7 +200,7 @@ function SwiftletsPage() {
 
             <div className="swiftlets-media-grid">
               <LiveCameraCard camera={selectedCamera} />
-              <BirdTrendChart data={defaultMockTrend} />
+              <BirdTrendChart data={USE_MOCK ? defaultMockTrend : []} />
             </div>
 
             <AIEventsTable events={events} />
