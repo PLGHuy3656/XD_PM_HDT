@@ -54,10 +54,12 @@ class CameraStartRequest(CanonicalModel):
     summary="List registered AI cameras and their current runtime status",
 )
 def list_cameras(
+    farm_id: Optional[str] = Query(default=None, description="Optional farm ID filter"),
+    farmId: Optional[str] = Query(default=None, description="Optional camelCase alias for farm_id"),
     runtime_manager: AIRuntimeManager = Depends(get_runtime_manager),
     state_store: InMemoryAIRuntimeStateStore = Depends(get_state_store),
 ) -> List[CameraRuntimeStatus]:
-    """Return runtime status for all cameras registered in AIRuntimeManager / runtime state."""
+    """Return runtime status for registered cameras, optionally filtered by farm_id."""
     statuses_by_id = {s.cameraId: s for s in state_store.list_camera_statuses()}
     for cam_id in runtime_manager.list_camera_ids():
         if cam_id not in statuses_by_id:
@@ -65,7 +67,24 @@ def list_cameras(
             if pipeline is not None:
                 state_store.record_status(pipeline.status)
                 statuses_by_id[cam_id] = pipeline.status
-    return [statuses_by_id[k] for k in sorted(statuses_by_id.keys())]
+
+    effective_farm_id = (farm_id or farmId or "").strip() or None
+    results: List[CameraRuntimeStatus] = []
+    for k in sorted(statuses_by_id.keys()):
+        st = statuses_by_id[k]
+        if st.farmId is None or st.zoneId is None:
+            resolved_farm, resolved_zone = default_camera_metadata_resolver.resolve(st.cameraId)
+            if resolved_farm is not None or resolved_zone is not None:
+                st = st.model_copy(
+                    update={
+                        "farmId": st.farmId or resolved_farm,
+                        "zoneId": st.zoneId or resolved_zone,
+                    }
+                )
+        if effective_farm_id is not None and st.farmId != effective_farm_id:
+            continue
+        results.append(st)
+    return results
 
 
 @router.get(

@@ -18,6 +18,7 @@ from prometheus_fastapi_instrumentator import (
 from app import __version__
 from app.api import (
     analyze_router,
+    audio_router,
     cameras_router,
     events_router,
     health_router,
@@ -87,10 +88,11 @@ def create_app(
     effective_runtime_manager.add_sink(effective_ws_manager.sink)
     effective_runtime_manager.add_sink(effective_publisher_sink)
 
+    default_load_cameras = "false" if runtime_manager is not None else "true"
     should_load_cameras = (
         load_configured_cameras
         if load_configured_cameras is not None
-        else os.getenv("AI_LOAD_CONFIGURED_CAMERAS", "true").lower() in ("1", "true", "yes")
+        else os.getenv("AI_LOAD_CONFIGURED_CAMERAS", default_load_cameras).lower() in ("1", "true", "yes")
     )
 
     @asynccontextmanager
@@ -160,6 +162,7 @@ def create_app(
     application.include_router(events_router)
     application.include_router(snapshots_router)
     application.include_router(analyze_router)
+    application.include_router(audio_router)
     application.include_router(runtime_control_router)
     application.include_router(ws_router)
 

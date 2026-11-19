@@ -7,16 +7,22 @@ from app.ports.domain_event_publisher import (
 )
 from app.ports.metadata_resolver import (
     CameraMetadataResolver,
+    CompositeCameraMetadataResolver,
     InMemoryCameraMetadataResolver,
+    ManagementCameraMetadataResolver,
+    StaticConfigCameraMetadataResolver,
     default_camera_metadata_resolver,
 )
 
 __all__ = [
     "CameraMetadataResolver",
+    "CompositeCameraMetadataResolver",
     "DomainEventPublisher",
     "InMemoryCameraMetadataResolver",
     "InMemoryDomainEventPublisher",
+    "ManagementCameraMetadataResolver",
     "NoOpDomainEventPublisher",
+    "StaticConfigCameraMetadataResolver",
     "default_camera_metadata_resolver",
     "noop_domain_event_publisher",
 ]

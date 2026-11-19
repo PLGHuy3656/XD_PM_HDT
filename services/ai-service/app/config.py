@@ -222,6 +222,18 @@ class Settings(BaseSettings):
         default=3.0,
         validation_alias=AliasChoices("ai_registry_timeout_seconds", "AI_REGISTRY_TIMEOUT_SECONDS"),
     )
+    ai_metadata_management_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("ai_metadata_management_enabled", "AI_METADATA_MANAGEMENT_ENABLED"),
+    )
+    ai_metadata_cache_ttl_seconds: float = Field(
+        default=60.0,
+        validation_alias=AliasChoices("ai_metadata_cache_ttl_seconds", "AI_METADATA_CACHE_TTL_SECONDS"),
+    )
+    ai_camera_metadata_json: str = Field(
+        default="",
+        validation_alias=AliasChoices("ai_camera_metadata_json", "AI_CAMERA_METADATA_JSON"),
+    )
     ai_allowed_source_dirs: list[str] = Field(
         default_factory=lambda: [str((AI_PIPELINE_DIR / "data" / "samples").resolve())],
         validation_alias=AliasChoices("ai_allowed_source_dirs", "AI_ALLOWED_SOURCE_DIRS"),
