@@ -8,25 +8,36 @@ function EnvironmentChart({ metric }) {
   const usableWidth = width - padding * 2
   const usableHeight = height - padding * 2
 
+  const values = Array.isArray(metric?.values) ? metric.values : []
+  const minVal = metric?.min ?? 0
+  const maxVal = metric?.max ?? 100
+  const range = (maxVal - minVal) || 1
+
   const points = useMemo(
     () =>
-      metric.values.map((value, index) => {
+      values.map((value, index) => {
         const x =
           padding +
-          (index / (metric.values.length - 1)) *
+          (index / ((values.length - 1) || 1)) *
             usableWidth
 
         const y =
           padding +
-          (1 -
-            (value - metric.min) /
-              (metric.max - metric.min)) *
+          (1 - (value - minVal) / range) *
             usableHeight
 
         return { x, y }
       }),
-    [metric, usableHeight, usableWidth]
+    [values, minVal, range, usableHeight, usableWidth]
   )
+
+  if (points.length === 0) {
+    return (
+      <div className="environment-chart" style={{ padding: '2rem 1rem', textAlign: 'center', color: '#64748b', fontSize: '0.9rem' }}>
+        Chưa có dữ liệu biểu đồ telemetry từ IoT Service.
+      </div>
+    )
+  }
 
   const polyline = points
     .map((point) => `${point.x},${point.y}`)
@@ -43,16 +54,12 @@ function EnvironmentChart({ metric }) {
 
   const safeTop =
     padding +
-    (1 -
-      (metric.safeMax - metric.min) /
-        (metric.max - metric.min)) *
+    (1 - ((metric?.safeMax ?? maxVal) - minVal) / range) *
       usableHeight
 
   const safeBottom =
     padding +
-    (1 -
-      (metric.safeMin - metric.min) /
-        (metric.max - metric.min)) *
+    (1 - ((metric?.safeMin ?? minVal) - minVal) / range) *
       usableHeight
 
   return (

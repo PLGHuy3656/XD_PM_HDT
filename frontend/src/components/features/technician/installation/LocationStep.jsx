@@ -1,23 +1,23 @@
 import EnvironmentSelect from '../../../ui/Select'
 
 function LocationStep({
-  installation,
-  farms,
+  installation = {},
+  farms = [],
   onChange,
 }) {
-  const selectedFarm = farms.find(
-    (farm) => farm.id === installation.farmId,
+  const selectedFarm = (farms || []).find(
+    (farm) => farm && farm.id === installation?.farmId,
   )
 
-  const farmOptions = farms.map((farm) => ({
-    value: farm.id,
-    label: farm.name,
+  const farmOptions = (farms || []).map((farm) => ({
+    value: farm?.id,
+    label: farm?.name || farm?.id,
   }))
 
   const zoneOptions =
-    selectedFarm?.zones.map((zone) => ({
-      value: zone.id,
-      label: zone.name,
+    (selectedFarm?.zones || []).map((zone) => ({
+      value: zone?.id,
+      label: zone?.name || zone?.id,
     })) ?? []
 
   return (

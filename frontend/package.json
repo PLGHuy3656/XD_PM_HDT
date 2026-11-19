@@ -7,7 +7,14 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node scripts/test_frontend_architecture.js && node scripts/test_api_client_regression.js",
+    "test:live-auth": "node scripts/test_cp12a_live_auth.js",
+    "test:farm-owner": "node scripts/test_cp12b_farm_owner.js",
+    "test:technician": "node scripts/test_cp12c_technician.js",
+    "test:admin": "node scripts/test_cp12d_admin.js",
+    "test:e2e": "node scripts/test_cp12e_browser_e2e.js",
+    "test:all": "npm test && npm run test:live-auth && npm run test:farm-owner && npm run test:technician && npm run test:admin && npm run test:e2e"
   },
   "dependencies": {
     "react": "^19.2.8",
@@ -23,6 +30,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.6",
     "globals": "^17.12.0",
+    "playwright": "^1.65.0",
     "vite": "^8.3.0"
   }
 }

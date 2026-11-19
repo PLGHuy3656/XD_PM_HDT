@@ -4,6 +4,12 @@ import {
   getFarmDeviceCount,
 } from './adminFarmsMockData'
 
+const approvalBadgeMap = {
+  PENDING: { label: 'Chờ duyệt', bg: '#fef3c7', color: '#92400e', border: '#fcd34d' },
+  APPROVED: { label: 'Đã duyệt', bg: '#ecfdf5', color: '#065f46', border: '#a7f3d0' },
+  REJECTED: { label: 'Từ chối', bg: '#fef2f2', color: '#991b1b', border: '#fecaca' },
+}
+
 function FarmTable({ farms, onViewFarm }) {
   if (farms.length === 0) {
     return (
@@ -42,21 +48,21 @@ function FarmTable({ farms, onViewFarm }) {
 
               <td>
                 <div className="admin-farm-person">
-                  <strong>{farm.owner.name}</strong>
-                  <span>{farm.owner.email}</span>
+                  <strong>{farm.owner?.name || 'Chưa gán chủ trại'}</strong>
+                  <span>{farm.owner?.email || '--'}</span>
                 </div>
               </td>
 
               <td>
                 <div className="admin-farm-person">
-                  <strong>{farm.technician.name}</strong>
-                  <span>{farm.technician.email}</span>
+                  <strong>{farm.technician?.name || 'Chưa gán kỹ thuật'}</strong>
+                  <span>{farm.technician?.email || '--'}</span>
                 </div>
               </td>
 
               <td>
                 <strong className="admin-farm-count">
-                  {farm.zones.length}
+                  {farm.zoneCount || farm.zones?.length || 0}
                 </strong>
               </td>
 
@@ -82,6 +88,26 @@ function FarmTable({ farms, onViewFarm }) {
                   >
                     {farmHealthLabels[farm.health]}
                   </small>
+                  {(() => {
+                    const badge = approvalBadgeMap[farm.approvalStatus || 'APPROVED'] || approvalBadgeMap.APPROVED
+                    return (
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          marginTop: '4px',
+                          padding: '2px 8px',
+                          borderRadius: '999px',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          background: badge.bg,
+                          color: badge.color,
+                          border: `1px solid ${badge.border}`,
+                        }}
+                      >
+                        {badge.label}
+                      </span>
+                    )
+                  })()}
                 </div>
               </td>
 

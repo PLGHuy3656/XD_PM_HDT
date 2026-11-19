@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import NotificationPopover from '../common/NotificationPopover'
 import { useAuth } from '../../context/AuthContext'
+import { useTelemetryWebSocket } from '../../features/telemetry/hooks/useTelemetryWebSocket'
+import { formatHeaderEnvironment } from '../../features/telemetry/adapters/telemetryAdapter'
 import './Header.css'
 
 function SearchIcon() {
@@ -49,17 +51,53 @@ const environmentData = [
   },
 ]
 
+const roleSearchTargets = {
+  ADMIN: [
+    { label: 'Tổng quan quản trị', path: '/admin/dashboard', keywords: 'dashboard tong quan quan tri' },
+    { label: 'Quản lý người dùng', path: '/admin/users', keywords: 'users nguoi dung tai khoan' },
+    { label: 'Quản lý nhà yến', path: '/admin/farms', keywords: 'farms nha yen phan cong' },
+    { label: 'Quản lý thiết bị', path: '/admin/devices', keywords: 'devices thiet bi node' },
+    { label: 'Hệ thống & Hạ tầng', path: '/admin/system', keywords: 'system he thong ha tang' },
+    { label: 'Cài đặt tài khoản', path: '/settings', keywords: 'settings cai dat' },
+  ],
+  FARM_OWNER: [
+    { label: 'Tổng quan nhà yến', path: '/owner/dashboard', keywords: 'dashboard tong quan' },
+    { label: 'Quản lý nhà yến & Khu vực', path: '/owner/farms', keywords: 'farms zones nha yen khu vuc' },
+    { label: 'Môi trường nhà yến', path: '/owner/environment', keywords: 'environment moi truong nhiet do am' },
+    { label: 'Điều khiển môi trường', path: '/owner/environment/control', keywords: 'control dieu khien' },
+    { label: 'Thiết bị', path: '/owner/devices', keywords: 'devices thiet bi' },
+    { label: 'Giám sát chim yến', path: '/owner/swiftlets', keywords: 'swiftlets chim yen camera ai' },
+    { label: 'Cảnh báo', path: '/owner/alerts', keywords: 'alerts canh bao' },
+    { label: 'Phân tích', path: '/owner/analytics', keywords: 'analytics phan tich' },
+    { label: 'Cài đặt tài khoản', path: '/settings', keywords: 'settings cai dat' },
+  ],
+  TECHNICIAN: [
+    { label: 'Tổng quan kỹ thuật', path: '/technician/dashboard', keywords: 'dashboard tong quan' },
+    { label: 'Môi trường phụ trách', path: '/technician/environment', keywords: 'environment moi truong' },
+    { label: 'Thiết bị phụ trách', path: '/technician/devices', keywords: 'devices thiet bi' },
+    { label: 'Lắp đặt thiết bị', path: '/technician/installation', keywords: 'installation lap dat' },
+    { label: 'Chẩn đoán thiết bị', path: '/technician/diagnostics', keywords: 'diagnostics chan doan' },
+    { label: 'Cảnh báo & Yêu cầu', path: '/technician/alerts', keywords: 'alerts canh bao yeu cau' },
+    { label: 'Cài đặt tài khoản', path: '/settings', keywords: 'settings cai dat' },
+  ],
+}
+
 function Header() {
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user, logout, isMockMode } = useAuth()
+  const { latestTelemetry } = useTelemetryWebSocket()
 
   const [profileOpen, setProfileOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchFocused, setSearchFocused] = useState(false)
 
   const profileRef = useRef(null)
+  const searchRef = useRef(null)
 
   const displayName = user?.name || 'NestMate User'
   const roleLabel = roleLabels[user?.role] || 'Người dùng'
+  const displayEnvironment = formatHeaderEnvironment(latestTelemetry, isMockMode)
 
   const initials = displayName
     .split(' ')
@@ -122,18 +160,85 @@ function Header() {
         scrolled ? 'app-header--scrolled' : ''
       }`}
     >
-      <div className="header-search">
+      <div className="header-search" ref={searchRef} style={{ position: 'relative' }}>
         <SearchIcon />
 
         <input
           type="search"
-          placeholder="Tìm kiếm trong NestMate..."
-          aria-label="Tìm kiếm"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+          onKeyDown={(e) => {
+            const targets = roleSearchTargets[user?.role] || []
+            const q = searchQuery.trim().toLowerCase()
+            const matched = q
+              ? targets.filter(
+                  (t) => t.label.toLowerCase().includes(q) || t.keywords.includes(q),
+                )
+              : []
+            if (e.key === 'Enter' && matched.length > 0) {
+              setSearchQuery('')
+              setSearchFocused(false)
+              navigate(matched[0].path)
+            } else if (e.key === 'Escape') {
+              setSearchFocused(false)
+            }
+          }}
+          placeholder="Đi nhanh tới trang..."
+          aria-label="Tìm kiếm trang theo vai trò"
         />
+
+        {searchFocused && searchQuery.trim() && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 6px)',
+              left: 0,
+              right: 0,
+              background: '#fffdf9',
+              border: '1px solid #e2dbcf',
+              borderRadius: '12px',
+              boxShadow: '0 12px 30px rgba(15, 29, 47, 0.14)',
+              zIndex: 120,
+              overflow: 'hidden',
+            }}
+          >
+            {(roleSearchTargets[user?.role] || [])
+              .filter((t) => {
+                const q = searchQuery.trim().toLowerCase()
+                return t.label.toLowerCase().includes(q) || t.keywords.includes(q)
+              })
+              .map((item) => (
+                <button
+                  key={item.path}
+                  type="button"
+                  onMouseDown={() => {
+                    setSearchQuery('')
+                    setSearchFocused(false)
+                    navigate(item.path)
+                  }}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '10px 14px',
+                    border: 0,
+                    background: 'transparent',
+                    color: '#172b46',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+          </div>
+        )}
       </div>
 
       <div className="header-environment">
-        {environmentData.map((item) => (
+        {displayEnvironment.map((item) => (
           <div
             className="header-environment-item"
             key={item.id}

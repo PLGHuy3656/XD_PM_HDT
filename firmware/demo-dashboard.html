@@ -437,8 +437,10 @@
       const m = data.metrics;
       const r = data.actuators;
 
+      temp = m.temperature ?? m.temp ?? 0; 
+
       // Cập nhật số đo
-      document.getElementById('valTemp').innerText = parseFloat(m.temp).toFixed(1);
+      document.getElementById('valTemp').innerText = parseFloat(temp).toFixed(1);
       document.getElementById('valHum').innerText = parseFloat(m.humidity).toFixed(1);
       document.getElementById('valCO2').innerText = m.co2 || 480;
       document.getElementById('valLux').innerText = parseFloat(m.lux).toFixed(2);
@@ -468,11 +470,11 @@
         chart.data.datasets[1].data.shift();
       }
       chart.data.labels.push(nowTime);
-      chart.data.datasets[0].data.push(m.temp);
+      chart.data.datasets[0].data.push(temp);
       chart.data.datasets[1].data.push(m.humidity);
       chart.update();
 
-      appendLog("TELEMETRY", `T: ${m.temp}°C | H: ${m.humidity}% | Mode: ${mode}`);
+      appendLog("TELEMETRY", `T: ${temp}°C | H: ${m.humidity}% | Mode: ${mode}`);
     }
 
     function updateRelayBadge(elemId, isActive, activeClass) {

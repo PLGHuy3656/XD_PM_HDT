@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: "SwiftletCare Monitoring"
+    orgId: 1
+    folder: "SwiftletCare"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

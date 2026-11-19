@@ -1,0 +1,96 @@
+import { useCallback, useEffect, useState } from 'react'
+import { devicesApi } from '../../../api/modules/devicesApi.js'
+import { USE_MOCK } from '../../../api/config.js'
+import { getMockDevices, normalizeDevice } from '../adapters/deviceAdapter.js'
+
+export function useDevices(farmId = null, { requireFarmId = false } = {}) {
+  const [devices, setDevices] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const fetchDevices = useCallback(async (signal) => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      if (USE_MOCK) {
+        const mockList = getMockDevices()
+        const filtered = farmId ? mockList.filter((d) => d.farmId === farmId) : mockList
+        setDevices(filtered)
+        return
+      }
+
+      if (requireFarmId && !farmId) {
+        setDevices([])
+        return
+      }
+      setDevices([])
+
+      // Query real Gateway /api/devices with optional farm_id filter
+      const options = {
+        signal,
+        params: farmId ? { farm_id: farmId } : {},
+      }
+      const response = await devicesApi.getDevices(options)
+      const rawList = Array.isArray(response) ? response : response?.items || response?.data || []
+      const normalized = rawList.map(normalizeDevice)
+      const filtered = farmId ? normalized.filter((d) => d.farmId === farmId) : normalized
+      setDevices(filtered)
+    } catch (err) {
+      if (err?.code !== 'ABORTED') {
+        setError(err?.message || 'Không thể tải danh sách thiết bị.')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [farmId, requireFarmId])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchDevices(controller.signal)
+
+    return () => {
+      controller.abort()
+    }
+  }, [fetchDevices])
+
+  const runDeviceMutation = useCallback(
+    async (fn, fallbackError) => {
+      try {
+        await fn()
+        await fetchDevices()
+        return { success: true }
+      } catch (err) {
+        return { success: false, error: err?.message || fallbackError }
+      }
+    },
+    [fetchDevices]
+  )
+
+  const createDevice = useCallback(
+    (payload) => runDeviceMutation(() => devicesApi.createDevice(payload), 'Đăng ký thiết bị thất bại'),
+    [runDeviceMutation]
+  )
+
+  const updateDevice = useCallback(
+    (deviceId, payload) => runDeviceMutation(() => devicesApi.updateDevice(deviceId, payload), 'Cập nhật thiết bị thất bại'),
+    [runDeviceMutation]
+  )
+
+  const deleteDevice = useCallback(
+    (deviceId) => runDeviceMutation(() => devicesApi.deleteDevice(deviceId), 'Xóa thiết bị thất bại'),
+    [runDeviceMutation]
+  )
+
+  return {
+    devices,
+    loading,
+    error,
+    createDevice,
+    updateDevice,
+    deleteDevice,
+    refetch: () => fetchDevices(),
+  }
+}
+
+export default useDevices

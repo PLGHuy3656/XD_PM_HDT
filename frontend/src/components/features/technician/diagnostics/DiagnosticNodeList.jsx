@@ -1,5 +1,6 @@
 const statusLabels = {
   HEALTHY: 'Ổn định',
+  REGISTERED: 'Đã đăng ký (Chưa có IoT)',
   WARNING: 'Cảnh báo',
   OFFLINE: 'Offline',
 }
@@ -30,7 +31,7 @@ function DiagnosticNodeList({
             className={`diagnostic-node-row ${
               selectedNodeId === node.id ? 'active' : ''
             }`}
-            onClick={() => onSelect(node)}
+            onClick={() => onSelect?.(node)}
           >
             <div className="diagnostic-node-main">
               <span
@@ -50,7 +51,7 @@ function DiagnosticNodeList({
 
             <div className="diagnostic-node-signal">
               <strong>
-                {node.connectivity.rssi === null
+                {node.connectivity?.rssi == null
                   ? '--'
                   : `${node.connectivity.rssi} dBm`}
               </strong>

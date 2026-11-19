@@ -6,6 +6,8 @@ function DeviceDetailPanel({
   onClose,
   onAssign,
 }) {
+  if (!device) return null
+
   const handleBackdropMouseDown = (event) => {
     if (event.target === event.currentTarget) {
       onClose()

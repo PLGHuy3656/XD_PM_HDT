@@ -11,7 +11,7 @@ function CloseIcon() {
   )
 }
 
-function DeviceDetailPanel({ device, onClose }) {
+function DeviceDetailPanel({ device, onClose, onEdit, onDelete }) {
   if (!device) return null
 
   return (
@@ -41,6 +41,30 @@ function DeviceDetailPanel({ device, onClose }) {
             <CloseIcon />
           </button>
         </header>
+
+        {(onEdit || onDelete) && (
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+            {onEdit && (
+              <button
+                type="button"
+                className="admin-farm-edit-button"
+                onClick={() => onEdit(device)}
+              >
+                Chỉnh sửa thiết bị
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                className="admin-farm-edit-button"
+                style={{ borderColor: '#dc2626', color: '#dc2626' }}
+                onClick={() => onDelete(device)}
+              >
+                Xóa thiết bị
+              </button>
+            )}
+          </div>
+        )}
 
         <section className="admin-device-detail__status">
           <div>
@@ -74,8 +98,13 @@ function DeviceDetailPanel({ device, onClose }) {
 
           <div className="admin-device-info-grid">
             <div>
-              <span>Device ID</span>
-              <strong>{device.id}</strong>
+              <span>Node ID</span>
+              <strong>{device.nodeId || device.id}</strong>
+            </div>
+
+            <div>
+              <span>Device UUID</span>
+              <strong style={{ fontSize: '0.78rem', wordBreak: 'break-all' }}>{device.deviceId || '--'}</strong>
             </div>
 
             <div>
@@ -103,26 +132,34 @@ function DeviceDetailPanel({ device, onClose }) {
             </div>
 
             <div>
-              <span>Khu vực</span>
-              <strong>{device.zone.name}</strong>
-              <small>{device.zone.floor}</small>
+              <span>Khu vực (Zone)</span>
+              <strong style={!device.isZoneAssigned ? { color: '#b45309' } : undefined}>
+                {device.zone.name}
+              </strong>
+              <small>{device.isZoneAssigned ? device.zone.floor : 'Chưa gán khu vực'}</small>
+            </div>
+
+            <div>
+              <span>Technician phụ trách Farm</span>
+              <strong>{device.farmTechnician?.name || 'Chưa phân công'}</strong>
+              <small>{device.farmTechnician?.email || '--'}</small>
             </div>
           </div>
         </section>
 
         <section className="admin-device-detail__section">
           <span className="admin-device-detail__label">
-            QUYỀN QUẢN TRỊ
+            QUẢN TRỊ THIẾT BỊ
           </span>
 
           <div className="admin-device-readonly-note">
-            <strong>Chế độ chỉ xem</strong>
+            <strong>Đăng ký &amp; phân bổ</strong>
 
             <p>
-              Administrator giám sát trạng thái thiết bị
-              toàn hệ thống. Cài đặt, cấu hình,
-              diagnostics và thao tác kỹ thuật được thực
-              hiện trong Technician workflow.
+              Administrator quản lý đăng ký thiết bị, cập nhật
+              thông tin và theo dõi phân bổ Farm/Zone. Việc có
+              Zone chưa đồng nghĩa thiết bị đã lắp đặt hoặc Online;
+              lắp đặt và chẩn đoán thực tế thuộc quy trình Technician.
             </p>
           </div>
         </section>

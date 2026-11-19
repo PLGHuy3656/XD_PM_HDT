@@ -15,9 +15,9 @@
 
   padding: 14px var(--space-8);
 
-  border-bottom: 1px solid rgba(15, 43, 67, 0.04);
+  border-bottom: 1px solid rgba(15, 43, 67, 0.06);
 
-  background: rgba(250, 247, 239, 0.9);
+  background: #faf7ef;
 
   backdrop-filter: blur(16px) saturate(125%);
   -webkit-backdrop-filter: blur(16px) saturate(125%);
@@ -30,9 +30,9 @@
 }
 
 .app-header--scrolled {
-  border-bottom-color: rgba(15, 43, 67, 0.085);
+  border-bottom-color: rgba(15, 43, 67, 0.1);
 
-  background: rgba(250, 247, 239, 0.78);
+  background: #faf7ef;
 
   box-shadow: 0 10px 30px rgba(12, 38, 57, 0.065);
   backdrop-filter: blur(22px) saturate(145%);
