@@ -137,6 +137,18 @@ function EnvironmentPage() {
   )
   const [showZonePicker, setShowZonePicker] = useState(false)
 
+  useEffect(() => {
+    if (effectiveZones.length > 0) {
+      if (!zoneId || !effectiveZones.some((z) => z.id === zoneId)) {
+        setZoneId(effectiveZones[0].id)
+      }
+      setComparisonZoneIds((prev) => {
+        const valid = prev.filter((id) => effectiveZones.some((z) => z.id === id))
+        return valid.length > 0 ? valid : effectiveZones.slice(0, 2).map((z) => z.id)
+      })
+    }
+  }, [effectiveZones, zoneId])
+
   const selectedZone =
     effectiveZones.find((zone) => zone.id === zoneId) ?? effectiveZones[0] ?? {
       id: 'default',

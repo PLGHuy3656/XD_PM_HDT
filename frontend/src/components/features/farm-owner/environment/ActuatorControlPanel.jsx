@@ -42,10 +42,12 @@ const actuatorMeta = {
 }
 
 function ActuatorControlPanel({
-  actuators,
-  isManual,
+  actuators = {},
+  isManual = false,
   onActuatorChange,
+  onToggleActuator,
 }) {
+  const handleToggle = onActuatorChange || onToggleActuator
   return (
     <section className="control-section">
       <div className="control-section-title">
@@ -97,7 +99,7 @@ function ActuatorControlPanel({
                 <Toggle
                   checked={isOn}
                   disabled={!isManual}
-                  onChange={(value) => onActuatorChange(key, value)}
+                  onChange={(value) => handleToggle?.(key, value)}
                   label={`${isOn ? 'Tắt' : 'Bật'} ${actuator.name}`}
                 />
               </div>

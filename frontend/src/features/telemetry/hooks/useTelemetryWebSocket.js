@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { WS_BASE_URL, USE_MOCK } from '../../../api/config.js'
 import { getAuthToken } from '../../../api/client.js'
+import { telemetryApi } from '../../../api/modules/telemetryApi.js'
 import { normalizeTelemetry } from '../adapters/telemetryAdapter.js'
+
+const DEFAULT_FARM_ID = 'a18d8eee-cb1a-4b00-b375-d505eb8128d7'
 
 export function useTelemetryWebSocket(farmId = null) {
   const [connectionStatus, setConnectionStatus] = useState('connecting')
@@ -31,6 +34,27 @@ export function useTelemetryWebSocket(farmId = null) {
     let socket = null
     let reconnectTimer = null
     let stopped = false
+    const targetFarmId = farmId || DEFAULT_FARM_ID
+
+    // Robust HTTP polling fallback (3s) to guarantee realtime display on top bar
+    const fetchLatestHttp = async () => {
+      if (stopped) return
+      try {
+        const response = await telemetryApi.getFarmLatest(targetFarmId)
+        if (!stopped && response) {
+          const normalized = normalizeTelemetry(response, false)
+          if (normalized) {
+            setLatestTelemetry(normalized)
+            setConnectionStatus('connected')
+          }
+        }
+      } catch {
+        // Soft ignore network errors
+      }
+    }
+
+    fetchLatestHttp()
+    const httpInterval = setInterval(fetchLatestHttp, 3000)
 
     function connect() {
       if (stopped) return
@@ -78,7 +102,7 @@ export function useTelemetryWebSocket(farmId = null) {
     }
 
     function scheduleReconnect() {
-      setConnectionStatus('disconnected')
+      if (stopped) return
       reconnectAttemptsRef.current += 1
       const backoffDelay = Math.min(10000, 1000 * Math.pow(1.5, reconnectAttemptsRef.current))
       reconnectTimer = setTimeout(connect, backoffDelay)
@@ -88,6 +112,7 @@ export function useTelemetryWebSocket(farmId = null) {
 
     return () => {
       stopped = true
+      clearInterval(httpInterval)
       clearTimeout(reconnectTimer)
       if (socket) {
         socket.onclose = null

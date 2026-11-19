@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import AppLayout from '../../../components/layout/AppLayout'
 import EnvironmentTabs from '../../../components/features/farm-owner/environment/EnvironmentTabs'
 import EnvironmentSelect from '../../../components/ui/Select'
@@ -43,6 +43,12 @@ function EnvironmentControlPage() {
       : selectedFarm?.zones || defaultMockFarms[0]?.zones || []
 
   const [selectedZoneId, setSelectedZoneId] = useState('')
+
+  useEffect(() => {
+    if (effectiveZones.length > 0 && (!selectedZoneId || !effectiveZones.some((z) => z.id === selectedZoneId))) {
+      setSelectedZoneId(effectiveZones[0].id)
+    }
+  }, [effectiveZones, selectedZoneId])
 
   const [zoneState, setZoneState] = useState(() => {
     const state = {}
@@ -133,14 +139,16 @@ function EnvironmentControlPage() {
       alarm: 'alarm',
     }
     const target = targetMap[key] || key
+    const deviceId = selectedZone?.deviceId || 'SWC-DEMO-NODE-001'
     try {
-      await devicesApi.sendRelayCommand('SWC-DEMO-NODE-001', {
+      await devicesApi.sendRelayCommand(deviceId, {
         target,
         state: value ? 1 : 0,
       })
-      setRuleNotice(`Đã gửi lệnh ${value ? 'BẬT' : 'TẮT'} ${target.toUpperCase()} tới ESP32 thành công.`)
+      setRuleNotice(`Đã gửi lệnh ${value ? 'BẬT' : 'TẮT'} ${target.toUpperCase()} tới ESP32 (${deviceId}) thành công.`)
     } catch (err) {
       console.warn('Lỗi gửi lệnh rơ-le:', err)
+      setRuleNotice(`Không thể gửi lệnh tới thiết bị: ${err?.message || 'Lỗi mạng'}`)
     }
   }
 
@@ -374,6 +382,7 @@ function EnvironmentControlPage() {
           <ActuatorControlPanel
             actuators={currentState.actuators}
             isManual={isManual}
+            onActuatorChange={updateActuator}
             onToggleActuator={updateActuator}
           />
         </section>
