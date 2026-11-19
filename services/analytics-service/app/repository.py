@@ -5,7 +5,54 @@ from uuid import UUID
 
 from psycopg.types.json import Jsonb
 
+from app.config import settings
 from app.database import get_connection
+
+
+def save_telemetry_sample(
+    *,
+    node_id: str,
+    recorded_at: datetime,
+    temperature: float | None = None,
+    humidity: float | None = None,
+    co2: float | None = None,
+    lux: float | None = None,
+    audio_rms: float | None = None,
+    target_temp: float | None = None,
+    temp_deadband: float | None = None,
+    target_hum: float | None = None,
+    hum_deadband: float | None = None,
+    co2_threshold: float | None = None,
+) -> bool:
+    """Persist an analytics-owned telemetry sample into analytics_db (deduplicated by node_id + recorded_at)."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO public.analytics_telemetry_samples (
+                    node_id, recorded_at, temperature, humidity, co2, lux, audio_rms,
+                    target_temp, temp_deadband, target_hum, hum_deadband, co2_threshold
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (node_id, recorded_at) DO NOTHING
+                RETURNING id
+                """,
+                (
+                    node_id,
+                    recorded_at,
+                    temperature,
+                    humidity,
+                    co2,
+                    lux,
+                    audio_rms,
+                    target_temp,
+                    temp_deadband,
+                    target_hum,
+                    hum_deadband,
+                    co2_threshold,
+                ),
+            )
+            return cur.fetchone() is not None
 
 
 def get_telemetry_analytics(
@@ -14,11 +61,11 @@ def get_telemetry_analytics(
     end: datetime,
     bucket: str,
 ) -> list[tuple]:
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                WITH samples AS (
+    if not node_ids:
+        return []
+
+    if settings.telemetry_source == "iot_legacy":
+        samples_cte = """
                     SELECT
                         date_trunc(
                             %s,
@@ -34,6 +81,31 @@ def get_telemetry_analytics(
                     WHERE d.node_id = ANY(%s)
                       AND t.recorded_at >= %s
                       AND t.recorded_at < %s
+        """
+    else:
+        samples_cte = """
+                    SELECT
+                        date_trunc(
+                            %s,
+                            t.recorded_at AT TIME ZONE 'UTC'
+                        ) AT TIME ZONE 'UTC' AS bucket,
+                        t.temperature,
+                        t.humidity,
+                        t.co2,
+                        t.lux,
+                        t.audio_rms
+                    FROM public.analytics_telemetry_samples t
+                    WHERE t.node_id = ANY(%s)
+                      AND t.recorded_at >= %s
+                      AND t.recorded_at < %s
+        """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                WITH samples AS (
+                    {samples_cte}
                 )
                 SELECT
                     bucket,
@@ -66,10 +138,8 @@ def get_latest_telemetry(node_ids: list[str]) -> list[tuple]:
     if not node_ids:
         return []
 
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
+    if settings.telemetry_source == "iot_legacy":
+        sql = """
                 SELECT DISTINCT ON (d.node_id)
                     d.node_id,
                     t.recorded_at,
@@ -88,9 +158,29 @@ def get_latest_telemetry(node_ids: list[str]) -> list[tuple]:
                     ON c.device_id = d.id
                 WHERE d.node_id = ANY(%s)
                 ORDER BY d.node_id, t.recorded_at DESC
-                """,
-                (node_ids,),
-            )
+        """
+    else:
+        sql = """
+                SELECT DISTINCT ON (t.node_id)
+                    t.node_id,
+                    t.recorded_at,
+                    t.temperature,
+                    t.humidity,
+                    t.co2,
+                    t.lux,
+                    t.target_temp,
+                    t.temp_deadband,
+                    t.target_hum,
+                    t.hum_deadband,
+                    t.co2_threshold
+                FROM public.analytics_telemetry_samples AS t
+                WHERE t.node_id = ANY(%s)
+                ORDER BY t.node_id, t.recorded_at DESC
+        """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (node_ids,))
             return cur.fetchall()
 
 
@@ -102,11 +192,8 @@ def get_anomaly_baselines(
     if not node_ids:
         return {}
 
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                WITH metric_samples AS (
+    if settings.telemetry_source == "iot_legacy":
+        metric_source = """
                     SELECT
                         d.node_id,
                         metric.name,
@@ -124,6 +211,33 @@ def get_anomaly_baselines(
                       AND t.recorded_at >= %s
                       AND t.recorded_at < %s
                       AND metric.value IS NOT NULL
+        """
+    else:
+        metric_source = """
+                    SELECT
+                        t.node_id,
+                        metric.name,
+                        metric.value
+                    FROM public.analytics_telemetry_samples AS t
+                    CROSS JOIN LATERAL (
+                        VALUES
+                            ('temperature', t.temperature),
+                            ('humidity', t.humidity),
+                            ('co2', t.co2),
+                            ('lux', t.lux)
+                    ) AS metric(name, value)
+                    WHERE t.node_id = ANY(%s)
+                      AND t.recorded_at >= %s
+                      AND t.recorded_at < %s
+                      AND metric.value IS NOT NULL
+        """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                WITH metric_samples AS (
+                    {metric_source}
                 ),
                 medians AS (
                     SELECT
@@ -223,8 +337,8 @@ def open_analytics_alert(
                 VALUES (%s, %s, %s)
                 """,
                 (
-                    event["event_id"],
-                    event["event_type"],
+                    event.get("eventId") or event["event_id"],
+                    event.get("eventType") or event["event_type"],
                     Jsonb(event),
                 ),
             )

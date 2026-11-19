@@ -1,4 +1,40 @@
+-- =============================================================================
+-- Migration 002: Operational Analytics Domains (PR #29)
+-- Database: analytics_db (Isolated Analytics Persistence — No Cross-DB FKs)
+-- Compatible: PostgreSQL 14 - 18+ | Idempotent & Replay-Safe
+-- =============================================================================
+
 BEGIN;
+
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version VARCHAR(64) PRIMARY KEY,
+    description TEXT NOT NULL,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Analytics-owned telemetry read model (decoupled from IoT Service storage)
+CREATE TABLE IF NOT EXISTS public.analytics_telemetry_samples (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    node_id VARCHAR(100) NOT NULL,
+    recorded_at TIMESTAMPTZ NOT NULL,
+    temperature DOUBLE PRECISION,
+    humidity DOUBLE PRECISION,
+    co2 DOUBLE PRECISION,
+    lux DOUBLE PRECISION,
+    audio_rms DOUBLE PRECISION,
+    target_temp DOUBLE PRECISION,
+    temp_deadband DOUBLE PRECISION,
+    target_hum DOUBLE PRECISION,
+    hum_deadband DOUBLE PRECISION,
+    co2_threshold DOUBLE PRECISION,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (node_id, recorded_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_analytics_telemetry_node_recorded_at
+    ON public.analytics_telemetry_samples (node_id, recorded_at DESC);
 
 CREATE TABLE IF NOT EXISTS public.analytics_alerts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -68,5 +104,12 @@ CREATE TABLE IF NOT EXISTS public.harvest_records (
 
 CREATE INDEX IF NOT EXISTS idx_harvest_records_farm_date
     ON public.harvest_records (farm_id, harvest_date DESC);
+
+INSERT INTO schema_migrations (version, description)
+VALUES (
+    '002_analytics_domains',
+    'Operational analytics tables (telemetry samples read model, alerts, outbox, AI count snapshots, harvest records)'
+)
+ON CONFLICT (version) DO NOTHING;
 
 COMMIT;

@@ -7,9 +7,9 @@ alerts, and summarizes AI bird counts and actual harvest records.
 ## Requirements and setup
 
 - Python 3.11+
-- PostgreSQL IoT database containing the `devices` and `telemetry` tables
-- Management Service for bearer-token verification and device-level access
-- RabbitMQ for delivering alert notifications
+- Isolated Analytics PostgreSQL database (`analytics_db`)
+- Management Service for bearer-token verification and device/farm/zone access
+- RabbitMQ (`swiftlet.domain.events` topic exchange, Canonical Domain Event Envelope V1) for delivering alert notifications
 - ReportLab for PDF report generation
 
 Run commands from this directory:
@@ -21,24 +21,20 @@ python -m pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Set `DATABASE_URL` to the IoT database used by `swiftletcare-backend` and
-`MANAGEMENT_SERVICE_URL` to the Management Service. The Analytics Service reads
-telemetry from the IoT database and asks Management Service for the devices the
-bearer token may monitor; it does not access management tables directly.
-Apply `database/migrations/001_telemetry_analytics_index.sql` to the IoT
-database to support time-range aggregation without blocking telemetry writes.
-Apply `database/migrations/002_analytics_domains.sql` to that same database to
-create alert/outbox, AI count, and harvest data tables. Configure the same
-random `ANALYTICS_SERVICE_TOKEN` in both this service and Management Service.
-Set a separate high-entropy `AI_INGEST_TOKEN` for the AI pipeline. Configure
-`RABBITMQ_URL` to publish threshold and anomaly events to the shared
-`swiftletcare.events` topic exchange. If RabbitMQ is not configured, alert
-events remain pending in the outbox and will not reach Notification Service.
+Set `ANALYTICS_DATABASE_URL` (or `DATABASE_URL`) to the isolated `analytics_db`
+database and `MANAGEMENT_SERVICE_URL` to Management Service. Apply migrations in
+order (both are idempotent and tracked in `schema_migrations`):
+- `database/migrations/001_initial_analytics_schema.sql` (CP9 OLAP read model)
+- `database/migrations/002_analytics_domains.sql` (operational telemetry samples, alerts, outbox, AI count snapshots, harvest records)
 
-Run the API on port `8003`:
+Configure `ANALYTICS_SERVICE_TOKEN`, `AI_INGEST_TOKEN`, and `RABBITMQ_URL` (or
+`RABBITMQ_HOST`/`RABBITMQ_PORT`/`RABBITMQ_USER`/`RABBITMQ_PASSWORD`) to publish
+Canonical Domain Event Envelope V1 alerts to `swiftlet.domain.events`.
+
+Run the API on port `8005`:
 
 ```powershell
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8003
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8005
 ```
 
 ## API

@@ -29,15 +29,17 @@ class AnalyticsEventPublisher:
                     durable=True,
                 )
 
+            message_id = str(payload.get("eventId") or payload.get("event_id") or "")
+            routing_key = str(payload.get("eventType") or event_type)
             await self.exchange.publish(
                 aio_pika.Message(
                     body=json.dumps(payload, separators=(",", ":")).encode(),
                     content_type="application/json",
                     delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-                    message_id=str(payload["event_id"]),
+                    message_id=message_id or None,
                 ),
-                routing_key=event_type,
-                mandatory=True,
+                routing_key=routing_key,
+                mandatory=False,
             )
 
     async def close(self) -> None:

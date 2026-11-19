@@ -23,6 +23,18 @@ METRICS = (
     ("audio_rms", "Audio RMS", ""),
 )
 
+_CSV_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_safe_cell(value):
+    """Neutralize spreadsheet formula injection on string cells without altering numeric values."""
+    if value is None or isinstance(value, (int, float)):
+        return value
+    text = str(value)
+    if text and text[0] in _CSV_FORMULA_PREFIXES:
+        return f"'{text}"
+    return text
+
 
 def telemetry_csv(analytics: dict) -> bytes:
     output = io.StringIO(newline="")
@@ -43,12 +55,12 @@ def telemetry_csv(analytics: dict) -> bytes:
         writer.writerow(
             [
                 "summary",
-                f"{label} ({unit})" if unit else label,
+                _csv_safe_cell(f"{label} ({unit})" if unit else label),
                 "",
                 analytics["sample_count"],
-                stats["average"],
-                stats["minimum"],
-                stats["maximum"],
+                _csv_safe_cell(stats["average"]),
+                _csv_safe_cell(stats["minimum"]),
+                _csv_safe_cell(stats["maximum"]),
             ],
         )
     for point in analytics["series"]:
@@ -57,12 +69,12 @@ def telemetry_csv(analytics: dict) -> bytes:
             writer.writerow(
                 [
                     "series",
-                    f"{label} ({unit})" if unit else label,
-                    point["timestamp"],
+                    _csv_safe_cell(f"{label} ({unit})" if unit else label),
+                    _csv_safe_cell(point["timestamp"]),
                     point["samples"],
-                    stats["average"],
-                    stats["minimum"],
-                    stats["maximum"],
+                    _csv_safe_cell(stats["average"]),
+                    _csv_safe_cell(stats["minimum"]),
+                    _csv_safe_cell(stats["maximum"]),
                 ],
             )
     return output.getvalue().encode("utf-8-sig")
@@ -84,16 +96,16 @@ def telemetry_pdf(analytics: dict) -> bytes:
         Spacer(1, 5 * mm),
         Paragraph(
             (
-                f"Period: {escape(analytics['period'])} | "
-                f"From: {escape(analytics['start'])} | "
-                f"To: {escape(analytics['end'])}"
+                f"Period: {escape(str(analytics['period']))} | "
+                f"From: {escape(str(analytics['start']))} | "
+                f"To: {escape(str(analytics['end']))}"
             ),
             styles["BodyText"],
         ),
         Paragraph(
             (
-                f"Authorized devices: {analytics['device_count']} | "
-                f"Telemetry samples: {analytics['sample_count']}"
+                f"Authorized devices: {int(analytics['device_count'])} | "
+                f"Telemetry samples: {int(analytics['sample_count'])}"
             ),
             styles["BodyText"],
         ),
@@ -125,7 +137,7 @@ def telemetry_pdf(analytics: dict) -> bytes:
             stats = point[metric]
             series_rows.append(
                 [
-                    point["timestamp"],
+                    str(point["timestamp"]),
                     str(point["samples"]),
                     f"{label} ({unit})" if unit else label,
                     _format_number(stats["average"]),

@@ -205,13 +205,21 @@ def _record_alert(
         "co2": "ppm",
         "lux": "lux",
     }
+    event_id = str(uuid4())
+    occurred_at = datetime.now(timezone.utc).isoformat()
+    # Canonical Domain Event Envelope V1 (compatible with Notification Service PR #30)
     event = {
-        "event_id": str(uuid4()),
-        "event_type": event_type,
-        "recipient_user_ids": recipients,
-        "occurred_at": datetime.now(timezone.utc).isoformat(),
-        "data": {
+        "eventId": event_id,
+        "eventType": event_type,
+        "eventVersion": "1.0",
+        "occurredAt": occurred_at,
+        "producer": "analytics-service",
+        "correlationId": event_id,
+        "payload": {
+            "recipientUserIds": recipients,
+            "nodeId": node_id,
             "node_id": node_id,
+            "farmId": context["farm_id"],
             "farm_id": context["farm_id"],
             "farm_code": context.get("farm_code"),
             "farm_name": context["farm_name"],
@@ -250,7 +258,8 @@ async def _publish_outbox(
         get_pending_analytics_events,
     ):
         try:
-            await publisher.publish(payload["event_type"], payload)
+            event_type = payload.get("eventType") or payload["event_type"]
+            await publisher.publish(event_type, payload)
         except Exception as exc:
             await asyncio.to_thread(
                 mark_analytics_event_failed,
