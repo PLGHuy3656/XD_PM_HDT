@@ -35,7 +35,7 @@ class RabbitMQEventPublisher(DomainEventPublisher):
         host: str = "127.0.0.1",
         port: int = 5672,
         user: str = "swiftlet",
-        password: str = "swiftlet123",
+        password: str = "",
         vhost: str = "/",
         exchange_name: str = CANONICAL_EXCHANGE,
     ) -> None:
