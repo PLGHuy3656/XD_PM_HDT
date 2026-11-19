@@ -24,6 +24,10 @@ class CommandRepository(Protocol):
         """Lists recent command records for a device, newest first."""
         ...
 
+    def list_all(self) -> list[DeviceCommand]:
+        """Lists all tracked command records."""
+        ...
+
     def clear(self) -> None:
         """Clears all command records (useful for test isolation)."""
         ...
@@ -52,6 +56,9 @@ class InMemoryCommandRepository:
         ]
         cmds.sort(key=lambda c: c.created_at, reverse=True)
         return cmds[:limit]
+
+    def list_all(self) -> list[DeviceCommand]:
+        return list(self._commands.values())
 
     def clear(self) -> None:
         self._commands.clear()

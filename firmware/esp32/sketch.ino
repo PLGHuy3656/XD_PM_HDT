@@ -342,6 +342,30 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
     sendAck(cmdId, "SUCCESS", "Thresholds updated in NVS; mode updated");
   }
+  else if (strcmp(action, "PROVISION_DEVICE") == 0) {
+    const char* farmId = doc["farmId"];
+    const char* zoneId = doc["zoneId"];
+    const char* serial = doc["serialNumber"] | "NM-ESP32-001";
+
+    if (farmId == NULL || zoneId == NULL) {
+      sendAck(cmdId, "FAILED", "Missing farmId or zoneId in PROVISION_DEVICE command");
+      return;
+    }
+
+    prefs.begin("swc_cfg", false);
+    prefs.putString("farm", farmId);
+    prefs.putString("zone", zoneId);
+    prefs.putString("serial", serial);
+    prefs.putBool("prov", true);
+    prefs.end();
+
+    Serial.print("[PROVISION] Node provisioned to Farm: ");
+    Serial.print(farmId);
+    Serial.print(", Zone: ");
+    Serial.println(zoneId);
+
+    sendAck(cmdId, "SUCCESS", "Device provisioned in NVS; activation ready");
+  }
   else {
     // Unknown action: gui ACK FAILED theo yeu cau contract
     sendAck(cmdId, "FAILED", "Unsupported command action");

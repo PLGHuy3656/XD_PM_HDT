@@ -4,6 +4,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Protocol
 
+from app.domain_events.evaluator import (
+    IoTConditionEvaluator,
+    default_condition_evaluator,
+)
 from app.mqtt.topics import build_topic
 from app.repositories.command_repository import (
     CommandRepository,
@@ -39,9 +43,13 @@ class DeviceCommandService:
         self,
         repository: CommandRepository | None = None,
         publisher: CommandPublisher | None = None,
+        condition_evaluator: IoTConditionEvaluator | None = None,
     ):
         self.repository = repository or default_command_repository
         self._publisher = publisher
+        self.condition_evaluator: IoTConditionEvaluator = (
+            condition_evaluator or default_condition_evaluator
+        )
 
     @property
     def publisher(self) -> CommandPublisher:
@@ -103,6 +111,10 @@ class DeviceCommandService:
         now = datetime.now(timezone.utc)
         command_id = payload_dict["commandId"]
 
+        # Validate device_id / topic BEFORE persisting PENDING state so invalid node_id never pollutes repository
+        topic = build_topic("command", device_id)
+        payload_json = json.dumps(payload_dict)
+
         # Step 1: Initialize PENDING state in repository
         command = DeviceCommand(
             command_id=command_id,
@@ -114,11 +126,7 @@ class DeviceCommandService:
         )
         self.repository.save(command)
 
-        # Step 2: Build command topic: swiftlet/command/{device_code}
-        topic = build_topic("command", device_id)
-        payload_json = json.dumps(payload_dict)
-
-        # Step 3: Publish with QoS 1, retain=False
+        # Step 2: Publish with QoS 1, retain=False
         publish_success = self.publisher.publish(
             topic=topic,
             payload=payload_json,
@@ -164,7 +172,55 @@ class DeviceCommandService:
                 command_id,
                 topic,
             )
+            try:
+                self.condition_evaluator.evaluate_command_failure(
+                    device_id=device_id,
+                    command_id=command_id,
+                    action=action,
+                    target=payload_dict.get("target"),
+                    reason="MQTT publish failed or broker unavailable",
+                    timestamp=now,
+                )
+            except Exception as exc:
+                logger.warning("[COMMAND FAILURE DOMAIN EVENT WARNING] %s", exc)
             return updated
+
+    def evaluate_command_timeouts(
+        self,
+        now: datetime | None = None,
+        timeout_seconds: int = 30,
+    ) -> list[DeviceCommand]:
+        """Transitions PUBLISHED commands with no ACK past timeout_seconds to TIMEOUT."""
+        current_time = now or datetime.now(timezone.utc)
+        timed_out: list[DeviceCommand] = []
+        if not hasattr(self.repository, "list_all"):
+            return timed_out
+
+        for cmd in self.repository.list_all():
+            if cmd.status != "PUBLISHED":
+                continue
+            ref_time = cmd.published_at or cmd.created_at
+            if (current_time - ref_time).total_seconds() > timeout_seconds:
+                updated = cmd.model_copy(
+                    update={
+                        "status": "TIMEOUT",
+                        "ack_message": f"Command timed out waiting for device ACK (>{timeout_seconds}s)",
+                    }
+                )
+                self.repository.update(updated)
+                timed_out.append(updated)
+                try:
+                    self.condition_evaluator.evaluate_command_failure(
+                        device_id=cmd.device_id,
+                        command_id=cmd.command_id,
+                        action=str(cmd.action),
+                        target=cmd.payload.get("target"),
+                        reason=updated.ack_message,
+                        timestamp=current_time,
+                    )
+                except Exception as exc:
+                    logger.warning("[COMMAND TIMEOUT DOMAIN EVENT WARNING] %s", exc)
+        return timed_out
 
     def get_command(self, command_id: str) -> DeviceCommand | None:
         return self.repository.get(command_id)

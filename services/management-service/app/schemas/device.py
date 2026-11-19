@@ -14,6 +14,8 @@ class DeviceRegistryResponse(BaseModel):
     is_active: bool = True
     status: str | None = None
     presence_status: str | None = None
+    provisioning_status: str | None = None
+    health_metadata: dict | None = None
     created_at: str | None = None
 
 

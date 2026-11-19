@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 RelayTarget = Literal["misting", "fan", "heater", "alarm"]
 CommandAction = Literal["SET_RELAY", "UPDATE_THRESHOLDS"]
-CommandStatus = Literal["PENDING", "PUBLISHED", "SUCCESS", "FAILED", "ERROR"]
+CommandStatus = Literal["PENDING", "PUBLISHED", "SUCCESS", "FAILED", "ERROR", "TIMEOUT"]
 AckStatus = Literal["SUCCESS", "FAILED", "ERROR"]
 ControlMode = Literal["AUTO", "MANUAL"]
 
