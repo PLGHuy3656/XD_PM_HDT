@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 
 import AppLayout from '../../../components/layout/AppLayout'
 import './EnvironmentPage.css'
