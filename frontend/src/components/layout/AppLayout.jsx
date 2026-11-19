@@ -1,5 +1,6 @@
 import Header from './Header'
 import Sidebar from './Sidebar'
+import { ErrorBoundary } from '../common/feedback'
 import './AppLayout.css'
 
 function AppLayout({ children }) {
@@ -11,7 +12,9 @@ function AppLayout({ children }) {
         <Header />
 
         <main className="main-content page-container">
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </main>
       </div>
     </div>

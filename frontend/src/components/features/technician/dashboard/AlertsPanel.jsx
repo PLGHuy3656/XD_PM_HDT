@@ -1,9 +1,10 @@
 import { alerts } from './dashboardMockData'
 
-function AlertsPanel() {
+function AlertsPanel({ alerts: propAlerts }) {
+  const displayAlerts = propAlerts && propAlerts.length > 0 ? propAlerts : alerts
   return (
     <div className="technician-alert-list">
-      {alerts.map((alert) => (
+      {displayAlerts.map((alert) => (
         <article
           className="technician-alert-item"
           key={alert.id}

@@ -1,3 +1,5 @@
+import { USE_MOCK } from '../../../../api/config.js'
+
 const eventMeta = {
   ENTRY: {
     label: 'Vào tổ',
@@ -28,9 +30,11 @@ function AIEventsTable({ events }) {
           </p>
         </div>
 
-        <span className="swiftlet-mock-label">
-          Dữ liệu minh họa
-        </span>
+        {USE_MOCK && (
+          <span className="swiftlet-mock-label">
+            Dữ liệu minh họa
+          </span>
+        )}
       </div>
 
       <div className="swiftlet-events-table-wrap">

@@ -21,6 +21,7 @@ outputs/snapshots/*
 !outputs/snapshots/.gitkeep
 data/samples/*
 !data/samples/.gitkeep
+!data/samples/README.md
 
 # train / dataset (no push dataset & train result)
 runs/

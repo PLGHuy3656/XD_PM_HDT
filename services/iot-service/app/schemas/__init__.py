@@ -1,0 +1,61 @@
+from app.schemas.api import (
+    CommandResponse,
+    ConfigCommandRequest,
+    PresenceResponse,
+    RealtimeEvent,
+    RealtimeEventType,
+    RelayCommandRequest,
+    TelemetryResponse,
+)
+from app.schemas.command import (
+    AckPayload,
+    AckStatus,
+    CommandAction,
+    CommandStatus,
+    ControlMode,
+    DeviceCommand,
+    RelayTarget,
+    SetRelayPayload,
+    UpdateThresholdsPayload,
+)
+from app.schemas.presence import (
+    DevicePresence,
+    HeartbeatPayload,
+    PresenceStatus,
+    StatusPayload,
+)
+from app.schemas.telemetry import (
+    AcceptedTelemetry,
+    ActuatorState,
+    DeviceRuntimeState,
+    TelemetryMetrics,
+    TelemetryPayload,
+)
+
+__all__ = [
+    "AcceptedTelemetry",
+    "AckPayload",
+    "AckStatus",
+    "ActuatorState",
+    "CommandAction",
+    "CommandResponse",
+    "CommandStatus",
+    "ConfigCommandRequest",
+    "ControlMode",
+    "DeviceCommand",
+    "DevicePresence",
+    "DeviceRuntimeState",
+    "HeartbeatPayload",
+    "PresenceResponse",
+    "PresenceStatus",
+    "RealtimeEvent",
+    "RealtimeEventType",
+    "RelayCommandRequest",
+    "RelayTarget",
+    "SetRelayPayload",
+    "StatusPayload",
+    "TelemetryMetrics",
+    "TelemetryPayload",
+    "TelemetryResponse",
+    "UpdateThresholdsPayload",
+]

@@ -170,6 +170,10 @@ export const statusMeta = {
     label: 'Offline',
     className: 'offline',
   },
+  UNKNOWN: {
+    label: 'Chưa kết nối IoT',
+    className: 'offline',
+  },
 }
 
 export const statusOptions = [
@@ -177,6 +181,7 @@ export const statusOptions = [
   { value: 'ONLINE', label: 'Online' },
   { value: 'WARNING', label: 'Warning' },
   { value: 'OFFLINE', label: 'Offline' },
+  { value: 'UNKNOWN', label: 'Chưa kết nối IoT' },
 ]
 
 export const typeOptions = [

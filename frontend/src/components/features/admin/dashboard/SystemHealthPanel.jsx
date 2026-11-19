@@ -1,4 +1,5 @@
 import { services } from './dashboardMockData'
+import { USE_MOCK } from '../../../../api/config.js'
 
 function StatusDot({ status = 'healthy' }) {
   return <span className={`admin-status-dot ${status}`} />
@@ -20,9 +21,10 @@ function ArrowIcon() {
   )
 }
 
-function SystemHealthPanel({ onOpen }) {
-  const healthyCount = services.filter(
-    (service) => service.status === 'healthy',
+function SystemHealthPanel({ onOpen, services: propServices }) {
+  const currentServices = propServices && propServices.length > 0 ? propServices : (USE_MOCK ? services : [])
+  const healthyCount = currentServices.filter(
+    (service) => service.status === 'healthy' || service.status === 'HEALTHY',
   ).length
 
   return (
@@ -37,9 +39,9 @@ function SystemHealthPanel({ onOpen }) {
       </div>
 
       <div className="admin-health-strip__services">
-        {services.map((service) => (
+        {currentServices.map((service) => (
           <div className="admin-service" key={service.id}>
-            <StatusDot status={service.status} />
+            <StatusDot status={service.status?.toLowerCase() || 'healthy'} />
             <span>{service.name}</span>
           </div>
         ))}
@@ -49,7 +51,7 @@ function SystemHealthPanel({ onOpen }) {
         <div>
           <StatusDot />
           <strong>
-            {healthyCount} / {services.length}
+            {healthyCount} / {currentServices.length}
           </strong>
           <span>Operational</span>
         </div>
@@ -61,5 +63,6 @@ function SystemHealthPanel({ onOpen }) {
     </button>
   )
 }
+
 
 export default SystemHealthPanel

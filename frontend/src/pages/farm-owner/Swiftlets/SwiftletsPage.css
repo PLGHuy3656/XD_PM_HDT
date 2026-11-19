@@ -807,3 +807,59 @@
     align-items: stretch;
   }
 }
+
+/* ========================================
+   COMPACT HORIZONTAL SELECTOR BAR
+   ======================================== */
+
+.swiftlets-selectors {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.swiftlets-selectors > label {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.swiftlets-selectors > label > span {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.swiftlets-ai-status.offline {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+.swiftlets-ai-status.offline span {
+  color: #64748b;
+}
+
+.swiftlets-ai-status.offline i {
+  background: #94a3b8;
+}
+
+@media (max-width: 1000px) {
+  .swiftlets-selectors {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .swiftlets-selectors {
+    grid-template-columns: 1fr;
+  }
+}

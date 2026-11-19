@@ -845,3 +845,102 @@
     border-left: 0;
   }
 }
+
+/* ========================================
+   DEVICES KPI CARDS & FILTER TOOLBAR
+   ======================================== */
+
+.tech-devices-overview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.tech-devices-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid #e6dfd3;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.tech-devices-metric-card .metric-title {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tech-devices-metric-card .metric-number {
+  color: #102d3f;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.tech-devices-metric-card .metric-caption {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.tech-devices-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid #e6dfd3;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.tech-devices-search {
+  flex: 1 1 240px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #d5dcd8;
+  border-radius: 10px;
+  background: #fff;
+  color: #64748b;
+}
+
+.tech-devices-search input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #102d3f;
+  font: inherit;
+  font-size: 13px;
+}
+
+.tech-devices-selects {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 10px;
+  flex: 1 1 480px;
+}
+
+@media (max-width: 1024px) {
+  .tech-devices-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tech-devices-selects {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .tech-devices-overview,
+  .tech-devices-selects {
+    grid-template-columns: 1fr;
+  }
+}

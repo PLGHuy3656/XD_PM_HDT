@@ -136,27 +136,34 @@ class TechnicianController:
                 detail=str(exc),
             ) from exc
 
-    def assign_technician(
-        self,
-        technician_id: str,
-        farm_id: str,
-        is_primary: bool = True,
-        control_permission: str = "MONITOR",
-    ):
+    def assign_technician(self, technician_id: str, farm_id: str, is_primary: bool = True):
         try:
-            assigned_id = self.service.assign_technician(
-                technician_id,
-                farm_id,
-                is_primary,
-                control_permission,
-            )
+            assigned_id = self.service.assign_technician(technician_id, farm_id, is_primary)
             return {
                 "assignment_id": assigned_id,
                 "technician_id": technician_id,
                 "farm_id": farm_id,
                 "is_primary": is_primary,
-                "control_permission": control_permission,
                 "status": "ASSIGNED",
+            }
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+
+    def unassign_technician(self, technician_id: str, farm_id: str):
+        try:
+            ok = self.service.unassign_technician(technician_id, farm_id)
+            if not ok:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Active technician assignment not found",
+                )
+            return {
+                "technician_id": technician_id,
+                "farm_id": farm_id,
+                "status": "UNASSIGNED",
             }
         except ValueError as exc:
             raise HTTPException(

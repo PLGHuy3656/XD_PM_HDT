@@ -1,16 +1,23 @@
 import asyncio
 import json
 import logging
+from typing import Any
+from uuid import UUID
 
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage
+import httpx
+from pydantic import ValidationError
 
 from app import repositories
+from app.config import settings
 from app.delivery import send_email, send_fcm, send_web_push
 from app.realtime import notification_connections
 from app.schemas import NotificationEvent
 
 logger = logging.getLogger(__name__)
+
+# Legacy snake_case event types (HaoHoc) + Canonical V1 event types (IoT PR #24 & AI PR #23)
 SUPPORTED_EVENT_TYPES = {
     "management.technician_assigned",
     "device.command.acknowledged",
@@ -21,11 +28,28 @@ SUPPORTED_EVENT_TYPES = {
     "ai.threat.detected",
     "management.work_request.created",
     "management.work_request.status_changed",
+    # Canonical V1 IoT & AI Domain Events
+    "iot.environment.high_temperature.started",
+    "iot.environment.high_temperature.recovered",
+    "iot.environment.low_temperature.started",
+    "iot.environment.low_temperature.recovered",
+    "iot.environment.high_humidity.started",
+    "iot.environment.high_humidity.recovered",
+    "iot.environment.low_humidity.started",
+    "iot.environment.low_humidity.recovered",
+    "iot.audio.fault.started",
+    "iot.audio.fault.recovered",
+    "iot.device.offline",
+    "iot.device.online",
+    "iot.command.failed",
+    "ai.predator.detected",
 }
+SUPPORTED_CANONICAL_VERSIONS = {"1.0"}
 MAX_RETRY_COUNT = 3
 RETRY_DELAY_MS = 5000
 MAX_DELIVERY_ATTEMPTS = 5
 DELIVERY_POLL_SECONDS = 1
+_SENSITIVE_KEYS = {"password", "secret", "token", "authorization", "access_token", "refresh_token", "database_url", "rabbitmq_url"}
 
 
 def _retry_queue_arguments(queue_name: str) -> dict:
@@ -52,19 +76,115 @@ def _build_retry_message(
     )
 
 
-async def process_event(event: dict) -> None:
+def _sanitize_payload_data(raw: dict[str, Any]) -> dict[str, Any]:
+    """Strip secrets/credentials and sanitize local filesystem paths before persisting."""
+    clean: dict[str, Any] = {}
+    for k, v in (raw or {}).items():
+        if str(k).lower() in _SENSITIVE_KEYS:
+            continue
+        if isinstance(v, str) and (
+            v.startswith(("/tmp/", "/var/", "/home/", "/etc/", "/app/"))
+            or (len(v) >= 3 and v[1:3] in (":\\", ":/"))
+        ):
+            v = v.replace("\\", "/").rsplit("/", 1)[-1]
+        elif isinstance(v, dict):
+            v = _sanitize_payload_data(v)
+        clean[k] = v
+    return clean
+
+
+async def resolve_farm_recipients(farm_id: str) -> list[str]:
+    """Resolve authorized recipient user UUIDs for a farm from Management Service."""
+    if not farm_id or not settings.management_service_url:
+        return []
+    url = f"{settings.management_service_url.rstrip('/')}/api/internal/farms/{farm_id}/recipients"
+    headers = {}
+    if settings.internal_service_token:
+        headers["X-Internal-Service-Token"] = settings.internal_service_token
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(url, headers=headers)
+        if resp.status_code != 200:
+            return []
+        body = resp.json()
+        raw_ids = body.get("recipient_user_ids") or body.get("recipients") or []
+        valid: list[str] = []
+        for item in raw_ids:
+            uid = item.get("user_id") or item.get("id") if isinstance(item, dict) else item
+            if uid:
+                try:
+                    valid.append(str(UUID(str(uid))))
+                except ValueError:
+                    continue
+        return list(dict.fromkeys(valid))
+    except Exception as exc:
+        logger.warning("Failed to resolve farm recipients for '%s': %s", farm_id, exc)
+        return []
+
+
+async def adapt_incoming_event(event: dict) -> dict | None:
+    """Adapt either Canonical Domain Event Envelope V1 or legacy snake_case event."""
+    if "eventType" in event or "eventId" in event:
+        version = str(event.get("eventVersion") or "")
+        if version not in SUPPORTED_CANONICAL_VERSIONS:
+            raise ValueError(f"Unsupported canonical eventVersion: '{version}'")
+        event_type = event.get("eventType")
+        if event_type not in SUPPORTED_EVENT_TYPES:
+            return None
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            raise ValueError("Canonical event payload must be a JSON object")
+
+        explicit_recipients = payload.get("recipientUserIds") or payload.get("recipient_user_ids")
+        if isinstance(explicit_recipients, list) and explicit_recipients:
+            recipients = [str(r) for r in explicit_recipients]
+        else:
+            farm_id = payload.get("farmId") or payload.get("farm_id")
+            recipients = await resolve_farm_recipients(str(farm_id)) if farm_id else []
+
+        if not recipients:
+            logger.warning(
+                "No resolvable recipients for canonical event '%s' (%s); skipping",
+                event_type,
+                event.get("eventId"),
+            )
+            return None
+
+        return {
+            "event_id": event.get("eventId"),
+            "event_type": event_type,
+            "recipient_user_ids": recipients,
+            "data": _sanitize_payload_data(
+                {
+                    **payload,
+                    "producer": event.get("producer"),
+                    "occurredAt": event.get("occurredAt"),
+                    "correlationId": event.get("correlationId"),
+                }
+            ),
+        }
+
     event_type = event.get("event_type")
     if event_type not in SUPPORTED_EVENT_TYPES:
+        return None
+    sanitized = dict(event)
+    sanitized["data"] = _sanitize_payload_data(event.get("data") or {})
+    return sanitized
+
+
+async def process_event(event: dict) -> None:
+    adapted = await adapt_incoming_event(event)
+    if adapted is None:
         return
 
-    validated_event = NotificationEvent.model_validate(event)
-    event = validated_event.model_dump(mode="json")
-    recipients = event["recipient_user_ids"]
+    validated_event = NotificationEvent.model_validate(adapted)
+    normalized = validated_event.model_dump(mode="json")
+    recipients = normalized["recipient_user_ids"]
 
     for user_id in dict.fromkeys(recipients):
         notification = await asyncio.to_thread(
             repositories.create_notification,
-            event,
+            normalized,
             user_id,
         )
         if notification is None:
@@ -198,8 +318,9 @@ async def consume_events(
             await queue.bind(exchange, routing_key="management.#")
             await queue.bind(exchange, routing_key="device.#")
             await queue.bind(exchange, routing_key="environment.#")
+            await queue.bind(exchange, routing_key="iot.#")
             await queue.bind(exchange, routing_key="ai.#")
-            logger.info("Consuming RabbitMQ events from %s", queue_name)
+            logger.info("Consuming RabbitMQ events from %s on exchange %s", queue_name, exchange_name)
 
             async with queue.iterator() as iterator:
                 async for message in iterator:
@@ -210,8 +331,12 @@ async def consume_events(
                         await process_event(event)
                     except asyncio.CancelledError:
                         raise
+                    except (json.JSONDecodeError, ValueError, ValidationError) as exc:
+                        # Poison/malformed message -> route straight to DLQ without wasting retries
+                        logger.warning("Rejecting poison/invalid notification message straight to DLQ: %s", exc)
+                        await message.reject(requeue=False)
                     except Exception:
-                        logger.exception("Notification event processing failed")
+                        logger.exception("Notification event processing failed (transient)")
                         retry_count = (message.headers or {}).get(
                             "x-notification-retry",
                             0,

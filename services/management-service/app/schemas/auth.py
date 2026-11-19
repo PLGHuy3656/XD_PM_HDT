@@ -10,6 +10,8 @@ class UserAuthInfo(BaseModel):
     id: str
     email: str
     full_name: str
+    phone: str | None = None
+    status: str
     roles: list[str] = []
 
 

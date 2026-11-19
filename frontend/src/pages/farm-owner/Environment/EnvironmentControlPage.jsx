@@ -2,20 +2,75 @@ import { useState } from 'react'
 import AppLayout from '../../../components/layout/AppLayout'
 import EnvironmentTabs from '../../../components/features/farm-owner/environment/EnvironmentTabs'
 import EnvironmentSelect from '../../../components/ui/Select'
-import Toggle from '../../../components/features/farm-owner/environment/Toggle'
 import AutomaticRulesPanel from '../../../components/features/farm-owner/environment/AutomaticRulesPanel'
 import ActuatorControlPanel from '../../../components/features/farm-owner/environment/ActuatorControlPanel'
-import { controlFarms as farms } from '../../../components/features/farm-owner/environment/environmentMockData'
+import { ErrorMessage, EmptyState } from '../../../components/common/feedback/index.js'
+import { controlFarms as defaultMockFarms } from '../../../components/features/farm-owner/environment/environmentMockData'
+import { useFarms } from '../../../features/farms/hooks/useFarms'
+import { useTelemetry } from '../../../features/telemetry/hooks/useTelemetry'
+import { SERVICE_STATE } from '../../../api/serviceStatus.js'
+import { USE_MOCK } from '../../../api/config.js'
 import './EnvironmentControlPage.css'
 
+const DEFAULT_ZONE_CONTROL_STATE = {
+  mode: 'AUTO',
+  rules: {
+    temperature: { active: true, target: 28.5, min: 27, max: 31 },
+    humidity: { active: true, target: 80, min: 75, max: 90 },
+  },
+  actuators: {
+    misting: false,
+    ventilation: false,
+    heating: false,
+  },
+}
+
 function EnvironmentControlPage() {
-  const [selectedFarmId, setSelectedFarmId] = useState(farms[0].id)
-  const [selectedZoneId, setSelectedZoneId] = useState(farms[0].zones[0].id)
+  const {
+    farms,
+    selectedFarm,
+    selectedFarmId,
+    setSelectedFarmId,
+    zones,
+    error: farmsError,
+  } = useFarms()
+
+  const {
+    hasData: hasTelemetry,
+    error: telemetryError,
+    serviceState: iotState,
+    refetch: refetchTelemetry,
+  } = useTelemetry(selectedFarmId)
+
+  const iotUnavailable = !USE_MOCK && iotState === SERVICE_STATE.UNAVAILABLE
+  const iotConnected = USE_MOCK || iotState === SERVICE_STATE.AVAILABLE
+  // Actuator command execution requires a verified live IoT control API (or explicit mock mode)
+  const iotControlAvailable = USE_MOCK
+
+  const effectiveZones =
+    zones.length > 0
+      ? zones.map((z, idx) => ({
+          ...z,
+          controller: iotConnected
+            ? `ESP32-CTRL-${String(idx + 1).padStart(2, '0')}`
+            : 'Chưa kết nối',
+          lastSync: iotConnected
+            ? 'Đã đồng bộ'
+            : iotUnavailable
+              ? 'Chưa kết nối dịch vụ IoT'
+              : 'Chưa có dữ liệu bộ điều khiển',
+        }))
+      : selectedFarm?.zones || (USE_MOCK ? defaultMockFarms[0]?.zones : []) || []
+
+  const [selectedZoneId, setSelectedZoneId] = useState('')
+  // View tab (AUTO vs MANUAL) is purely for navigation/inspection — never sends commands on switch
+  const [activeView, setActiveView] = useState('AUTO')
+  const [commandStatus, setCommandStatus] = useState({})
 
   const [zoneState, setZoneState] = useState(() => {
+    if (!USE_MOCK) return {}
     const state = {}
-
-    farms.forEach((farm) => {
+    defaultMockFarms.forEach((farm) => {
       farm.zones.forEach((zone) => {
         state[zone.id] = {
           mode: zone.mode,
@@ -27,27 +82,37 @@ function EnvironmentControlPage() {
         }
       })
     })
-
     return state
   })
 
   const [manualConfirmOpen, setManualConfirmOpen] = useState(false)
   const [ruleNotice, setRuleNotice] = useState('')
 
-  const selectedFarm =
-    farms.find((farm) => farm.id === selectedFarmId) || farms[0]
+  const activeZoneId = effectiveZones.some((z) => z.id === selectedZoneId)
+    ? selectedZoneId
+    : effectiveZones[0]?.id || ''
 
   const selectedZone =
-    selectedFarm.zones.find((zone) => zone.id === selectedZoneId) ||
-    selectedFarm.zones[0]
+    effectiveZones.find((zone) => zone.id === activeZoneId) || {
+      id: 'default-zone',
+      name: effectiveZones.length === 0 ? 'Chưa có khu vực' : 'Khu vực 1',
+      controller: iotConnected ? 'ESP32-CTRL-01' : 'Chưa kết nối',
+      lastSync: iotConnected
+        ? 'Đã đồng bộ'
+        : iotUnavailable
+          ? 'Chưa kết nối dịch vụ IoT'
+          : 'Chưa có dữ liệu bộ điều khiển',
+    }
 
-  const currentState = zoneState[selectedZone.id]
-  const isManual = currentState.mode === 'MANUAL'
+  const currentState = zoneState[selectedZone.id] || DEFAULT_ZONE_CONTROL_STATE
+  // Verified controller mode is null when IoT control state has not been confirmed by API
+  const verifiedMode = iotControlAvailable ? currentState.mode : null
+  const isManualActive = verifiedMode === 'MANUAL'
 
-  const handleModeRequest = (mode) => {
-    if (mode === currentState.mode) return
+  const handleModeAction = (targetMode) => {
+    if (!iotControlAvailable || targetMode === verifiedMode) return
 
-    if (mode === 'MANUAL') {
+    if (targetMode === 'MANUAL') {
       setManualConfirmOpen(true)
       return
     }
@@ -55,187 +120,188 @@ function EnvironmentControlPage() {
     setZoneState((previous) => ({
       ...previous,
       [selectedZone.id]: {
-        ...previous[selectedZone.id],
+        ...(previous[selectedZone.id] || DEFAULT_ZONE_CONTROL_STATE),
         mode: 'AUTO',
       },
     }))
-
+    setActiveView('AUTO')
     setRuleNotice(
-      `Đã chuyển ${selectedZone.name} về AUTO. Controller tiếp tục áp dụng quy tắc cục bộ.`,
+      `Đã chuyển ${selectedZone.name} về AUTO. Bộ điều khiển áp dụng lại quy tắc tự động.`,
     )
   }
 
   const confirmManualMode = () => {
+    if (!iotControlAvailable) {
+      setManualConfirmOpen(false)
+      return
+    }
     setZoneState((previous) => ({
       ...previous,
       [selectedZone.id]: {
-        ...previous[selectedZone.id],
+        ...(previous[selectedZone.id] || DEFAULT_ZONE_CONTROL_STATE),
         mode: 'MANUAL',
       },
     }))
-
+    setActiveView('MANUAL')
     setManualConfirmOpen(false)
     setRuleNotice(
-      `${selectedZone.name} đang ở MANUAL. Điều khiển tự động theo ngưỡng đã tạm dừng.`,
+      `${selectedZone.name} đã chuyển sang MANUAL. Quy tắc tự động tạm dừng.`,
     )
   }
 
   const updateActuator = (key, value) => {
-    if (!isManual) return
+    if (!iotControlAvailable || !isManualActive) return
 
+    setCommandStatus((prev) => ({ ...prev, [key]: { state: 'pending' } }))
     setZoneState((previous) => ({
       ...previous,
       [selectedZone.id]: {
-        ...previous[selectedZone.id],
+        ...(previous[selectedZone.id] || DEFAULT_ZONE_CONTROL_STATE),
         actuators: {
-          ...previous[selectedZone.id].actuators,
+          ...(previous[selectedZone.id]?.actuators || DEFAULT_ZONE_CONTROL_STATE.actuators),
           [key]: value,
         },
       },
     }))
+    setCommandStatus((prev) => ({ ...prev, [key]: { state: 'acked' } }))
   }
 
   const updateRule = (group, key, value) => {
+    if (!iotControlAvailable) return
     setZoneState((previous) => ({
       ...previous,
       [selectedZone.id]: {
-        ...previous[selectedZone.id],
+        ...(previous[selectedZone.id] || DEFAULT_ZONE_CONTROL_STATE),
         rules: {
-          ...previous[selectedZone.id].rules,
+          ...(previous[selectedZone.id]?.rules || DEFAULT_ZONE_CONTROL_STATE.rules),
           [group]: {
-            ...previous[selectedZone.id].rules[group],
-            [key]: Number(value),
+            ...(previous[selectedZone.id]?.rules?.[group] ||
+              DEFAULT_ZONE_CONTROL_STATE.rules[group]),
+            [key]: value,
           },
         },
       },
     }))
-
-    setRuleNotice('')
   }
 
-  const saveRules = () => {
-    setRuleNotice(
-      `Đã lưu cấu hình mock cho ${selectedZone.name}. Khi tích hợp Backend, cấu hình sẽ được đồng bộ xuống controller.`,
-    )
+  const handleSaveRules = () => {
+    if (!iotControlAvailable) return
+    setRuleNotice(`Đã lưu cấu hình quy tắc cho ${selectedZone.name}.`)
   }
+
+  const modeBadgeLabel = verifiedMode
+    ? isManualActive
+      ? 'Đang vận hành: MANUAL'
+      : 'Đang vận hành: AUTO'
+    : iotUnavailable
+      ? 'Chưa xác định chế độ · Chưa kết nối IoT'
+      : 'Chưa xác minh trạng thái bộ điều khiển'
 
   return (
     <AppLayout>
       <div className="environment-control-page">
-        <section className="environment-control-heading">
-          <div>
-            <span className="environment-control-eyebrow">
-              ENVIRONMENT CONTROL
-            </span>
-
+        <header className="control-header-row">
+          <div className="control-header-copy">
+            <span className="environment-control-eyebrow">ENVIRONMENT CONTROLS</span>
             <h1>Điều khiển môi trường</h1>
-
-            <p>
-              Quản lý chế độ vận hành, quy tắc tự động và thiết bị điều khiển
-              theo từng khu vực.
-            </p>
+            <p>Cấu hình ngưỡng tự động hoặc điều khiển thủ công thiết bị theo khu vực.</p>
           </div>
 
-          <div className="environment-control-live">
-            <span className="environment-control-live-dot" />
-            Controller online
-          </div>
-        </section>
+          <EnvironmentTabs />
+        </header>
 
-        <EnvironmentTabs />
+        {farmsError && (
+          <ErrorMessage title="Lỗi danh sách nhà yến" message={farmsError} />
+        )}
 
-        <section className="control-context-card">
-          <div className="control-context-copy">
-            <span className="control-mini-label">CONTROL CONTEXT</span>
-            <h2>Chọn khu vực điều khiển</h2>
-            <p>
-              Mọi thay đổi bên dưới chỉ áp dụng cho khu vực đang được chọn.
-            </p>
-          </div>
+        {iotUnavailable && (
+          <ErrorMessage
+            variant="warning"
+            title="Chưa kết nối dịch vụ IoT"
+            message={
+              telemetryError && !/upstream|503|unreachable|network/i.test(String(telemetryError))
+                ? telemetryError
+                : 'Bạn vẫn có thể xem trước giao diện AUTO/MANUAL, nhưng mọi thao tác gửi lệnh điều khiển đang tạm khóa cho đến khi IoT Service hoạt động.'
+            }
+            onRetry={refetchTelemetry}
+          />
+        )}
 
-          <div className="control-context-fields">
-            <EnvironmentSelect
-                label="Nhà yến"
-                value={selectedFarmId}
-                options={farms.map((farm) => ({
-                value: farm.id,
-                label: farm.name,
-                }))}
-                onChange={(farmId) => {
-                const farm = farms.find((item) => item.id === farmId)
+        {!USE_MOCK && !iotUnavailable && iotState === SERVICE_STATE.AVAILABLE && (
+          <ErrorMessage
+            variant="info"
+            title="Đã kết nối dịch vụ IoT"
+            message={`Telemetry đang khả dụng cho ${selectedFarm?.name || 'nhà yến'}. Quyền gửi lệnh điều khiển sẽ mở khóa khi API điều khiển actuator được kích hoạt.`}
+          />
+        )}
 
-                if (!farm) return
+        {farms.length === 0 ? (
+          <EmptyState
+            title="Chưa có nhà yến nào"
+            description="Hãy đăng ký nhà yến và chờ Admin phê duyệt trước khi cấu hình điều khiển môi trường."
+          />
+        ) : (
+          <>
+            <section className="control-context-bar control-context-bar--compact">
+              <div className="control-context-fields control-context-fields--compact">
+                <EnvironmentSelect
+                  label="Nhà yến"
+                  value={selectedFarmId || ''}
+                  options={farms.map((farm) => ({
+                    value: farm.id,
+                    label: farm.name,
+                  }))}
+                  onChange={(farmId) => {
+                    setSelectedFarmId(farmId)
+                    setSelectedZoneId('')
+                    setRuleNotice('')
+                    setCommandStatus({})
+                  }}
+                />
 
-                setSelectedFarmId(farm.id)
-                setSelectedZoneId(farm.zones[0].id)
-                setRuleNotice('')
-                }}
-            />
+                <EnvironmentSelect
+                  label="Khu vực"
+                  value={activeZoneId}
+                  options={
+                    effectiveZones.length > 0
+                      ? effectiveZones.map((zone) => ({
+                          value: zone.id,
+                          label: zone.name,
+                        }))
+                      : [{ value: '', label: 'Chưa có khu vực' }]
+                  }
+                  onChange={(zoneId) => {
+                    setSelectedZoneId(zoneId)
+                    setRuleNotice('')
+                    setCommandStatus({})
+                  }}
+                />
 
-            <EnvironmentSelect
-                label="Khu vực"
-                value={selectedZone.id}
-                options={selectedFarm.zones.map((zone) => ({
-                value: zone.id,
-                label: zone.name,
-                }))}
-                onChange={(zoneId) => {
-                setSelectedZoneId(zoneId)
-                setRuleNotice('')
-                }}
-            />
-
-            <div className="control-controller-field">
-                <span>Controller Node</span>
-
-                <strong>{selectedZone.controller}</strong>
-
-                <small>
-                <i className="online-dot" />
-                Online · {selectedZone.lastSync}
-                </small>
-            </div>
-            </div>
-        </section>
-
-        <section className="control-section">
-          <div className="control-section-title">
-            <span>01</span>
-            <div>
-              <small>OPERATION MODE</small>
-              <h2>Chế độ vận hành</h2>
-              <p>
-                Xác định controller tự vận hành hay nhận lệnh trực tiếp từ
-                người dùng.
-              </p>
-            </div>
-          </div>
-
-          <div className="control-mode-layout">
-            <div className="control-mode-card">
-              <div className="control-mode-top">
-                <div>
-                  <span className="control-mini-label">CURRENT MODE</span>
-                  <h3>{currentState.mode}</h3>
+                <div className="control-controller-field">
+                  <span>Controller Node</span>
+                  <strong>{selectedZone.controller}</strong>
+                  <small>
+                    <i className={iotConnected ? 'online-dot' : 'offline-dot'} />
+                    {iotConnected
+                      ? hasTelemetry
+                        ? 'IoT đã kết nối'
+                        : selectedZone.lastSync
+                      : selectedZone.lastSync}
+                  </small>
                 </div>
-
-                <span
-                  className={`mode-status-badge ${
-                    isManual ? 'manual' : 'auto'
-                  }`}
-                >
-                  <i />
-                  {isManual ? 'Điều khiển thủ công' : 'Tự động cục bộ'}
-                </span>
               </div>
+            </section>
 
-              <div className="control-mode-switcher">
+            <section className="control-mode-bar" aria-label="Chọn chế độ xem điều khiển">
+              <div className="control-mode-tabs" role="tablist" aria-label="Chế độ điều khiển">
                 <button
                   type="button"
-                  className={!isManual ? 'active' : ''}
-                  onClick={() => handleModeRequest('AUTO')}
+                  role="tab"
+                  aria-selected={activeView === 'AUTO'}
+                  className={`control-mode-tab ${activeView === 'AUTO' ? 'is-active' : ''}`}
+                  onClick={() => setActiveView('AUTO')}
                 >
-                  <span className="mode-option-icon">
+                  <span className="control-mode-tab__icon">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M12 3v3" />
                       <path d="M12 18v3" />
@@ -248,136 +314,106 @@ function EnvironmentControlPage() {
                       <circle cx="12" cy="12" r="4" />
                     </svg>
                   </span>
-
                   <span>
                     <strong>AUTO</strong>
-                    <small>ESP32 tự điều khiển theo ngưỡng</small>
+                    <small>Quy tắc theo ngưỡng</small>
                   </span>
                 </button>
 
                 <button
                   type="button"
-                  className={isManual ? 'active manual' : ''}
-                  onClick={() => handleModeRequest('MANUAL')}
+                  role="tab"
+                  aria-selected={activeView === 'MANUAL'}
+                  className={`control-mode-tab ${activeView === 'MANUAL' ? 'is-active is-manual' : ''}`}
+                  onClick={() => setActiveView('MANUAL')}
                 >
-                  <span className="mode-option-icon">
+                  <span className="control-mode-tab__icon">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M8 11V7a2 2 0 0 1 4 0v4" />
-                      <path d="M12 10V5a2 2 0 0 1 4 0v6" />
-                      <path d="M16 10V7a2 2 0 0 1 4 0v7c0 4-3 7-7 7h-1c-3 0-5-1-7-4l-2-3a2 2 0 0 1 3-2l2 2" />
+                      <rect x="5" y="11" width="14" height="10" rx="2" />
+                      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
                     </svg>
                   </span>
-
                   <span>
                     <strong>MANUAL</strong>
-                    <small>Cho phép bật/tắt thiết bị trực tiếp</small>
+                    <small>Bật/tắt thiết bị thủ công</small>
                   </span>
                 </button>
               </div>
 
-              <div className={`control-mode-note ${isManual ? 'warning' : ''}`}>
-                <span>
-                  {isManual ? '!' : 'i'}
+              <div className="control-mode-meta">
+                <span
+                  className={`mode-status-badge ${
+                    !verifiedMode ? 'unknown' : isManualActive ? 'manual' : 'auto'
+                  }`}
+                >
+                  <i />
+                  {modeBadgeLabel}
                 </span>
 
-                <p>
-                  {isManual
-                    ? 'Automatic control đang tạm dừng tại Khu vực này. Người dùng chịu trách nhiệm điều khiển các actuator.'
-                    : 'Controller thực thi quy tắc ngay tại ESP32 và vẫn có thể tiếp tục AUTO khi mất kết nối cloud.'}
-                </p>
+                {iotControlAvailable && verifiedMode !== activeView && (
+                  <button
+                    type="button"
+                    className="control-mode-apply-btn"
+                    onClick={() => handleModeAction(activeView)}
+                  >
+                    {activeView === 'MANUAL'
+                      ? 'Kích hoạt MANUAL'
+                      : 'Chuyển về AUTO'}
+                  </button>
+                )}
               </div>
+            </section>
+
+            {ruleNotice && (
+              <div className="control-mode-note control-mode-note--inline">
+                <span>i</span>
+                <p>{ruleNotice}</p>
+              </div>
+            )}
+
+            <div className="control-mode-stage" role="tabpanel">
+              {activeView === 'AUTO' ? (
+                <AutomaticRulesPanel
+                  zone={selectedZone}
+                  rules={currentState.rules}
+                  disabled={!iotControlAvailable || isManualActive}
+                  isConnected={iotConnected}
+                  unavailableMessage={
+                    !iotControlAvailable
+                      ? iotUnavailable
+                        ? 'Giá trị ngưỡng hiển thị là mức tham chiếu mặc định (chưa đồng bộ ESP32). Nút lưu sẽ mở khi IoT Service hoạt động.'
+                        : 'Chưa xác minh đồng bộ với bộ điều khiển ESP32 cho khu vực này.'
+                      : isManualActive
+                        ? 'Khu vực đang ở chế độ MANUAL. Chuyển về AUTO để chỉnh sửa và áp dụng ngưỡng tự động.'
+                        : null
+                  }
+                  onRuleChange={updateRule}
+                  onSave={handleSaveRules}
+                />
+              ) : (
+                <ActuatorControlPanel
+                  actuators={currentState.actuators}
+                  isManual={isManualActive}
+                  disabled={!iotControlAvailable}
+                  commandStatus={commandStatus}
+                  onActuatorChange={updateActuator}
+                />
+              )}
             </div>
-
-            <div className="controller-health-card">
-              <div className="controller-health-header">
-                <div>
-                  <span className="control-mini-label">CONTROLLER STATUS</span>
-                  <h3>{selectedZone.controller}</h3>
-                </div>
-
-                <span className="controller-online-badge">ONLINE</span>
-              </div>
-
-              <div className="controller-health-grid">
-                <div>
-                  <span>Nhiệt độ hiện tại</span>
-                  <strong>{selectedZone.temperature}°C</strong>
-                </div>
-
-                <div>
-                  <span>Độ ẩm hiện tại</span>
-                  <strong>{selectedZone.humidity}%</strong>
-                </div>
-
-                <div>
-                  <span>Local control</span>
-                  <strong>Available</strong>
-                </div>
-
-                <div>
-                  <span>Đồng bộ gần nhất</span>
-                  <strong>{selectedZone.lastSync}</strong>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <AutomaticRulesPanel
-          zone={selectedZone}
-          rules={currentState.rules}
-          onRuleChange={updateRule}
-          onSave={saveRules}
-        />
-
-        <ActuatorControlPanel
-          actuators={currentState.actuators}
-          isManual={isManual}
-          onActuatorChange={updateActuator}
-        />
-
-        {ruleNotice && (
-          <div className="control-toast" role="status">
-            <span>✓</span>
-            <p>{ruleNotice}</p>
-            <button type="button" onClick={() => setRuleNotice('')}>
-              ×
-            </button>
-          </div>
+          </>
         )}
 
         {manualConfirmOpen && (
-          <div
-            className="manual-modal-backdrop"
-            role="presentation"
-            onMouseDown={() => setManualConfirmOpen(false)}
-          >
-            <div
-              className="manual-modal"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="manual-mode-title"
-              onMouseDown={(event) => event.stopPropagation()}
-            >
-              <span className="manual-modal-icon">!</span>
+          <div className="manual-modal-backdrop">
+            <div className="manual-modal" role="dialog" aria-modal="true">
+              <div className="manual-modal-icon">!</div>
 
-              <span className="control-mini-label">MANUAL OVERRIDE</span>
-
-              <h2 id="manual-mode-title">Chuyển sang MANUAL?</h2>
+              <h2>Xác nhận chuyển sang điều khiển thủ công</h2>
 
               <p>
-                Điều khiển tự động tại <strong>{selectedZone.name}</strong> sẽ
-                tạm dừng. Bạn có thể trực tiếp bật hoặc tắt phun sương, quạt và
-                sưởi.
+                Chế độ MANUAL sẽ <strong>tạm dừng quy tắc tự động</strong> của{' '}
+                {selectedZone.name}. Thiết bị có thể hoạt động liên tục nếu bạn không chủ động tắt.
               </p>
-
-              <div className="manual-modal-warning">
-                <strong>Lưu ý</strong>
-                <span>
-                  Hãy theo dõi nhiệt độ và độ ẩm trong thời gian sử dụng chế độ
-                  thủ công.
-                </span>
-              </div>
 
               <div className="manual-modal-actions">
                 <button
@@ -385,7 +421,7 @@ function EnvironmentControlPage() {
                   className="secondary"
                   onClick={() => setManualConfirmOpen(false)}
                 >
-                  Hủy
+                  Hủy bỏ
                 </button>
 
                 <button
@@ -393,7 +429,7 @@ function EnvironmentControlPage() {
                   className="primary"
                   onClick={confirmManualMode}
                 >
-                  Chuyển sang MANUAL
+                  Xác nhận chuyển MANUAL
                 </button>
               </div>
             </div>

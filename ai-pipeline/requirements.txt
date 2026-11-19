@@ -6,3 +6,8 @@ PyYAML>=6.0
 requests>=2.31          # HttpPublisher
 paho-mqtt>=2.0          # MqttPublisher (optional)
 pytest>=8.0             # tests
+
+fastapi>=0.110          # REST API
+uvicorn>=0.29           # REST server
+pydantic>=2.5
+httpx>=0.27             # tests only (FastAPI TestClient)

@@ -13,7 +13,7 @@ import _bootstrap
 from _bootstrap import ROOT
 
 from swiftletcare_ai.config import load_pipeline_config, resolve_path
-from swiftletcare_ai.dataset_tools import list_images
+# list_images replaced with Path.rglob
 from swiftletcare_ai.detector import YoloDetector
 from swiftletcare_ai.schemas import DetectionMessage
 from swiftletcare_ai.snapshot import draw_detections
@@ -34,7 +34,8 @@ def main():
     det = YoloDetector(resolve_path(m["path"], ROOT), imgsz=m.get("imgsz", 640), device=m.get("device", "auto"),
                        half=m.get("half", False), min_conf=m.get("min_conf", 0.15), iou=m.get("iou", 0.5))
     src = Path(a.source)
-    files = [src] if src.is_file() else list_images(src)
+    valid_exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+    files = [src] if src.is_file() else sorted([p for p in src.rglob("*") if p.is_file() and p.suffix.lower() in valid_exts])
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     results = []

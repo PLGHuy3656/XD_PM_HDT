@@ -42,6 +42,8 @@ class AuthService:
                 "id": user_id,
                 "email": user["email"],
                 "full_name": user["full_name"],
+                "phone": user.get("phone"),
+                "status": user["status"],
                 "roles": roles,
             },
         }

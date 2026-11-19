@@ -7,9 +7,9 @@ Messaging (FCM) messages.
 ## Requirements and setup
 
 - Python 3.11+
-- PostgreSQL shared with Management Service (`users` table)
-- Management Service for bearer-token verification
-- RabbitMQ for event-driven notifications
+- Isolated PostgreSQL database (`notification_db`)
+- Management Service for bearer-token verification and farm recipient lookup
+- RabbitMQ (`swiftlet.domain.events` topic exchange) for event-driven notifications
 - Optional SMTP, VAPID, and Firebase service-account credentials
 
 Run commands from this directory:
@@ -21,16 +21,16 @@ python -m pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Set `DATABASE_URL`, `MANAGEMENT_SERVICE_URL`, and `RABBITMQ_URL` in `.env`.
-Apply `database/schema.sql` to the Management Service database. The script is
-idempotent and creates notification, subscription, FCM-token, and delivery
-tables. RabbitMQ can be started using `services/rabbitmq/docker-compose.yml`
-from the repository root.
+Set `NOTIFICATION_DATABASE_URL` (or `DATABASE_URL`), `MANAGEMENT_SERVICE_URL`,
+and `RABBITMQ_URL` (or `RABBITMQ_HOST`/`RABBITMQ_PORT`/`RABBITMQ_USER`/`RABBITMQ_PASSWORD`)
+in `.env`. Apply `database/schema.sql` to `notification_db`. The script is
+idempotent (tracked in `schema_migrations`) and creates notification,
+subscription, FCM-token, and delivery tables without cross-service foreign keys.
 
 Run the API:
 
 ```powershell
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8002
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8004
 ```
 
 The service reads `.env` from this directory regardless of the process working

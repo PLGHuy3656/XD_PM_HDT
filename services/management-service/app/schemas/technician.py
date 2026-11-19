@@ -58,3 +58,4 @@ class TechnicianDashboardResponse(BaseModel):
 
     online_device_count: int = Field(ge=0)
     offline_device_count: int = Field(ge=0)
+    unknown_device_count: int = Field(default=0, ge=0)

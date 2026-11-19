@@ -1,0 +1,75 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# C extensions & OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.env
+!*.env.example
+*.env.docker_demo_runtime
+*.env.pre_gate*
+*.env.test_dryrun
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Node & Frontend
+node_modules/
+dist/
+build/
+.npm/
+.vite/
+
+# Firmware & Archives
+firmware.zip
+*.zip
+
+# Logs, Backups & Temporary files
+*.log
+*.bak
+logs/
+*.pid
+*.seed
+_backup_*/
+_local_archive/
+scratch/
+
+# Audit & handover directories (not to be committed)
+Claude outputs/
+handoff/
+handovers/
+
+# IDE & Editor caches
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Mosquitto & Redis Broker Secrets / ACLs (Gate 5B.3 / Gate 6B Remediation)
+infrastructure/mosquitto/password_file
+infrastructure/mosquitto/*password_file*
+infrastructure/mosquitto/acl_file
+infrastructure/redis/redis.conf
