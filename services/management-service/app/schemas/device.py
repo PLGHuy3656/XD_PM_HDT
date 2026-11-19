@@ -13,6 +13,9 @@ class DeviceRegistryResponse(BaseModel):
     firmware_version: str | None = None
     is_active: bool = True
     status: str | None = None
+    presence_status: str | None = None
+    provisioning_status: str | None = None
+    health_metadata: dict | None = None
     created_at: str | None = None
 
 
@@ -26,5 +29,14 @@ class DeviceCreateRequest(BaseModel):
     ip_address: str | None = None
 
 
+class DeviceUpdateRequest(BaseModel):
+    name: str | None = None
+    device_type: str | None = None
+    zone_id: str | None = None
+    firmware_version: str | None = None
+    ip_address: str | None = None
+    is_active: bool | None = None
+
+
 class DeviceZoneUpdateRequest(BaseModel):
-    zone_id: str
+    zone_id: str | None = None

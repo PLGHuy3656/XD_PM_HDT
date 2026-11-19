@@ -1,88 +1,86 @@
 import { useNavigate } from 'react-router-dom'
-import { devices } from './dashboardMockData'
+import { EmptyState } from '../../../common/feedback/index.js'
 
-function StatusDot({ status }) {
-  return <span className={`technician-status-dot ${status}`} />
+const STATUS_DISPLAY = {
+  ONLINE: { label: 'Trực tuyến', badgeClass: 'tech-badge--online' },
+  WARNING: { label: 'Cảnh báo', badgeClass: 'tech-badge--warning' },
+  OFFLINE: { label: 'Ngoại tuyến', badgeClass: 'tech-badge--offline' },
+  UNKNOWN: { label: 'Chưa kết nối IoT', badgeClass: 'tech-badge--unknown' },
 }
 
-function DeviceStatusPanel() {
+function DeviceStatusPanel({ devices = [] }) {
   const navigate = useNavigate()
+  const displayDevices = Array.isArray(devices) ? devices : []
 
   return (
-    <section className="technician-card technician-device-panel">
-      <div className="technician-card-heading">
+    <section className="tech-ws-card">
+      <div className="tech-ws-card__head">
         <div>
-          <span>DEVICE MANAGEMENT</span>
-          <h3>Trạng thái thiết bị</h3>
-          <p>
-            Theo dõi controller và sensor đang kết nối trong nhà yến
-          </p>
+          <span className="tech-ws-eyebrow">DEVICE REGISTRY</span>
+          <h3>Thiết bị tại nhà yến</h3>
         </div>
 
         <button
           type="button"
-          className="technician-link-button"
+          className="tech-ws-btn"
           onClick={() => navigate('/technician/devices')}
         >
-          Xem tất cả
-          <span aria-hidden="true">›</span>
+          Xem tất cả ({displayDevices.length}) ›
         </button>
       </div>
 
-      <div className="technician-device-list">
-        <div className="technician-device-list__header">
-          <span>Node</span>
-          <span>Khu vực</span>
-          <span>Sensor</span>
-          <span>Trạng thái</span>
-          <span>Cập nhật</span>
+      {displayDevices.length === 0 ? (
+        <EmptyState
+          title="Chưa có thiết bị nào"
+          description="Nhà yến đang chọn chưa có thiết bị được đăng ký."
+        />
+      ) : (
+        <div className="tech-ws-table-wrap">
+          <table className="tech-ws-table">
+            <thead>
+              <tr>
+                <th>Thiết bị & Node ID</th>
+                <th>Loại</th>
+                <th>Khu vực (Zone)</th>
+                <th>Trạng thái IoT</th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayDevices.map((device) => {
+                const statusKey = String(device.status || 'UNKNOWN').toUpperCase()
+                const statusInfo = STATUS_DISPLAY[statusKey] || STATUS_DISPLAY.UNKNOWN
+                return (
+                  <tr key={device.id}>
+                    <td>
+                      <strong style={{ display: 'block', color: '#102d3f' }}>
+                        {device.nodeId || device.id}
+                      </strong>
+                      <small className="tech-ws-truncate" title={device.name} style={{ color: '#64748b' }}>
+                        {device.name}
+                      </small>
+                    </td>
+                    <td>{device.typeLabel || device.type}</td>
+                    <td>
+                      <span
+                        className={`tech-badge ${
+                          device.isZoneAssigned ? 'tech-badge--online' : 'tech-badge--warning'
+                        }`}
+                      >
+                        {device.isZoneAssigned ? device.zoneName : 'Chưa phân bổ Zone'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`tech-badge ${statusInfo.badgeClass}`}>
+                        {statusInfo.label}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
-
-        {devices.map((device) => (
-          <article className="technician-device-row" key={device.id}>
-            <div className="technician-device-row__node">
-              <span
-                className={`technician-device-icon technician-device-icon--${device.status}`}
-                aria-hidden="true"
-              >
-                N
-              </span>
-
-              <strong>{device.id}</strong>
-            </div>
-
-            <span>{device.zone}</span>
-
-            <strong className="technician-device-row__sensor">
-              {device.sensors}
-            </strong>
-
-            <span
-              className={`technician-device-state technician-device-state--${device.status}`}
-            >
-              <StatusDot
-                status={
-                  device.status === 'online'
-                    ? 'healthy'
-                    : device.status === 'warning'
-                      ? 'warning'
-                      : 'danger'
-                }
-              />
-
-              {device.status === 'online'
-                ? 'Online'
-                : device.status === 'warning'
-                  ? 'Warning'
-                  : 'Offline'}
-            </span>
-
-            <span className="technician-device-row__time">
-              {device.lastSeen}
-            </span>
-          </article>
-        ))}
-      </div>
+      )}
     </section>
   )
 }

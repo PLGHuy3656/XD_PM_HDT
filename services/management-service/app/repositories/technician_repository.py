@@ -1,13 +1,10 @@
-from datetime import datetime, timezone
-from uuid import uuid4
-
-from psycopg.types.json import Jsonb
-
-from app.adapters.legacy_iot_adapter import legacy_iot_adapter
+from app.adapters.iot_service_adapter import IoTServiceAdapter, iot_service_adapter
 from app.database import get_connection
 
 
 class TechnicianRepository:
+    def __init__(self, iot_adapter: IoTServiceAdapter | None = None):
+        self._iot_adapter = iot_adapter or iot_service_adapter
     def list_technicians(self):
         with get_connection() as conn:
             with conn.cursor() as cur:
@@ -116,10 +113,22 @@ class TechnicianRepository:
         technician_id: str,
         farm_id: str,
     ):
+        import uuid
+        farm_id_str = str(farm_id).strip()
+        is_farm_uuid = False
+        try:
+            uuid.UUID(farm_id_str)
+            is_farm_uuid = True
+        except (ValueError, AttributeError, TypeError):
+            is_farm_uuid = False
+
+        where_farm = "(ta.farm_id = %s OR f.farm_code = %s)" if is_farm_uuid else "f.farm_code = %s"
+        farm_params = (farm_id_str, farm_id_str) if is_farm_uuid else (farm_id_str,)
+
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """
+                    f"""
                     SELECT
                         f.id,
                         f.farm_code,
@@ -135,14 +144,14 @@ class TechnicianRepository:
                         ON d.farm_id = f.id
                        AND d.is_active = TRUE
                     WHERE ta.technician_id = %s
-                      AND (ta.farm_id = %s OR f.farm_code = %s)
+                      AND {where_farm}
                       AND ta.is_active = TRUE
                     GROUP BY
                         f.id,
                         f.farm_code,
                         f.name
                     """,
-                    (technician_id, farm_id, farm_id),
+                    (technician_id, *farm_params),
                 )
 
                 row = cur.fetchone()
@@ -167,10 +176,22 @@ class TechnicianRepository:
         technician_id: str,
         farm_id: str,
     ):
+        import uuid
+        farm_id_str = str(farm_id).strip()
+        is_farm_uuid = False
+        try:
+            uuid.UUID(farm_id_str)
+            is_farm_uuid = True
+        except (ValueError, AttributeError, TypeError):
+            is_farm_uuid = False
+
+        where_farm = "(ta.farm_id = %s OR f.farm_code = %s)" if is_farm_uuid else "f.farm_code = %s"
+        farm_params = (farm_id_str, farm_id_str) if is_farm_uuid else (farm_id_str,)
+
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """
+                    f"""
                     SELECT
                         d.id,
                         d.node_id,
@@ -189,33 +210,34 @@ class TechnicianRepository:
                     LEFT JOIN zones z
                         ON z.id = d.zone_id
                     WHERE ta.technician_id = %s
-                      AND (ta.farm_id = %s OR f.farm_code = %s)
+                      AND {where_farm}
                       AND ta.is_active = TRUE
                       AND d.is_active = TRUE
                     ORDER BY d.node_id
                     """,
-                    (technician_id, farm_id, farm_id),
+                    (technician_id, *farm_params),
                 )
 
                 rows = cur.fetchall()
 
-        device_ids = [str(row[0]) for row in rows]
-
-        # TODO(MICROSERVICE-BOUNDARY):
-        # - Boundary Crossover: Reading runtime state (recorded_at, device_state JSONB) via legacy_iot_adapter.
-        # - Future Service Owner: IoT Service owns runtime state, telemetry, and device online/offline status.
-        # - Eventual Replacement: Replace with IoT Service REST API call or local read model updated via RabbitMQ telemetry events.
-        runtime_states = legacy_iot_adapter.get_devices_runtime_state(device_ids)
+        all_presence = self._iot_adapter.list_devices_presence()
+        iot_reachable = all_presence is not None
 
         devices = []
 
         for row in rows:
             dev_id = str(row[0])
-            state_info = runtime_states.get(dev_id)
-            is_online = state_info is not None
-            recorded_at = state_info["recorded_at"] if state_info else None
-            device_state = state_info["device_state"] if state_info else {}
-            rssi = device_state.get("networkRssi")
+            node_id = str(row[1]) if row[1] else None
+            presence_info = (
+                all_presence.get(node_id)
+                if (all_presence and node_id and node_id in all_presence)
+                else (all_presence.get(dev_id) if all_presence else None)
+            )
+
+            status_val, mqtt_val, rssi, recorded_at = self._iot_adapter.resolve_status(
+                presence_info,
+                iot_reachable,
+            )
 
             devices.append(
                 {
@@ -231,17 +253,9 @@ class TechnicianRepository:
                         else None
                     ),
                     "zone_name": row[6],
-                    "status": (
-                        "ONLINE"
-                        if is_online
-                        else "OFFLINE"
-                    ),
+                    "status": status_val,
                     "rssi": rssi,
-                    "mqtt_status": (
-                        "Connected"
-                        if is_online
-                        else "Disconnected"
-                    ),
+                    "mqtt_status": mqtt_val,
                     "ip_address": row[7],
                     "firmware_version": row[8],
                     "last_seen": (
@@ -293,7 +307,10 @@ class TechnicianRepository:
                             AS device_count,
 
                         ARRAY_AGG(DISTINCT d.id) FILTER (WHERE d.id IS NOT NULL)
-                            AS device_ids
+                            AS device_ids,
+
+                        ARRAY_AGG(DISTINCT d.node_id) FILTER (WHERE d.node_id IS NOT NULL)
+                            AS node_ids
 
                     FROM technician_assignments ta
 
@@ -313,114 +330,81 @@ class TechnicianRepository:
                 row = cur.fetchone()
 
         device_uuids = [str(did) for did in (row[3] or [])]
+        node_ids = [str(nid) for nid in (row[4] or [])] if len(row) > 4 else []
+        lookup_ids = node_ids if node_ids else device_uuids
+        total_devices = int(row[2] or 0)
 
-        # TODO(MICROSERVICE-BOUNDARY):
-        # - Boundary Crossover: Reading runtime presence counts via legacy_iot_adapter.
-        # - Future Service Owner: IoT Service owns device presence and telemetry state.
-        # - Eventual Replacement: Query IoT Service metrics endpoint or read cached state projection.
-        online_count, offline_count = legacy_iot_adapter.get_devices_presence_counts(
-            device_uuids
-        )
+        all_presence = self._iot_adapter.list_devices_presence()
+        if all_presence is None:
+            # IoT Service is down / unreachable: all devices are UNKNOWN; never count UNKNOWN as OFFLINE
+            online_count = 0
+            offline_count = 0
+            unknown_count = total_devices
+        else:
+            online_count = 0
+            offline_count = 0
+            unknown_count = 0
+            for did in lookup_ids:
+                p_info = all_presence.get(did)
+                status_val, _, _, _ = self._iot_adapter.resolve_status(p_info, iot_reachable=True)
+                if status_val == "ONLINE":
+                    online_count += 1
+                elif status_val == "OFFLINE":
+                    offline_count += 1
+                else:
+                    unknown_count += 1
+
+            accounted = online_count + offline_count + unknown_count
+            if accounted < total_devices:
+                offline_count += (total_devices - accounted)
 
         return {
             "technician_id": technician_id,
             "assigned_farm_count": row[0] or 0,
             "zone_count": row[1] or 0,
-            "device_count": row[2] or 0,
+            "device_count": total_devices,
             "online_device_count": online_count,
             "offline_device_count": offline_count,
+            "unknown_device_count": unknown_count,
         }
 
-    def assign_technician(
-        self,
-        technician_id: str,
-        farm_id: str,
-        is_primary: bool = True,
-        control_permission: str = "MONITOR",
-    ):
+    def assign_technician(self, technician_id: str, farm_id: str, is_primary: bool = True):
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
                     INSERT INTO technician_assignments (
-                        technician_id,
-                        farm_id,
-                        is_primary,
-                        control_permission,
-                        is_active
+                        technician_id, farm_id, is_primary, is_active
                     )
-                    VALUES (%s, %s, %s, %s, TRUE)
+                    VALUES (%s, %s, %s, TRUE)
                     ON CONFLICT (technician_id, farm_id)
                     DO UPDATE SET
                         is_primary = EXCLUDED.is_primary,
-                        control_permission = EXCLUDED.control_permission,
                         is_active = TRUE,
                         assigned_at = NOW()
                     RETURNING id;
                     """,
-                    (
-                        technician_id,
-                        farm_id,
-                        is_primary,
-                        control_permission
-                    ),
+                    (technician_id, farm_id, is_primary),
                 )
                 assigned_id = cur.fetchone()[0]
-
-                cur.execute(
-                    """
-                    SELECT
-                        f.farm_code,
-                        f.name,
-                        f.owner_id,
-                        t.full_name
-                    FROM farms f
-                    JOIN technicians t ON t.id = %s
-                    WHERE f.id = %s
-                    """,
-                    (technician_id, farm_id),
-                )
-                farm = cur.fetchone()
-                if farm is None:
-                    raise ValueError("Farm or technician not found")
-
-                recipient_user_ids = list(
-                    dict.fromkeys(
-                        str(user_id)
-                        for user_id in (technician_id, farm[2])
-                        if user_id is not None
-                    )
-                )
-                event_id = str(uuid4())
-                payload = {
-                    "event_id": event_id,
-                    "event_type": "management.technician_assigned",
-                    "occurred_at": datetime.now(timezone.utc).isoformat(),
-                    "recipient_user_ids": recipient_user_ids,
-                    "data": {
-                        "assignment_id": str(assigned_id),
-                        "technician_id": technician_id,
-                        "technician_name": farm[3],
-                        "farm_id": farm_id,
-                        "farm_code": farm[0],
-                        "farm_name": farm[1],
-                        "control_permission": control_permission,
-                    },
-                }
-                cur.execute(
-                    """
-                    INSERT INTO event_outbox (event_id, event_type, payload)
-                    VALUES (%s, %s, %s)
-                    """,
-                    (
-                        event_id,
-                        "management.technician_assigned",
-                        Jsonb(payload),
-                    ),
-                )
                 conn.commit()
 
         return str(assigned_id)
+
+    def unassign_technician(self, technician_id: str, farm_id: str) -> bool:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE technician_assignments
+                    SET is_active = FALSE
+                    WHERE technician_id = %s AND farm_id = %s AND is_active = TRUE;
+                    """,
+                    (technician_id, farm_id),
+                )
+                updated = cur.rowcount > 0
+                conn.commit()
+        return updated
 
 
 technician_repository = TechnicianRepository()

@@ -2,43 +2,53 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../../../context/AuthContext'
+import PasswordInput from '../../../components/ui/PasswordInput'
 import './LoginPage.css'
 
 function LoginPage() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, authError } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
 
-    const result = login(email, password)
+    try {
+      setLoading(true)
+      const result = await login(email, password)
 
-    if (!result.success) {
-      setError(result.message)
-      return
-    }
+      if (!result.success) {
+        setError(result.message)
+        setLoading(false)
+        return
+      }
 
-    setError('')
+      setError('')
 
-    switch (result.user.role) {
-      case 'FARM_OWNER':
-        navigate('/owner/dashboard')
-        break
+      switch (result.user.role) {
+        case 'FARM_OWNER':
+          navigate('/owner/dashboard')
+          break
 
-      case 'TECHNICIAN':
-        navigate('/technician/dashboard')
-        break
+        case 'TECHNICIAN':
+          navigate('/technician/dashboard')
+          break
 
-      case 'ADMIN':
-        navigate('/admin/dashboard')
-        break
+        case 'ADMIN':
+          navigate('/admin/dashboard')
+          break
 
-      default:
-        navigate('/login')
+        default:
+          navigate('/login')
+      }
+    } catch (err) {
+      setError(err?.message || 'Đăng nhập không thành công.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -63,34 +73,11 @@ function LoginPage() {
             <span>Nhà yến an tâm.</span>
           </h2>
 
-          <div className="login-environment">
-            <div className="environment-card">
-              <span className="environment-icon">🌡</span>
-
-              <div>
-                <strong>29.4°C</strong>
-                <span>Nhiệt độ</span>
-              </div>
-            </div>
-
-            <div className="environment-card">
-              <span className="environment-icon">💧</span>
-
-              <div>
-                <strong>82%</strong>
-                <span>Độ ẩm</span>
-              </div>
-            </div>
-
-            <div className="environment-card">
-              <span className="environment-status-dot" />
-
-              <div>
-                <strong>Ổn định</strong>
-                <span>Môi trường</span>
-              </div>
-            </div>
-          </div>
+          <p>
+            Nền tảng quản trị nhà yến thông minh: theo dõi vi khí hậu, quản lý
+            nhà yến, khu vực và thiết bị tập trung cho Chủ trại, Kỹ thuật viên
+            và Quản trị hệ thống.
+          </p>
         </div>
 
         <div className="login-curve" />
@@ -135,9 +122,8 @@ function LoginPage() {
                 Mật khẩu
               </label>
 
-              <input
+              <PasswordInput
                 id="password"
-                type="password"
                 placeholder="Mật khẩu"
                 autoComplete="current-password"
                 value={password}
@@ -163,19 +149,20 @@ function LoginPage() {
               </button>
             </div>
 
-              {error && (
+              {(error || authError) && (
                 <div className="login-alert" role="alert">
                   <span className="login-alert-icon">!</span>
 
-                  <span>{error}</span>
+                  <span>{error || authError}</span>
                 </div>
               )}
               
             <button
               type="submit"
               className="login-submit"
+              disabled={loading}
             >
-              Đăng nhập
+              {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
               <span>→</span>
             </button>
           </form>

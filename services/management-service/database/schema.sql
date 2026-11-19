@@ -50,6 +50,10 @@ CREATE TABLE IF NOT EXISTS farms (
     name VARCHAR(255) NOT NULL,
     address TEXT,
     status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+    approval_status VARCHAR(20) NOT NULL DEFAULT 'APPROVED',
+    approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    approved_at TIMESTAMPTZ,
+    rejection_reason TEXT,
     owner_id UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -79,7 +83,8 @@ CREATE TABLE IF NOT EXISTS devices (
     ip_address VARCHAR(50),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    metadata_version BIGINT NOT NULL DEFAULT 1
 );
 
 -- 7. Technicians (Technician Domain Profile, linked to users)
@@ -99,8 +104,6 @@ CREATE TABLE IF NOT EXISTS technician_assignments (
     technician_id UUID NOT NULL REFERENCES technicians(id) ON DELETE CASCADE,
     farm_id UUID NOT NULL REFERENCES farms(id) ON DELETE CASCADE,
     is_primary BOOLEAN NOT NULL DEFAULT TRUE,
-    control_permission VARCHAR(20) NOT NULL DEFAULT 'MONITOR'
-        CHECK (control_permission IN ('MONITOR', 'OPERATE')),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     assigned_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(technician_id, farm_id)
@@ -114,18 +117,19 @@ CREATE INDEX IF NOT EXISTS idx_devices_zone_id ON devices(zone_id);
 CREATE INDEX IF NOT EXISTS idx_technician_assignments_tech ON technician_assignments(technician_id);
 CREATE INDEX IF NOT EXISTS idx_technician_assignments_farm ON technician_assignments(farm_id);
 
-CREATE TABLE IF NOT EXISTS event_outbox (
-    event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    event_type VARCHAR(150) NOT NULL,
-    payload JSONB NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    published_at TIMESTAMPTZ,
-    attempts INTEGER NOT NULL DEFAULT 0,
-    next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    locked_until TIMESTAMPTZ,
-    last_error TEXT
-);
 
-CREATE INDEX IF NOT EXISTS idx_event_outbox_pending
-    ON event_outbox (next_attempt_at, created_at)
-    WHERE published_at IS NULL;
+-- Trigger to maintain devices.metadata_version and devices.updated_at on any UPDATE
+CREATE OR REPLACE FUNCTION trg_devices_update_metadata_version()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CLOCK_TIMESTAMP();
+    NEW.metadata_version = COALESCE(OLD.metadata_version, 0) + 1;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_devices_metadata_version_bump ON devices;
+CREATE TRIGGER trg_devices_metadata_version_bump
+    BEFORE UPDATE ON devices
+    FOR EACH ROW
+    EXECUTE FUNCTION trg_devices_update_metadata_version();

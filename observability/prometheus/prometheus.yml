@@ -1,0 +1,76 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+rule_files:
+  - "rules/*.yml"
+
+scrape_configs:
+  # Self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # API Gateway (CP11 - Port 8000)
+  - job_name: "api-gateway"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
+        labels:
+          tier: "edge-gateway"
+          env: "development"
+
+  # Management Service (CP-DB P0 - Port 8001)
+  - job_name: "management-service"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:8001"]
+        labels:
+          tier: "core-domain"
+          env: "development"
+
+  # IoT Telemetry & Control Service (CP-DB P1 - Port 8002)
+  - job_name: "iot-service"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:8002"]
+        labels:
+          tier: "iot-domain"
+          env: "development"
+
+  # AI Vision & Counting Service (CP7/CP8 - Port 8003)
+  - job_name: "ai-service"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:8003"]
+        labels:
+          tier: "ai-domain"
+          env: "development"
+
+  # Alert & Notification Service (CP6 - Port 8004)
+  - job_name: "notification-service"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:8004"]
+        labels:
+          tier: "notification-domain"
+          env: "development"
+
+  # Analytics Service (CP9 - Port 8005)
+  - job_name: "analytics-service"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:8005"]
+        labels:
+          tier: "olap-analytics"
+          env: "development"
+
+  # RabbitMQ Broker Prometheus Plugin (Port 15692)
+  - job_name: "rabbitmq"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:15692"]
+        labels:
+          tier: "messaging-broker"
+          env: "development"

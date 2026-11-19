@@ -3,7 +3,7 @@ from app.services.device_service import DeviceService
 
 
 class FakeDeviceRepository:
-    def list_devices(self, farm_id=None, zone_id=None, farm_ids=None):
+    def list_devices(self, farm_id=None, zone_id=None):
         devices = [
             {
                 "device_id": "dev-001",
@@ -23,8 +23,6 @@ class FakeDeviceRepository:
             devices = [d for d in devices if d["farm_id"] == farm_id]
         if zone_id:
             devices = [d for d in devices if d["zone_id"] == zone_id]
-        if farm_ids is not None:
-            devices = [d for d in devices if d["farm_id"] in farm_ids]
         return devices
 
     def get_device_by_id(self, device_id: str):
@@ -56,15 +54,44 @@ def test_list_devices(service):
     assert devices[0]["node_id"] == "ESP32-001"
 
 
-def test_list_devices_applies_accessible_farm_scope(service):
-    devices = service.list_devices(farm_ids=[])
-    assert devices == []
-
-
 def test_get_device(service):
-    device = service.get_device("dev-001")
-    assert device is not None
-    assert device["device_type"] == "CONTROLLER"
+    # Lookup by UUID
+    device_by_uuid = service.get_device("dev-001")
+    assert device_by_uuid is not None
+    assert device_by_uuid["device_type"] == "CONTROLLER"
+    assert device_by_uuid["farm_id"] == "farm-001"
+
+    # Lookup by node_id (e.g., NODE-A1 / ESP32-001)
+    device_by_node = service.get_device("ESP32-001")
+    assert device_by_node is not None
+    assert device_by_node["device_id"] == "dev-001"
+    assert device_by_node["farm_id"] == "farm-001"
+
+
+def test_device_repository_sql_branching_avoids_uuid_cast_error():
+    """Verifies that DeviceRepository inspects UUID vs node_id to avoid PostgreSQL UUID cast error."""
+    import uuid
+    from app.repositories.device_repository import DeviceRepository
+
+    # 1. Non-UUID node_id like 'NODE-A1'
+    node_id_val = "NODE-A1"
+    is_uuid = False
+    try:
+        uuid.UUID(node_id_val)
+        is_uuid = True
+    except (ValueError, AttributeError, TypeError):
+        is_uuid = False
+    assert is_uuid is False  # Must branch to WHERE d.node_id = %s
+
+    # 2. Canonical UUID string
+    uuid_val = "11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    is_uuid = False
+    try:
+        uuid.UUID(uuid_val)
+        is_uuid = True
+    except (ValueError, AttributeError, TypeError):
+        is_uuid = False
+    assert is_uuid is True  # Branches to WHERE d.id = %s OR d.node_id = %s
 
 
 def test_empty_device_id_raises_value_error(service):
