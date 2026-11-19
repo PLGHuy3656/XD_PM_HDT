@@ -49,6 +49,10 @@ if not POSTGRES_AVAILABLE:
 if not REDIS_AVAILABLE:
     settings.ai_redis_enabled = False
 
+# Legacy unit tests invoke camera lifecycle endpoints without service-key headers;
+# security tests explicitly verify fail-closed default (Settings().ai_camera_control_require_auth is True).
+settings.ai_camera_control_require_auth = False
+
 
 def _clear_ai_redis_keys() -> None:
     if not REDIS_AVAILABLE:

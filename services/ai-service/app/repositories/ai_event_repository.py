@@ -47,7 +47,11 @@ def _normalize_snapshot_ref(raw_ref: Optional[str]) -> Optional[str]:
     cleaned = raw_ref.strip()
     if not cleaned:
         return None
-    if cleaned.startswith(("/api/v1/ai/snapshots/", "/snapshots/", "http://", "https://")) and ".." not in cleaned:
+    if (
+        cleaned.startswith(("/api/v1/ai/snapshots/", "/snapshots/", "http://", "https://"))
+        and ".." not in cleaned
+        and "\\" not in cleaned
+    ):
         return cleaned
     filename = cleaned.replace("\\", "/").rsplit("/", 1)[-1]
     if not filename or filename in (".", ".."):

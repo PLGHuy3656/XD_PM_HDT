@@ -42,6 +42,16 @@ class TestSnapshotSanitization:
 
 
 class TestCameraWriteAuthorization:
+    def test_camera_write_auth_is_fail_closed_by_default_without_env_vars(self, monkeypatch):
+        from app.config import Settings
+
+        monkeypatch.delenv("AI_CAMERA_CONTROL_REQUIRE_AUTH", raising=False)
+        monkeypatch.delenv("AI_INTERNAL_SERVICE_KEY", raising=False)
+        fresh = Settings(_env_file=None)
+        assert fresh.ai_camera_control_require_auth is True
+        assert fresh.ai_internal_service_key == ""
+        assert fresh.rabbitmq_password == ""
+
     def test_camera_write_endpoints_fail_closed_when_auth_enabled_and_key_missing(self, monkeypatch):
         monkeypatch.setattr(settings, "ai_camera_control_require_auth", True)
         monkeypatch.setattr(settings, "ai_internal_service_key", "")
