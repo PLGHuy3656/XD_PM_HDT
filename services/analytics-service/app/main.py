@@ -1,21 +1,64 @@
 """
 Main FastAPI Application Entrypoint for Analytics Service.
+Unifies CP9 OLAP summary/trends read models (/api/v1/analytics) with
+operational telemetry, bird count ingestion, harvest records, alerting,
+and CSV/PDF reporting (/api/analytics, /api/ai).
 """
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
 import psycopg
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator, routing as pfi_routing
 
+from app.alerting import run_analytics_monitor
 from app.api.health import router as health_router
 from app.api.summary import router as summary_router
 from app.api.trends import router as trends_router
+from app.config import settings
+from app.routes import ai_router, router as operational_router
 from app.services.analytics_service import FarmNotFoundError, InvalidPeriodError
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    monitor_task = None
+    if settings.database_url and settings.analytics_service_token:
+        monitor_task = asyncio.create_task(
+            run_analytics_monitor(
+                settings.rabbitmq_url,
+                settings.event_exchange,
+            ),
+            name="analytics-monitor",
+        )
+    else:
+        logger.warning(
+            "Analytics monitoring is disabled; configure ANALYTICS_DATABASE_URL "
+            "(or DATABASE_URL) and ANALYTICS_SERVICE_TOKEN to enable it"
+        )
+
+    try:
+        yield
+    finally:
+        if monitor_task is not None:
+            monitor_task.cancel()
+            try:
+                await monitor_task
+            except asyncio.CancelledError:
+                pass
+
 
 app = FastAPI(
     title="SwiftletCare Analytics Service",
-    description="OLAP read model and statistical reporting service for SwiftletCare",
+    description="OLAP read model, operational analytics, alerting, and reporting service for SwiftletCare",
     version="0.1.0",
+    lifespan=lifespan,
 )
+
 
 # Exception Handlers
 @app.exception_handler(psycopg.OperationalError)
@@ -57,10 +100,12 @@ async def invalid_period_handler(request: Request, exc: InvalidPeriodError):
     )
 
 
-# Include Routers
+# Include Routers (CP9 OLAP + PR #29 Operational Analytics)
 app.include_router(health_router)
 app.include_router(summary_router)
 app.include_router(trends_router)
+app.include_router(operational_router)
+app.include_router(ai_router)
 
 # Prometheus Metrics Instrumentation (CP10-B2)
 # FastAPI >=0.157 _IncludedRouter compatibility for prometheus-fastapi-instrumentator 7.x
