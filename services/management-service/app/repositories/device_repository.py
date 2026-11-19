@@ -90,7 +90,7 @@ class DeviceRepository:
                 iot_reachable,
             )
 
-            # Map provisioning status for Administrator
+            # Map provisioning status for Administrator (preserve UNKNOWN when IoT unreachable or no heartbeat yet)
             if status_val in ("OFFLINE", "STALE"):
                 prov_status = "DISCONNECTED"
             elif status_val == "WARNING":
@@ -98,7 +98,7 @@ class DeviceRepository:
             elif status_val == "ONLINE":
                 prov_status = "PROVISIONED"
             else:
-                prov_status = "DISCONNECTED"
+                prov_status = "UNKNOWN"
 
             health_meta = {
                 "uptime": presence_info.get("uptime") if presence_info else None,
@@ -212,7 +212,7 @@ class DeviceRepository:
         elif status_val == "ONLINE":
             prov_status = "PROVISIONED"
         else:
-            prov_status = "DISCONNECTED"
+            prov_status = "UNKNOWN"
 
         health_meta = {
             "uptime": presence_info.get("uptime") if presence_info else None,

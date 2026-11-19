@@ -113,7 +113,12 @@ class AckService:
             logger.warning("[ACK REJECTED] %s", msg)
             return AckProcessResult(success=False, error=msg)
 
-        # Step 7: Handle duplicate/terminal state idempotently
+        # Step 7: Handle late ACK after TIMEOUT or duplicate terminal state idempotently
+        if command.status == "TIMEOUT":
+            msg = f"Late ACK ignored: command '{command.command_id}' already timed out"
+            logger.warning("[ACK LATE] %s", msg)
+            return AckProcessResult(success=False, command=command, error=msg)
+
         if command.status in ("SUCCESS", "FAILED", "ERROR"):
             logger.info(
                 "[ACK IDEMPOTENT] Command '%s' is already in terminal state '%s'; ignoring duplicate ACK",

@@ -137,6 +137,16 @@ class DevicePresenceService:
         now = timestamp or datetime.now(timezone.utc)
         existing = self.repository.get(device_id)
 
+        # Ignore out-of-order / stale heartbeats older than the latest recorded event
+        if existing and existing.last_seen and now < existing.last_seen:
+            logger.warning(
+                "[PRESENCE] Ignoring stale/out-of-order heartbeat for '%s' (%s < %s)",
+                device_id,
+                now.isoformat(),
+                existing.last_seen.isoformat(),
+            )
+            return existing
+
         updates = {
             "status": "ONLINE",
             "uptime": heartbeat.uptime,

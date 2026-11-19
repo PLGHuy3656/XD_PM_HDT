@@ -126,8 +126,8 @@ class DiagnosticsService:
         catalog_entry = self._catalog.get(device_id)
         name = catalog_entry["name"] if catalog_entry else f"Node {device_id}"
         dev_type = catalog_entry["type"] if catalog_entry else "ESP32 Controller"
-        farm_name = catalog_entry["farmName"] if catalog_entry else "Nhà yến Bình An"
-        zone_name = catalog_entry["zoneName"] if catalog_entry else "Khu vực A"
+        farm_name = catalog_entry["farmName"] if catalog_entry else "Chưa phân bổ"
+        zone_name = catalog_entry["zoneName"] if catalog_entry else "Chưa phân bổ"
 
         presence = self.presence_repo.get(device_id)
         latest_telemetry = self.telemetry_repo.get_latest(device_id)
@@ -154,11 +154,11 @@ class DiagnosticsService:
             ip = presence.ip
             issues.append("Heartbeat quá hạn (>90s) - mất tín hiệu định kỳ.")
         else:
-            # ONLINE node - check health signals
+            # ONLINE node - check health signals (never fabricate RSSI or IP when absent)
             status = "HEALTHY"
             mqtt_status = "CONNECTED"
-            rssi = latest_telemetry.state.networkRssi if latest_telemetry else -50
-            ip = presence.ip or "192.168.1.50"
+            rssi = latest_telemetry.state.networkRssi if latest_telemetry else None
+            ip = presence.ip
 
             if rssi and rssi < -75:
                 wifi_status = "WEAK"
@@ -338,7 +338,7 @@ class DiagnosticsService:
             passed=power_passed,
             label="Nguồn thiết bị",
             description="Thiết bị đã khởi động và cấp nguồn ổn định." if power_passed else "Chưa nhận được tín hiệu nguồn từ thiết bị.",
-            details={"uptime": presence.uptime if presence else 0},
+            details={"uptime": presence.uptime if presence else None},
         )
 
         # 2. Network check: IP assigned and Wi-Fi RSSI valid
@@ -359,7 +359,7 @@ class DiagnosticsService:
             passed=mqtt_passed,
             label="MQTT Broker",
             description="Thiết bị kết nối và gửi heartbeat đến broker thành công." if mqtt_passed else "Thiết bị chưa kết nối tới MQTT broker.",
-            details={"status": presence.status if presence else "OFFLINE"},
+            details={"status": presence.status if presence else "UNKNOWN"},
         )
 
         # 4. Sensor telemetry check: At least 1 valid reading received

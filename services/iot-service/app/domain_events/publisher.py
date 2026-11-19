@@ -69,7 +69,7 @@ class RabbitMQEventPublisher(DomainEventPublisher):
         host: str = "127.0.0.1",
         port: int = 5672,
         user: str = "swiftlet",
-        password: str = "swiftlet123",
+        password: str = "",
         exchange: str = "swiftlet.domain.events",
     ):
         self.host = host
@@ -137,7 +137,7 @@ def get_default_publisher() -> DomainEventPublisher:
             host=os.getenv("RABBITMQ_HOST", "127.0.0.1"),
             port=int(os.getenv("RABBITMQ_PORT", "5672")),
             user=os.getenv("RABBITMQ_USER", "swiftlet"),
-            password=os.getenv("RABBITMQ_PASSWORD", "swiftlet123"),
+            password=os.getenv("RABBITMQ_PASSWORD", ""),
             exchange=os.getenv("RABBITMQ_EXCHANGE", "swiftlet.domain.events"),
         )
     return NoOpDomainEventPublisher()
