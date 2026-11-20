@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { formatRelativeTime } from '../../../../features/telemetry/provenance.js'
+import { AI_CLASS_LABEL, resolveAiCameraView } from '../../../../features/cameras/aiCameraState.js'
 
 /**
  * INT02: AI camera panel driven by the real AI Service (through the Gateway).
@@ -9,22 +10,7 @@ import { formatRelativeTime } from '../../../../features/telemetry/provenance.js
  * (not provisioned in INT02) and UNAVAILABLE. No video is shown unless it is the real local
  * webcam preview; demo detections are drawn on a schematic canvas, never on a fake video.
  */
-const SOURCE_META = {
-  DEMO_VIDEO: { label: 'DEMO VIDEO', className: 'demo', note: 'Video mẫu tổng hợp (synthetic) được AI Service xử lý — không phải camera thật.' },
-  LOCAL_CAMERA: { label: 'LOCAL CAMERA', className: 'local', note: 'Webcam của máy này — khung hình chỉ được gửi khi phiên đang bật, không lưu lại.' },
-  LAN_CAMERA: { label: 'LAN CAMERA', className: 'lan', note: 'Camera qua mạng LAN.' },
-  UNAVAILABLE: { label: 'UNAVAILABLE', className: 'unavailable', note: 'Không có nguồn hình ảnh đang được AI xử lý.' },
-}
-
-const STATUS_LABEL = {
-  STARTING: 'Đang khởi động',
-  ONLINE: 'Đang xử lý',
-  DEGRADED: 'Suy giảm',
-  OFFLINE: 'Đã dừng',
-  ERROR: 'Lỗi',
-}
-
-const CLASS_LABEL = { swiftlet: 'Chim yến', rat: 'Chuột', snake: 'Rắn' }
+const CLASS_LABEL = AI_CLASS_LABEL
 
 function DetectionOverlay({ detection, width, height, className }) {
   const canvasRef = useRef(null)
@@ -74,18 +60,10 @@ function LiveCameraCard({ camera, ai }) {
   }
 
   const status = ai.status
-  const running = ai.sessionState === 'ACTIVE' && status && ['STARTING', 'ONLINE', 'DEGRADED'].includes(status.status)
-  const sourceMode =
-    ai.sessionState === 'UNAVAILABLE' || ai.sessionState === 'FORBIDDEN'
-      ? 'UNAVAILABLE'
-      : running
-        ? status.sourceMode || 'UNAVAILABLE'
-        : 'UNAVAILABLE'
-  const source = SOURCE_META[sourceMode] || SOURCE_META.UNAVAILABLE
+  const view = resolveAiCameraView(ai, cameraId)
+  const { running, sourceMode, source, counts, detections } = view
   const webcamOn = ai.webcam.state === 'STREAMING' || ai.webcam.state === 'REQUESTING'
-  const counts = running && ai.counts && ai.counts.cameraId === cameraId ? ai.counts : null
   const detection = running ? ai.detection : null
-  const detections = detection?.detections || []
 
   return (
     <section className="swiftlet-card swiftlet-camera-card ai-camera-card" data-testid="ai-camera-card" data-source-mode={sourceMode} data-session-state={ai.sessionState}>
@@ -129,7 +107,7 @@ function LiveCameraCard({ camera, ai }) {
             <small>Sơ đồ vị trí phát hiện của AI trên video demo (hình ảnh video không truyền về trình duyệt).</small>
           </div>
         )}
-        {sourceMode === 'UNAVAILABLE' && !webcamOn && (
+        {(sourceMode === 'UNAVAILABLE' || sourceMode === 'OFFLINE') && !webcamOn && (
           <div className="ai-camera-empty" data-testid="ai-camera-unavailable">
             <strong>{ai.sessionState === 'UNAVAILABLE' ? 'Dịch vụ AI không khả dụng' : 'Chưa có nguồn hình ảnh'}</strong>{' '}
             <span>
@@ -149,7 +127,7 @@ function LiveCameraCard({ camera, ai }) {
       )}
 
       <dl className="ai-camera-runtime" data-testid="ai-runtime">
-        <div><dt>Trạng thái AI</dt><dd>{ai.sessionState === 'UNAVAILABLE' ? 'Không khả dụng' : status ? STATUS_LABEL[status.status] || status.status : 'Chưa chạy'}</dd></div>
+        <div><dt>Trạng thái AI</dt><dd>{view.runtimeLabel}</dd></div>
         <div><dt>Model / Tracker</dt><dd>{status ? `${status.modelVersion} · ${status.trackerType}` : '--'}</dd></div>
         <div><dt>FPS xử lý</dt><dd>{running ? status.fps.toFixed(1) : '--'}</dd></div>
         <div><dt>Khung đã xử lý</dt><dd>{running ? status.processedFrames : '--'}</dd></div>

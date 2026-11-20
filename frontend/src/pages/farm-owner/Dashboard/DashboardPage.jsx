@@ -9,7 +9,7 @@ import DeviceQuickCard from '../../../components/features/farm-owner/dashboard/D
 import AlertItem from '../../../components/features/farm-owner/dashboard/AlertItem'
 import { LoadingSpinner } from '../../../components/common/feedback/index.js'
 
-import { cameras as defaultMockCameras } from '../../../components/features/farm-owner/swiftlets/swiftletsMockData'
+import DashboardAiCamera from '../../../components/features/farm-owner/dashboard/DashboardAiCamera'
 import {
   environmentMetrics as defaultMetrics,
   mockDevices,
@@ -22,161 +22,13 @@ import { formatFarmOptionLabel } from '../../../features/farms/adapters/farmAdap
 import { useDevices } from '../../../features/devices/hooks/useDevices'
 import { useAlerts } from '../../../features/alerts/hooks/useAlerts'
 import { useTelemetry } from '../../../features/telemetry/hooks/useTelemetry'
-import { metricSource, sourceLabel } from '../../../features/telemetry/provenance.js'
+import { metricSource, sourceLabel, overallSource, formatRelativeTime } from '../../../features/telemetry/provenance.js'
+import { deviceStatusMeta, resolveIotState } from '../../../features/devices/deviceStatus.js'
 import { useCameras } from '../../../features/cameras/hooks/useCameras'
 import { USE_MOCK } from '../../../api/config.js'
 
 import '../../../components/features/farm-owner/dashboard/DashboardComponents.css'
 import './DashboardPage.css'
-
-function CameraIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="6" width="18" height="13" rx="2" />
-      <circle cx="12" cy="12.5" r="3.5" />
-      <path d="M8 6 9.5 4h5L16 6" />
-    </svg>
-  )
-}
-
-function LiveCamera({ cameras = [] }) {
-  const effectiveCameras = cameras.length > 0 ? cameras : (USE_MOCK ? defaultMockCameras : [])
-  const [selectedCameraId, setSelectedCameraId] = useState(effectiveCameras[0]?.id || 'CAM-01')
-
-  if (effectiveCameras.length === 0) {
-    return (
-      <div style={{ padding: '1.5rem', color: '#64748b', textAlign: 'center' }}>
-        Chưa có camera AI nào được cấu hình cho nhà yến này.
-      </div>
-    )
-  }
-
-  const selectedCamera =
-    effectiveCameras.find((camera) => camera.id === selectedCameraId) ?? effectiveCameras[0]
-
-  const currentIndex = effectiveCameras.findIndex(
-    (camera) => camera.id === selectedCamera.id,
-  )
-
-  const isOnline = selectedCamera.status === 'ONLINE'
-
-  function moveCamera(offset) {
-    const nextIndex =
-      (currentIndex + offset + effectiveCameras.length) % effectiveCameras.length
-    setSelectedCameraId(effectiveCameras[nextIndex].id)
-  }
-
-  return (
-    <div className="live-camera-layout">
-      <div className={`camera-preview ${!isOnline ? 'camera-preview-offline' : ''}`}>
-        <div className="camera-toolbar">
-          <div>
-            <span className={`camera-live-dot ${!isOnline ? 'offline' : ''}`} />
-            {isOnline ? 'LIVE' : 'OFFLINE'}
-          </div>
-          <span>
-            {selectedCamera.id} · {selectedCamera.name}
-          </span>
-        </div>
-
-        {isOnline ? (
-          <>
-            <div className="camera-placeholder">
-              <CameraIcon />
-              <strong>Camera trực tiếp</strong>
-              <span>Luồng camera đang được kết nối</span>
-            </div>
-
-            {(selectedCamera.detections || []).map((detection, index) => (
-              <div
-                key={detection.id || index}
-                className={`mock-detection detection-${
-                  index === 0 ? 'one' : index === 1 ? 'two' : 'three'
-                }`}
-              >
-                <span>
-                  {detection.label} · {detection.confidence}%
-                </span>
-              </div>
-            ))}
-          </>
-        ) : (
-          <div className="camera-placeholder camera-offline-placeholder">
-            <CameraIcon />
-            <strong>Camera ngoại tuyến</strong>
-            <span>Không nhận được tín hiệu từ {selectedCamera.node || selectedCamera.id}</span>
-          </div>
-        )}
-      </div>
-
-      <aside className="camera-information">
-        <div className="dashboard-camera-selector">
-          <button
-            type="button"
-            onClick={() => moveCamera(-1)}
-            aria-label="Camera trước"
-          >
-            ‹
-          </button>
-
-          <EnvironmentSelect
-            value={selectedCamera.id}
-            onChange={setSelectedCameraId}
-            options={effectiveCameras.map((camera) => ({
-              value: camera.id,
-              label: `${camera.code || camera.id} · ${camera.name}${
-                camera.status === 'OFFLINE' ? ' · Offline' : ''
-              }`,
-            }))}
-          />
-
-          <button
-            type="button"
-            onClick={() => moveCamera(1)}
-            aria-label="Camera tiếp theo"
-          >
-            ›
-          </button>
-        </div>
-
-        <div className={`camera-online ${!isOnline ? 'offline' : ''}`}>
-          <span className="camera-online-dot" />
-          <div>
-            <strong>
-              {isOnline ? 'Camera đang trực tuyến' : 'Camera ngoại tuyến'}
-            </strong>
-            <small>
-              {selectedCamera.id} ·{' '}
-              {isOnline ? 'AI đang hoạt động' : `Mất kết nối ${selectedCamera.node || ''}`}
-            </small>
-          </div>
-        </div>
-
-        <div className="camera-stat-grid">
-          <article>
-            <span>Chim vào</span>
-            <strong>{isOnline ? (selectedCamera.entries ?? (USE_MOCK ? '128' : '—')) : '—'}</strong>
-            <small>Hôm nay</small>
-          </article>
-
-          <article>
-            <span>Chim ra</span>
-            <strong>{isOnline ? (selectedCamera.exits ?? (USE_MOCK ? '94' : '—')) : '—'}</strong>
-            <small>Hôm nay</small>
-          </article>
-        </div>
-      </aside>
-    </div>
-  )
-}
 
 function EnvironmentPanel({ telemetry }) {
   const [selectedMetric, setSelectedMetric] = useState('temperature')
@@ -405,18 +257,48 @@ function EnvironmentPanel({ telemetry }) {
   )
 }
 
-function OperationsOverview({ telemetry, devices = [], alerts = [], alertsError = null }) {
+const IOT_STATE_META = {
+  ONLINE: { label: 'IoT trực tuyến', badge: 'normal' },
+  OFFLINE: { label: 'IoT ngoại tuyến', badge: 'danger' },
+  UNKNOWN: { label: 'IoT chưa có heartbeat', badge: 'warning' },
+  UNAVAILABLE: { label: 'IoT không khả dụng', badge: 'offline' },
+  NONE: { label: 'Chưa có thiết bị IoT', badge: 'offline' },
+}
+
+function IotStatusStrip({ telemetry, devices, pollStatus, isStale }) {
+  const state = USE_MOCK ? 'ONLINE' : resolveIotState(devices, pollStatus)
+  const meta = IOT_STATE_META[state]
+  const source = telemetry ? overallSource(telemetry) : null
+  return (
+    <div className="dashboard-iot-strip" data-testid="dashboard-iot-status" data-iot-state={state}>
+      <StatusBadge status={meta.badge}>{meta.label}</StatusBadge>
+      {source && source !== 'UNAVAILABLE' && (
+        <span className={`dashboard-iot-source source-${source.toLowerCase()}`} data-testid="dashboard-iot-source">
+          {source}
+        </span>
+      )}
+      <small>
+        Cập nhật: {telemetry?.timestamp ? formatRelativeTime(telemetry.timestamp) : '--'}
+        {isStale ? ' · dữ liệu cũ' : ''}
+      </small>
+    </div>
+  )
+}
+
+function OperationsOverview({ telemetry, devices = [], alerts = [], alertsError = null, pollStatus = 'idle', isStale = false }) {
   const navigate = useNavigate()
 
+  // Cameras have their own AI block above; quick devices list IoT nodes with the INT01-R1 status vocabulary
+  const iotDevices = devices.filter((d) => d.type !== 'CAMERA')
   const quickDevices =
-    devices.length > 0
-      ? devices.slice(0, 4).map((d) => ({
+    iotDevices.length > 0
+      ? iotDevices.slice(0, 4).map((d) => ({
           id: d.id,
           name: d.name,
-          zone: d.zoneId || 'Tầng 1',
-          state: d.status === 'ONLINE' ? 'Đang chạy' : 'Tắt',
-          status: d.status === 'ONLINE' ? 'normal' : 'danger',
-          value: d.firmware,
+          zone: d.zoneName || d.zoneId || '--',
+          state: deviceStatusMeta(d.status).label,
+          status: d.status === 'ONLINE' ? 'normal' : d.status === 'OFFLINE' ? 'danger' : 'warning',
+          value: d.firmware || '--',
         }))
       : (USE_MOCK ? mockDevices : [])
 
@@ -432,6 +314,7 @@ function OperationsOverview({ telemetry, devices = [], alerts = [], alertsError 
             <p>Chỉ số hiện tại và ngưỡng vận hành</p>
           </div>
         </div>
+        <IotStatusStrip telemetry={telemetry} devices={devices} pollStatus={pollStatus} isStale={isStale} />
         <EnvironmentPanel telemetry={telemetry} />
       </section>
 
@@ -446,7 +329,7 @@ function OperationsOverview({ telemetry, devices = [], alerts = [], alertsError 
         <div className="quick-device-list">
           {quickDevices.length === 0 ? (
             <div style={{ padding: '0.75rem', color: '#64748b', fontSize: '0.88rem' }}>
-              Chưa có thiết bị nào trong nhà yến này.
+              Chưa có thiết bị IoT nào trong nhà yến này.
             </div>
           ) : (
             quickDevices.map((device) => (
@@ -504,7 +387,7 @@ function DashboardPage() {
 
   const { devices } = useDevices(selectedFarmId, { requireFarmId: true })
   const { alerts, error: alertsError } = useAlerts(selectedFarmId)
-  const { telemetry } = useTelemetry(selectedFarmId)
+  const { telemetry, pollStatus, isStale } = useTelemetry(selectedFarmId)
   const { cameras } = useCameras(selectedFarmId, null, { requireFarmId: true })
 
   const ownerName = user?.fullName || user?.name || 'Farm Owner'
@@ -560,17 +443,17 @@ function DashboardPage() {
 
             <p className="farm-last-update">
               Cập nhật dữ liệu gần nhất:
-              <strong> {hasLiveSignal || USE_MOCK ? 'vài giây trước' : 'Chưa có dữ liệu'}</strong>
+              <strong> {USE_MOCK ? 'vài giây trước' : telemetry?.timestamp ? formatRelativeTime(telemetry.timestamp) : '--'}</strong>
             </p>
           </div>
         </section>
 
         <SectionCard
-          title="Live Camera"
-          subtitle="Giám sát lối vào và phân tích AI theo thời gian thực"
+          title="Camera AI"
+          subtitle="Trạng thái AI runtime, phát hiện và đếm chim — cùng nguồn với trang Giám sát chim yến"
           className="live-camera-card"
         >
-          <LiveCamera cameras={cameras} />
+          <DashboardAiCamera key={selectedFarmId || 'none'} cameras={cameras} />
         </SectionCard>
 
         <SectionCard
@@ -583,6 +466,8 @@ function DashboardPage() {
             devices={devices}
             alerts={alerts}
             alertsError={alertsError}
+            pollStatus={pollStatus}
+            isStale={isStale}
           />
         </SectionCard>
       </div>

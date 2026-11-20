@@ -38,3 +38,15 @@ export function realNumberOrNull(value) {
   const n = Number(value)
   return Number.isFinite(n) ? n : null
 }
+
+/** INT02 UI sync: farm-scoped IoT state from real device presence + the shared telemetry poller. */
+export function resolveIotState(devices = [], pollStatus = 'idle') {
+  const iot = devices.filter((d) => d.type !== 'CAMERA')
+  if (iot.length === 0) return 'NONE'
+  if (pollStatus === 'unavailable' || pollStatus === 'error') return 'UNAVAILABLE'
+  const statuses = iot.map((d) => d.status)
+  if (statuses.includes('ONLINE') || statuses.includes('WARNING')) return 'ONLINE'
+  if (statuses.includes('UNAVAILABLE')) return 'UNAVAILABLE'
+  if (statuses.includes('OFFLINE')) return 'OFFLINE'
+  return 'UNKNOWN'
+}
