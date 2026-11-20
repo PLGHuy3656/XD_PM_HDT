@@ -863,3 +863,27 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* INT02 — AI camera card */
+.ai-source-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.03em;background:#eef2f7;color:#334155;border:1px solid #cbd5e1}
+.ai-source-chip--demo{background:#fff7e6;color:#9a5b00;border-color:#f5c56b}
+.ai-source-chip--local{background:#e8f5ee;color:#126b3b;border-color:#8ad1a9}
+.ai-source-chip--lan{background:#e8f0fe;color:#1d4ed8;border-color:#93b4f5}
+.ai-source-chip--unavailable{background:#fdecec;color:#b42318;border-color:#f3a6a0}
+.ai-camera-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.ai-camera-actions button{padding:7px 14px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-weight:600}
+.ai-camera-actions button:disabled{opacity:.5;cursor:not-allowed}
+.ai-camera-stage{position:relative;width:100%;aspect-ratio:4/3;background:#0f172a;border-radius:10px;overflow:hidden}
+.ai-camera-stage video,.ai-camera-overlay,.ai-camera-schematic-canvas{position:absolute;inset:0;width:100%;height:100%}
+.ai-camera-stage video{object-fit:contain}
+.ai-camera-overlay{pointer-events:none}
+.ai-camera-schematic{position:absolute;inset:0}
+.ai-camera-note{font-size:12px;color:#64748b;margin:6px 0}
+.ai-camera-empty,.ai-camera-error{padding:14px;border-radius:8px;margin:8px 0;font-size:14px}
+.ai-camera-empty{background:#f8fafc;color:#475569;border:1px dashed #cbd5e1}
+.ai-camera-error{background:#fdecec;color:#b42318;border:1px solid #f3a6a0}
+.ai-camera-runtime,.ai-camera-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 14px;font-size:13px;margin-top:10px}
+.ai-muted{color:#94a3b8}
+.ai-camera-video.is-hidden{display:none}
+/* INT02: keep the farm/zone/camera dropdown panels above the stats cards */
+.swiftlets-selectors{position:relative;z-index:20}

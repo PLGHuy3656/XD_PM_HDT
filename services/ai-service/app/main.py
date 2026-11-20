@@ -22,6 +22,7 @@ from app.api import (
     events_router,
     health_router,
     runtime_control_router,
+    sessions_router,
     snapshots_router,
 )
 from app.config import AI_PIPELINE_DIR, load_pipeline_config, load_runtime_cameras, settings
@@ -161,6 +162,7 @@ def create_app(
     application.include_router(snapshots_router)
     application.include_router(analyze_router)
     application.include_router(runtime_control_router)
+    application.include_router(sessions_router)
     application.include_router(ws_router)
 
     inst = Instrumentator(

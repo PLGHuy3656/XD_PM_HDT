@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { devicesApi } from '../../../api/modules/devicesApi.js'
-import { camerasApi } from '../../../api/modules/camerasApi.js'
-import { analyticsApi } from '../../../api/modules/analyticsApi.js'
 import { USE_MOCK } from '../../../api/config.js'
 import {
   getMockCameras,
@@ -10,6 +8,7 @@ import {
   normalizeCamera,
 } from '../adapters/cameraAdapter.js'
 
+// eslint-disable-next-line no-unused-vars -- cameraId kept for call-site compatibility
 export function useCameras(farmId = null, cameraId = null, { requireFarmId = false } = {}) {
   const [cameras, setCameras] = useState(() => (USE_MOCK ? getMockCameras() : []))
   const [birdStats, setBirdStats] = useState(() => (USE_MOCK ? getMockBirdStats() : null))
@@ -54,37 +53,8 @@ export function useCameras(farmId = null, cameraId = null, { requireFarmId = fal
 
       setCameras(cameraDevices)
 
-      // In real mode, load live bird performance from Analytics if farmId is provided
-      if (farmId) {
-        try {
-          const summary = await analyticsApi.getFarmSummary(farmId, { signal })
-          if (summary?.birdPerformance) {
-            setBirdStats({
-              totalCount: summary.birdPerformance.entries ?? 0,
-              entries: summary.birdPerformance.entries ?? 0,
-              exits: summary.birdPerformance.exits ?? 0,
-              activeNests: summary.yieldSummary?.activeNests ?? 0,
-              change: summary.birdPerformance.change ?? 0,
-            })
-          }
-        } catch {
-          // Analytics may be empty or gap
-        }
-      }
-
-      // Check status of individual camera if requested
-      if (cameraId) {
-        try {
-          const statusResp = await camerasApi.getCameraStatus(cameraId, { signal })
-          if (statusResp) {
-            setCameras((prev) =>
-              prev.map((c) => (c.id === cameraId ? { ...c, ...statusResp } : c)),
-            )
-          }
-        } catch {
-          // Offline camera returns 404
-        }
-      }
+      // INT02: bird counts / runtime status come from the AI Service per camera
+      // (useCameraAiRuntime via the Gateway) - not from Analytics, which is not deployed yet.
     } catch (err) {
       if (err?.code !== 'ABORTED') {
         setError(err?.message || 'Không thể tải thông tin camera AI.')
@@ -92,13 +62,14 @@ export function useCameras(farmId = null, cameraId = null, { requireFarmId = fal
     } finally {
       setLoading(false)
     }
-  }, [farmId, cameraId, requireFarmId])
+  }, [farmId, requireFarmId])
 
   useEffect(() => {
     const controller = new AbortController()
-    fetchCameras(controller.signal)
+    const first = setTimeout(() => fetchCameras(controller.signal), 0)
 
     return () => {
+      clearTimeout(first)
       controller.abort()
     }
   }, [fetchCameras])

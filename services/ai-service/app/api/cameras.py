@@ -87,11 +87,18 @@ def get_camera_status(
     runtime_manager: AIRuntimeManager = Depends(get_runtime_manager),
     state_store: InMemoryAIRuntimeStateStore = Depends(get_state_store),
 ) -> CameraRuntimeStatus:
+    # INT02: a pipeline owned by this process is the live source of truth (processedFrames/fps/lastFrameAt);
+    # the state-store snapshot is only written on transitions and stays the fallback for other replicas.
+    pipeline = runtime_manager.get_pipeline(cameraId)
+    if pipeline is not None:
+        live = pipeline.status
+        if live.status in ("STARTING", "ONLINE", "DEGRADED"):
+            return live
+
     status = state_store.get_camera_status(cameraId)
     if status is not None:
         return status
 
-    pipeline = runtime_manager.get_pipeline(cameraId)
     if pipeline is not None:
         state_store.record_status(pipeline.status)
         return pipeline.status

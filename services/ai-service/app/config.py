@@ -45,6 +45,8 @@ class RuntimeCameraConfig:
     farm_id: Optional[str] = None
     zone_id: Optional[str] = None
     autostart: bool = False
+    # INT02: provenance of the frames (CONFIGURED | DEMO_VIDEO | LOCAL_CAMERA | LAN_CAMERA)
+    source_mode: str = "CONFIGURED"
 
     @classmethod
     def from_tv2_camera_config(
@@ -226,6 +228,27 @@ class Settings(BaseSettings):
     ai_registry_timeout_seconds: float = Field(
         default=3.0,
         validation_alias=AliasChoices("ai_registry_timeout_seconds", "AI_REGISTRY_TIMEOUT_SECONDS"),
+    )
+
+    # INT02 interactive camera sessions (Gateway-authorised). The demo video is a SERVER-SIDE
+    # file; clients can never choose a path or URL.
+    ai_demo_video_path: str = Field(
+        default_factory=lambda: str(
+            (AI_PIPELINE_DIR / "data" / "samples" / "fixture_swiftlet_bidirectional.avi").resolve()
+        ),
+        validation_alias=AliasChoices("ai_demo_video_path", "AI_DEMO_VIDEO_PATH"),
+    )
+    ai_local_frame_max_bytes: int = Field(
+        default=1_500_000,
+        validation_alias=AliasChoices("ai_local_frame_max_bytes", "AI_LOCAL_FRAME_MAX_BYTES"),
+    )
+    ai_local_frame_min_interval_s: float = Field(
+        default=0.15,
+        validation_alias=AliasChoices("ai_local_frame_min_interval_s", "AI_LOCAL_FRAME_MIN_INTERVAL_S"),
+    )
+    ai_local_session_idle_timeout_s: float = Field(
+        default=20.0,
+        validation_alias=AliasChoices("ai_local_session_idle_timeout_s", "AI_LOCAL_SESSION_IDLE_TIMEOUT_S"),
     )
     ai_allowed_source_dirs: list[str] = Field(
         default_factory=lambda: [str((AI_PIPELINE_DIR / "data" / "samples").resolve())],

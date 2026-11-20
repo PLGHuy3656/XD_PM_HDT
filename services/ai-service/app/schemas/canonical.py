@@ -271,6 +271,9 @@ class CameraRuntimeStatus(CanonicalModel):
     updatedAt: str
     errorCode: Optional[str] = None
     errorMessage: Optional[str] = None
+    # INT02 (optional, backward compatible): where frames come from
+    # CONFIGURED | DEMO_VIDEO | LOCAL_CAMERA | LAN_CAMERA
+    sourceMode: Optional[str] = None
 
     @field_validator("cameraId", "modelVersion", "trackerType")
     @classmethod

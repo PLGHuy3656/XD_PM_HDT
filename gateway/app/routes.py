@@ -1540,6 +1540,149 @@ async def proxy_ai_camera_detection_latest(
     )
 
 
+# -----------------------------------------------------------------------------
+# INT02: interactive AI camera sessions (DEMO_VIDEO / LOCAL_CAMERA) and frame ingest
+# -----------------------------------------------------------------------------
+MAX_AI_FRAME_BYTES = 1_500_000
+
+
+async def _resolve_camera_context(camera_id: str, request: Request) -> Dict[str, Optional[str]]:
+    """Authorise the caller for the camera, then read farm/zone AUTHORITATIVELY from Management.
+
+    The client never supplies farmId/zoneId or a media source.
+    """
+    canonical_camera_id = await resolve_camera_access(camera_id, request)
+    client = getattr(request.app.state, "http_client", None)
+    owns_client = client is None
+    if owns_client:
+        client = httpx.AsyncClient()
+    try:
+        resp = await client.get(
+            f"{settings.management_service_url.rstrip('/')}/api/cameras/{canonical_camera_id}",
+            headers={
+                "Authorization": f"Bearer {getattr(request.state, 'raw_token', '')}",
+                "X-Correlation-ID": getattr(request.state, "correlation_id", "unknown-cid"),
+                "Accept": "application/json",
+            },
+            timeout=settings.management_timeout_seconds,
+        )
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service Unavailable: Management unreachable") from exc
+    finally:
+        if owns_client:
+            await client.aclose()
+    if resp.status_code != status.HTTP_200_OK:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Camera metadata could not be resolved")
+    data = resp.json() if resp.content else {}
+    farm_id = str(data.get("farm_id") or data.get("farmId") or "").strip() or None
+    zone_id = str(data.get("zone_id") or data.get("zoneId") or "").strip() or None
+    if not farm_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Camera is not bound to a farm")
+    return {"cameraId": canonical_camera_id, "farmId": farm_id, "zoneId": zone_id}
+
+
+async def _ai_internal_post(request: Request, path: str, json_body: Optional[Dict[str, Any]] = None) -> Response:
+    from app.proxy import internal_service_headers_for
+
+    client = getattr(request.app.state, "http_client", None)
+    owns_client = client is None
+    if owns_client:
+        client = httpx.AsyncClient()
+    try:
+        resp = await client.post(
+            f"{settings.ai_service_url.rstrip('/')}{path}",
+            json=json_body,
+            headers={
+                **internal_service_headers_for(settings.ai_service_url),
+                "X-Correlation-ID": getattr(request.state, "correlation_id", "unknown-cid"),
+            },
+            timeout=settings.ai_timeout_seconds,
+        )
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service Unavailable: AI Service unreachable") from exc
+    finally:
+        if owns_client:
+            await client.aclose()
+    try:
+        content = resp.json()
+    except ValueError:
+        content = {"detail": resp.text[:200]}
+    return JSONResponse(status_code=resp.status_code, content=content)
+
+
+@router.post(
+    "/api/v1/ai/cameras/{camera_id}/session",
+    tags=["AI Service - Camera Sessions (INT02)"],
+    summary="Start a DEMO_VIDEO or LOCAL_CAMERA AI session for an authorised camera",
+)
+async def proxy_ai_camera_session_start(
+    request: Request,
+    camera_id: str,
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER", "TECHNICIAN")),
+) -> Response:
+    _check_path_security(request, f"cameras/{camera_id}/session")
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+    mode = body.get("mode") if isinstance(body, dict) else None
+    if mode not in ("DEMO_VIDEO", "LOCAL_CAMERA") or (isinstance(body, dict) and set(body.keys()) - {"mode"}):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Body must be exactly {\"mode\": \"DEMO_VIDEO\" | \"LOCAL_CAMERA\"}",
+        )
+    ctx = await _resolve_camera_context(camera_id, request)
+    return await _ai_internal_post(
+        request,
+        f"/api/v1/ai/cameras/{ctx['cameraId']}/sessions",
+        {"mode": mode, "farmId": ctx["farmId"], "zoneId": ctx["zoneId"]},
+    )
+
+
+@router.post(
+    "/api/v1/ai/cameras/{camera_id}/session/stop",
+    tags=["AI Service - Camera Sessions (INT02)"],
+    summary="Stop the AI session of an authorised camera",
+)
+async def proxy_ai_camera_session_stop(
+    request: Request,
+    camera_id: str,
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER", "TECHNICIAN")),
+) -> Response:
+    _check_path_security(request, f"cameras/{camera_id}/session/stop")
+    canonical_camera_id = await resolve_camera_access(camera_id, request)
+    return await _ai_internal_post(request, f"/api/v1/ai/cameras/{canonical_camera_id}/stop")
+
+
+@router.post(
+    "/api/v1/ai/cameras/{camera_id}/frames",
+    tags=["AI Service - Camera Sessions (INT02)"],
+    summary="Push one webcam frame (JPEG/PNG) into the camera's LOCAL_CAMERA session",
+)
+async def proxy_ai_camera_frame(
+    request: Request,
+    camera_id: str,
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER", "TECHNICIAN")),
+) -> Response:
+    _check_path_security(request, f"cameras/{camera_id}/frames")
+    ctype = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if ctype not in ("image/jpeg", "image/png"):
+        raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="Frames must be image/jpeg or image/png")
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_AI_FRAME_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Frame too large")
+    canonical_camera_id = await resolve_camera_access(camera_id, request)
+    body = await request.body()
+    if len(body) > MAX_AI_FRAME_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Frame too large")
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.ai_service_url,
+        upstream_path=f"/api/v1/ai/cameras/{canonical_camera_id}/frames",
+        timeout=settings.ai_timeout_seconds,
+    )
+
+
 @router.get(
     "/api/v1/ai/events",
     tags=["AI Service - Events (Locked)"],

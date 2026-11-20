@@ -65,6 +65,23 @@ export const camerasApi = {
   async getEvents(options = {}) {
     return apiClient.get(ENDPOINTS.AI.EVENTS, options)
   },
+
+  /**
+   * INT02: start a DEMO_VIDEO or LOCAL_CAMERA AI session (Gateway resolves farm/zone itself)
+   * @param {string} cameraId - camera node_id
+   * @param {'DEMO_VIDEO'|'LOCAL_CAMERA'} mode
+   */
+  async startSession(cameraId, mode, options = {}) {
+    return apiClient.post(ENDPOINTS.AI.CAMERA_SESSION(cameraId), { mode }, options)
+  },
+
+  /**
+   * INT02: stop the camera's AI session
+   * @param {string} cameraId
+   */
+  async stopSession(cameraId, options = {}) {
+    return apiClient.post(ENDPOINTS.AI.CAMERA_SESSION_STOP(cameraId), {}, options)
+  },
 }
 
 export default camerasApi

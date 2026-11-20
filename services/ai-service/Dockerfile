@@ -14,6 +14,8 @@ RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/wh
 
 # Copy ai-pipeline library and configs to /ai-pipeline
 COPY ai-pipeline /ai-pipeline
+# INT02: reproducible SYNTHETIC demo fixtures (generated, never committed) for DEMO_VIDEO sessions
+RUN python /ai-pipeline/scripts/generate_test_fixtures.py
 
 # Copy ai-service source to /app
 COPY services/ai-service/app ./app

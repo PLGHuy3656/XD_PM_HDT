@@ -50,6 +50,10 @@ export const ENDPOINTS = {
     CAMERA_COUNTS_LATEST: (cameraId) => `/api/v1/ai/cameras/${cameraId}/counts/latest`,
     CAMERA_COUNTS_HISTORY: (cameraId) => `/api/v1/ai/cameras/${cameraId}/counts`,
     CAMERA_DETECTIONS_LATEST: (cameraId) => `/api/v1/ai/cameras/${cameraId}/detections/latest`,
+    // INT02: interactive AI sessions through the Gateway (camera ownership enforced there)
+    CAMERA_SESSION: (cameraId) => `/api/v1/ai/cameras/${cameraId}/session`,
+    CAMERA_SESSION_STOP: (cameraId) => `/api/v1/ai/cameras/${cameraId}/session/stop`,
+    CAMERA_FRAMES: (cameraId) => `/api/v1/ai/cameras/${cameraId}/frames`,
     EVENTS: '/api/v1/ai/events',
     EVENT_DETAIL: (eventId) => `/api/v1/ai/events/${eventId}`,
   },

@@ -386,6 +386,7 @@ class AIRuntimeManager:
             farm_id=camera_config.farm_id,
             zone_id=camera_config.zone_id,
             autostart=camera_config.autostart,
+            source_mode=getattr(camera_config, "source_mode", "CONFIGURED"),
         )
 
         pipeline = CameraPipeline(
@@ -639,6 +640,69 @@ class AIRuntimeManager:
         )
         self.start_camera(camera_id, max_frames=max_frames)
         return self._threads[camera_id]
+
+    # ------------------------------------------------------------------ INT02 sessions
+    def _replace_pipeline(self, camera_id: str) -> None:
+        """Stop and unregister any existing pipeline so a new session can take the camera id."""
+        if self.is_running(camera_id):
+            try:
+                self.stop_camera(camera_id)
+            except KeyError:
+                pass
+        existing = self._pipelines.pop(camera_id, None)
+        if existing is not None:
+            try:
+                existing.close()
+            except Exception:
+                pass
+        self._threads.pop(camera_id, None)
+        getattr(self, "_push_sources", {}).pop(camera_id, None)
+
+    def start_session(
+        self,
+        camera_id: str,
+        mode: str,
+        demo_video_path: str,
+        farm_id: Optional[str] = None,
+        zone_id: Optional[str] = None,
+        idle_timeout_s: float = 20.0,
+    ) -> CameraRuntimeStatus:
+        """Start an INT02 interactive session on the real pipeline.
+
+        DEMO_VIDEO   -> server-side demo video replayed in a loop.
+        LOCAL_CAMERA -> frames pushed by the authorised client (browser webcam via Gateway).
+        """
+        from app.runtime.session_sources import LoopingVideoSource, PushFrameSource
+
+        if not hasattr(self, "_push_sources"):
+            self._push_sources: Dict[str, PushFrameSource] = {}
+        self._replace_pipeline(camera_id)
+        if mode == "DEMO_VIDEO":
+            source: FrameSource = LoopingVideoSource(camera_id, demo_video_path)
+            source_type = "video"
+        elif mode == "LOCAL_CAMERA":
+            source = PushFrameSource(camera_id, idle_timeout_s=idle_timeout_s)
+            source_type = "push"
+            self._push_sources[camera_id] = source  # type: ignore[assignment]
+        else:
+            raise ValueError(f"Unsupported session mode: {mode}")
+        cam_cfg = RuntimeCameraConfig(
+            camera_id=camera_id,
+            source=source,
+            source_type=source_type,
+            farm_id=farm_id,
+            zone_id=zone_id,
+            source_mode=mode,
+        )
+        self.register_camera(cam_cfg)
+        return self.start_camera(camera_id)
+
+    def push_frame(self, camera_id: str, data: bytes) -> bool:
+        """Feed one client JPEG frame into an active LOCAL_CAMERA session."""
+        src = getattr(self, "_push_sources", {}).get(camera_id)
+        if src is None or src.closed or not self.is_running(camera_id):
+            raise LookupError(f"No active LOCAL_CAMERA session for {camera_id}")
+        return src.push_jpeg(data)
 
     def analyze_single_image(
         self,

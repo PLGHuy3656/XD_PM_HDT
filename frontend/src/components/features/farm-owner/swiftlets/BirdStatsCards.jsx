@@ -46,8 +46,8 @@ function BirdStatsCards({ stats }) {
     <section className="swiftlet-stats-grid">
       <StatCard
         icon="↘"
-        label="Vào tổ hôm nay"
-        hint="Lượt chim được AI ghi nhận"
+        label={`Vào tổ ${stats.scope || 'hôm nay'}`}
+        hint={stats.sourceMode === 'DEMO_VIDEO' ? 'AI đếm trên VIDEO DEMO (không phải số liệu nhà yến)' : 'Lượt chim được AI ghi nhận'}
         value={stats.entries}
         unit="lượt"
         delta={stats.entriesDelta}
@@ -56,7 +56,7 @@ function BirdStatsCards({ stats }) {
 
       <StatCard
         icon="↗"
-        label="Xuất đàn hôm nay"
+        label={`Xuất đàn ${stats.scope || 'hôm nay'}`}
         hint="Lượt chim rời nhà yến"
         value={stats.exits}
         unit="lượt"

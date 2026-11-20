@@ -39,6 +39,8 @@ class GatewaySettings(BaseSettings):
     # INT01-R1: service-to-service key presented to IoT Service (X-Internal-Service-Key).
     # Injected by the Gateway only after JWT + farm/device authorization; never taken from clients.
     iot_internal_service_key: str = ""
+    # INT02: service-to-service key presented to AI Service for camera session/frame operations
+    ai_internal_service_key: str = ""
 
     # Timeouts (seconds)
     default_timeout_seconds: float = 5.0

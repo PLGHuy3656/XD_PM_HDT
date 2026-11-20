@@ -101,9 +101,13 @@ def validate_path_security(request: Request, path: str = "") -> None:
 
 def internal_service_headers_for(upstream_base_url: str) -> dict[str, str]:
     """INT01-R1: trusted service-to-service credential for upstreams that require it (IoT Service)."""
+    base = upstream_base_url.rstrip("/")
     key = (settings.iot_internal_service_key or "").strip()
-    if key and upstream_base_url.rstrip("/") == settings.iot_service_url.rstrip("/"):
+    if key and base == settings.iot_service_url.rstrip("/"):
         return {"X-Internal-Service-Key": key}
+    ai_key = (settings.ai_internal_service_key or "").strip()
+    if ai_key and base == settings.ai_service_url.rstrip("/"):
+        return {"X-Internal-Service-Key": ai_key}
     return {}
 
 

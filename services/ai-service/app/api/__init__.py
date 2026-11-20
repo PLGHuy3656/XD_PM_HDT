@@ -5,6 +5,7 @@ from app.api.events import router as events_router
 from app.api.health import router as health_router
 from app.api.runtime_control import router as runtime_control_router
 from app.api.snapshots import router as snapshots_router
+from app.api.sessions import router as sessions_router
 
 __all__ = [
     "analyze_router",
@@ -13,4 +14,5 @@ __all__ = [
     "health_router",
     "runtime_control_router",
     "snapshots_router",
+    "sessions_router",
 ]

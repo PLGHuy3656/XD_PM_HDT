@@ -151,6 +151,7 @@ class CameraPipeline:
             updatedAt=updated_at or epoch_to_iso8601_utc(),
             errorCode=self._error_code,
             errorMessage=self._error_message,
+            sourceMode=getattr(self.camera_config, "source_mode", None),
         )
 
     def _emit_status(self, updated_at: Optional[str] = None) -> CameraRuntimeStatus:

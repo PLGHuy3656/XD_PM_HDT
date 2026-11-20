@@ -162,9 +162,12 @@ services:
       MANAGEMENT_SERVICE_URL: http://management-service:8001
       IOT_SERVICE_URL: http://iot-service:8002
       IOT_INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
-      # INT01 deployment scope (drives Admin service status; AI/Notification/Analytics join in INT02-04)
+      # INT02: AI Service joins the stack (internal network only)
+      AI_SERVICE_URL: http://ai-service:8003
+      AI_INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      # Deployment scope (drives Admin service status; Notification/Analytics join in INT03-04)
       IOT_SERVICE_DEPLOYED: "true"
-      AI_SERVICE_DEPLOYED: "false"
+      AI_SERVICE_DEPLOYED: "true"
       NOTIFICATION_SERVICE_DEPLOYED: "false"
       ANALYTICS_SERVICE_DEPLOYED: "false"
       REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/1
@@ -203,6 +206,31 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+    networks:
+      - int01-net
+
+  # INT02: AI Service (YOLO26n best.pt + ByteTrack + line counting). No host port: reachable only
+  # through the API Gateway (JWT + camera ownership via Management). In-memory runtime state:
+  # ai_db / Redis / RabbitMQ are intentionally not used in INT02 (Notification = INT03).
+  ai-service:
+    build:
+      context: .
+      dockerfile: services/ai-service/Dockerfile
+    container_name: swiftletcare-int01-ai
+    hostname: ai-service
+    restart: unless-stopped
+    environment:
+      AI_LOAD_CONFIGURED_CAMERAS: "false"
+      RABBITMQ_ENABLED: "false"
+      AI_RABBITMQ_ENABLED: "false"
+      AI_REDIS_ENABLED: "false"
+      AI_BACKEND_ENABLED: "false"
+      AI_RUNTIME_INTERNAL_ENABLED: "false"
+      AI_CAMERA_CONTROL_REQUIRE_AUTH: "true"
+      AI_INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      AI_MANAGEMENT_SERVICE_URL: http://management-service:8001
+      AI_LOCAL_FRAME_MIN_INTERVAL_S: "0.15"
+      AI_LOCAL_SESSION_IDLE_TIMEOUT_S: "20"
     networks:
       - int01-net
 
