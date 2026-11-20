@@ -26,6 +26,7 @@ from app.repositories.telemetry_repository import (
     TelemetryRepository,
     default_telemetry_repository,
 )
+from app.schemas.telemetry import resolve_metric_sources
 from app.schemas.diagnostics import (
     ActuatorHealthItem,
     AdminDeviceRegistryItem,
@@ -184,21 +185,26 @@ class DiagnosticsService:
         else:
             last_seen_str = "Chưa có dữ liệu"
 
-        # Sensors health
+        # Sensors health (INT01-R1: null metric -> UNAVAILABLE, never a default value; source label attached)
         sensors: list[SensorHealthItem] = []
         if latest_telemetry and status != "OFFLINE":
             m = latest_telemetry.metrics
+            sources = resolve_metric_sources(m, latest_telemetry.state, latest_telemetry.provenance)
             temp_status = "HEALTHY" if 20.0 <= m.temperature <= 35.0 else "WARNING"
             hum_status = "HEALTHY" if 65.0 <= m.humidity <= 90.0 else "WARNING"
-            co2_status = "HEALTHY" if m.co2 <= 1000.0 else "WARNING"
-            lux_status = "HEALTHY" if m.lux <= 2.0 else "WARNING"
 
-            sensors.append(SensorHealthItem(name="Nhiệt độ", status=temp_status, value=f"{m.temperature:.1f}°C"))
-            sensors.append(SensorHealthItem(name="Độ ẩm", status=hum_status, value=f"{m.humidity:.1f}%"))
-            sensors.append(SensorHealthItem(name="CO₂", status=co2_status, value=f"{int(m.co2)} ppm"))
-            sensors.append(SensorHealthItem(name="Ánh sáng", status=lux_status, value=f"{m.lux:.1f} lux"))
+            sensors.append(SensorHealthItem(name="Nhiệt độ", status=temp_status, value=f"{m.temperature:.1f}°C", source=sources["temperature"]))
+            sensors.append(SensorHealthItem(name="Độ ẩm", status=hum_status, value=f"{m.humidity:.1f}%", source=sources["humidity"]))
+            if m.co2 is None:
+                sensors.append(SensorHealthItem(name="CO₂", status="UNAVAILABLE", value="--", source="UNAVAILABLE"))
+            else:
+                sensors.append(SensorHealthItem(name="CO₂", status="HEALTHY" if m.co2 <= 1000.0 else "WARNING", value=f"{int(m.co2)} ppm", source=sources["co2"]))
+            if m.lux is None:
+                sensors.append(SensorHealthItem(name="Ánh sáng", status="UNAVAILABLE", value="--", source="UNAVAILABLE"))
+            else:
+                sensors.append(SensorHealthItem(name="Ánh sáng", status="HEALTHY" if m.lux <= 2.0 else "WARNING", value=f"{m.lux:.1f} lux", source=sources["lux"]))
 
-            if not m.audioHealthy:
+            if m.audioHealthy is False:
                 status = "WARNING"
                 issues.append("Cảm biến âm thanh phát hiện mất tiếng loa ru.")
             if hum_status == "WARNING":
@@ -213,17 +219,17 @@ class DiagnosticsService:
             sensors.append(SensorHealthItem(name="CO₂", status="UNAVAILABLE", value="--"))
             sensors.append(SensorHealthItem(name="Ánh sáng", status="UNAVAILABLE", value="--"))
 
-        # Actuators health
+        # Actuators (INT01-R1): only the reported relay state is known; no feedback sensor exists,
+        # so actuator health is UNVERIFIED rather than a fabricated HEALTHY.
         actuators: list[ActuatorHealthItem] = []
+        actuator_names = (("fan", "Quạt thông gió"), ("misting", "Máy phun sương"), ("heater", "Máy sưởi"), ("alarm", "Còi báo động"))
         if latest_telemetry and status != "OFFLINE":
             act = latest_telemetry.actuators
-            actuators.append(ActuatorHealthItem(name="Quạt thông gió", status="HEALTHY" if not act.fan or is_online else "WARNING"))
-            actuators.append(ActuatorHealthItem(name="Máy phun sương", status="HEALTHY" if not act.misting or is_online else "WARNING"))
-            actuators.append(ActuatorHealthItem(name="Máy sưởi", status="HEALTHY"))
-            actuators.append(ActuatorHealthItem(name="Còi báo động", status="HEALTHY"))
+            for key, label in actuator_names:
+                actuators.append(ActuatorHealthItem(name=label, status="UNVERIFIED", state="ON" if getattr(act, key) else "OFF"))
         else:
-            actuators.append(ActuatorHealthItem(name="Quạt thông gió", status="WARNING"))
-            actuators.append(ActuatorHealthItem(name="Máy phun sương", status="WARNING"))
+            for key, label in actuator_names:
+                actuators.append(ActuatorHealthItem(name=label, status="UNAVAILABLE", state=None))
 
         return DeviceDiagnosticDetail(
             id=device_id,

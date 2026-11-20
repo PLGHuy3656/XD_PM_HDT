@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from app.realtime.publisher import WebSocketConnectionManager
 from app.routes.dependencies import get_ws_manager
+from app.security import require_internal_service_ws
 
 router = APIRouter(tags=["Realtime"])
 
 
-@router.websocket("/ws/iot")
+@router.websocket("/ws/iot", dependencies=[Depends(require_internal_service_ws)])
 async def iot_websocket_endpoint(
     websocket: WebSocket,
     manager: WebSocketConnectionManager = Depends(get_ws_manager),

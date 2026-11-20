@@ -62,7 +62,7 @@ function DevicesPage() {
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [selectedDeviceId, setSelectedDeviceId] = useState(null)
-  const [refreshLabel, setRefreshLabel] = useState('Vừa xong')
+  const [refreshLabel, setRefreshLabel] = useState('Làm mới')
   const [createOpen, setCreateOpen] = useState(false)
   const [editingDevice, setEditingDevice] = useState(null)
   const [devForm, setDevForm] = useState({ node_id: '', name: '', zone_id: '', device_type: 'CONTROLLER' })
@@ -105,7 +105,7 @@ function DevicesPage() {
     devices.find((device) => device.id === selectedDeviceId) ?? null
 
   const onlineCount = devices.filter((device) => device.status === 'ONLINE').length
-  const warningCount = devices.filter((device) => device.status === 'WARNING').length
+  const warningCount = devices.filter((device) => ['WARNING', 'UNKNOWN', 'UNAVAILABLE'].includes(device.status)).length
   const offlineCount = devices.filter((device) => device.status === 'OFFLINE').length
   const farmDeviceCount = devices.length
 
@@ -118,7 +118,7 @@ function DevicesPage() {
   const handleRefresh = async () => {
     setRefreshLabel('Đang làm mới...')
     await refetchDevices()
-    setRefreshLabel('Vừa xong')
+    setRefreshLabel(`Cập nhật ${new Date().toLocaleTimeString('vi-VN')}`)
   }
 
   const handleSaveDevice = async (event) => {
@@ -250,13 +250,13 @@ function DevicesPage() {
           <article className="device-summary-card">
             <span className="device-summary-label">Cần kiểm tra</span>
             <strong>{warningCount}</strong>
-            <small>Tín hiệu yếu hoặc chập chờn</small>
+            <small>Cảnh báo / chưa có heartbeat / IoT không xác định</small>
           </article>
 
           <article className="device-summary-card">
             <span className="device-summary-label">Ngoại tuyến</span>
             <strong>{offlineCount}</strong>
-            <small>Chưa kết nối IoT / mất tín hiệu</small>
+            <small>Đã xác nhận mất tín hiệu</small>
           </article>
         </section>
 
@@ -322,7 +322,8 @@ function DevicesPage() {
               <DeviceTable
                 devices={filteredDevices}
                 selectedDeviceId={selectedDeviceId}
-                onSelectDevice={(device) => setSelectedDeviceId(device.id)}
+                // INT01-R1: DeviceTable passes the device id (string); previously `.id` of a string -> panel never opened
+                onSelectDevice={(deviceOrId) => setSelectedDeviceId(typeof deviceOrId === 'string' ? deviceOrId : deviceOrId?.id ?? null)}
                 getZoneName={getZoneName}
               />
             )}
@@ -331,7 +332,8 @@ function DevicesPage() {
           <aside className="devices-side-panel">
             <DeviceDetailPanel
               device={selectedDevice}
-              getZoneName={getZoneName}
+              zoneName={selectedDevice ? getZoneName(selectedDevice) : ''}
+              farmName={selectedFarm?.name || ''}
               onClose={() => setSelectedDeviceId(null)}
             />
             {selectedDevice && (

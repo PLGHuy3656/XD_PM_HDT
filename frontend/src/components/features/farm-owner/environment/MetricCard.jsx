@@ -1,4 +1,5 @@
 import { getMetricState } from './metricState.js'
+import { SOURCE_META, sourceLabel } from '../../../../features/telemetry/provenance.js'
 
 export function MetricIcon({ type }) {
   if (type === 'temperature') {
@@ -65,6 +66,16 @@ function MetricCard({
       <strong className="metric-card-value">
         {metric.displayValue}
       </strong>
+
+      {metric.source && (
+        <span
+          className={`metric-source-chip metric-source-chip--${SOURCE_META[metric.source]?.className || 'unverified'}`}
+          data-testid={`metric-source-${metricKey}`}
+          data-source={metric.source}
+        >
+          {sourceLabel(metric.source)}
+        </span>
+      )}
 
       <div className="metric-card-range">
         Ngưỡng {metric.safeMin}–{metric.safeMax}

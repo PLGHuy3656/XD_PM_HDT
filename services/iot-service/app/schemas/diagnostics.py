@@ -18,12 +18,15 @@ class SensorHealthItem(BaseModel):
     name: str
     status: Literal["HEALTHY", "WARNING", "UNAVAILABLE"]
     value: str
+    source: str | None = None
 
 
 class ActuatorHealthItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
-    status: Literal["HEALTHY", "WARNING"]
+    # INT01-R1: UNVERIFIED = relay state is reported but no feedback sensor confirms actuator health
+    status: Literal["HEALTHY", "WARNING", "UNVERIFIED", "UNAVAILABLE"]
+    state: Literal["ON", "OFF"] | None = None
 
 
 class DeviceDiagnosticDetail(BaseModel):

@@ -123,6 +123,7 @@ class DeviceRepository:
                     "presence_status": status_val,
                     "provisioning_status": prov_status,
                     "health_metadata": health_meta,
+                    "iot_available": iot_reachable,
                     "created_at": row[10].isoformat() if row[10] else None,
                 }
             )
@@ -199,6 +200,7 @@ class DeviceRepository:
 
         # L-1 & M-3: Re-use central resolve_status helper to unify Owner and Technician behavior
         iot_reachable = presence.get("reason") != "IOT_SERVICE_UNREACHABLE"
+        iot_available = self._iot_adapter.is_presence_source_available(presence)
         presence_info = presence if presence.get("reason") != "PRESENCE_NOT_FOUND" else None
         status_val, _, _, _ = self._iot_adapter.resolve_status(
             presence_info,
@@ -236,6 +238,7 @@ class DeviceRepository:
             "presence_status": status_val,
             "provisioning_status": prov_status,
             "health_metadata": health_meta,
+            "iot_available": iot_available,
             "created_at": row[10].isoformat() if row[10] else None,
         }
 

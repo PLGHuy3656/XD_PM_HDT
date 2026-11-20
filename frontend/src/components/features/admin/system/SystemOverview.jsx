@@ -28,7 +28,7 @@ function SystemOverview({ services: propServices }) {
         <article>
           <span>Dịch vụ hiện hành</span>
           <strong>{operationalServices.length}</strong>
-          <small>Đã triển khai trong repo</small>
+          <small>Đã triển khai ở môi trường này</small>
         </article>
 
         <article>
@@ -40,9 +40,9 @@ function SystemOverview({ services: propServices }) {
         </article>
 
         <article>
-          <span>Kiến trúc mục tiêu</span>
+          <span>Chưa triển khai</span>
           <strong>{plannedServices.length}</strong>
-          <small>Theo kế hoạch / Chưa tích hợp</small>
+          <small>Thuộc checkpoint tích hợp sau</small>
         </article>
 
         <article>
@@ -81,16 +81,17 @@ function SystemOverview({ services: propServices }) {
               <div className="admin-system-service__info">
                 <strong>{service.name}</strong>
                 <span>{service.description}</span>
+                {service.detail && <small className="admin-system-service__detail">{service.detail}</small>}
               </div>
 
               <div className="admin-system-service__latency">
                 <span>
                   {service.latency
                     ? 'Độ trễ'
-                    : 'Tích hợp'}
+                    : 'Triển khai'}
                 </span>
                 <strong>
-                  {service.latency || 'Theo kế hoạch'}
+                  {service.latency || (service.status === 'NOT_DEPLOYED' ? 'Không' : '--')}
                 </strong>
               </div>
 

@@ -757,3 +757,9 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* INT01-R1: service not deployed in this environment */
+.admin-status-dot.planned {
+  background: #b8b0a2;
+  box-shadow: 0 0 0 4px rgba(165, 155, 138, 0.12);
+}

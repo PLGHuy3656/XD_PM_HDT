@@ -254,6 +254,7 @@ class TechnicianRepository:
                     ),
                     "zone_name": row[6],
                     "status": status_val,
+                    "iot_available": iot_reachable,
                     "rssi": rssi,
                     "mqtt_status": mqtt_val,
                     "ip_address": row[7],
@@ -354,9 +355,11 @@ class TechnicianRepository:
                 else:
                     unknown_count += 1
 
+            # INT01-R1: devices without any presence record (never heartbeat / no node_id) are UNKNOWN,
+            # never counted as a confirmed OFFLINE.
             accounted = online_count + offline_count + unknown_count
             if accounted < total_devices:
-                offline_count += (total_devices - accounted)
+                unknown_count += (total_devices - accounted)
 
         return {
             "technician_id": technician_id,

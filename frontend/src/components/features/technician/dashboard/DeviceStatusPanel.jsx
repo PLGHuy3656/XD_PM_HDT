@@ -5,7 +5,8 @@ const STATUS_DISPLAY = {
   ONLINE: { label: 'Trực tuyến', badgeClass: 'tech-badge--online' },
   WARNING: { label: 'Cảnh báo', badgeClass: 'tech-badge--warning' },
   OFFLINE: { label: 'Ngoại tuyến', badgeClass: 'tech-badge--offline' },
-  UNKNOWN: { label: 'Chưa kết nối IoT', badgeClass: 'tech-badge--unknown' },
+  UNKNOWN: { label: 'Chưa có heartbeat', badgeClass: 'tech-badge--unknown' },
+  UNAVAILABLE: { label: 'Không xác định (IoT)', badgeClass: 'tech-badge--unknown' },
 }
 
 function DeviceStatusPanel({ devices = [] }) {

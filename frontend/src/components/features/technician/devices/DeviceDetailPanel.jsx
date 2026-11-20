@@ -52,16 +52,17 @@ function DeviceDetailPanel({
             <strong
               className={`tech-detail-${device.status.toLowerCase()}`}
             >
-              {statusMeta[device.status].label}
+              {(statusMeta[device.status] || statusMeta.UNKNOWN).label}
             </strong>
           </div>
 
           <div>
             <span>RSSI</span>
             <strong>
-              {device.rssi !== null
-                ? `${device.rssi} dBm`
-                : 'No signal'}
+              {/* INT01-R1: adapter field is `signal`; never render undefined / fabricated RSSI */}
+              {(device.rssi ?? device.signal) != null
+                ? `${device.rssi ?? device.signal} dBm`
+                : '--'}
             </strong>
           </div>
 
@@ -71,8 +72,8 @@ function DeviceDetailPanel({
           </div>
 
           <div>
-            <span>IP ADDRESS</span>
-            <strong>{device.ip}</strong>
+            <span>IP ĐĂNG KÝ</span>
+            <strong>{device.ip || (device.ipAddress && device.ipAddress !== '--' ? device.ipAddress : '--')}</strong>
           </div>
 
           <div>

@@ -18,7 +18,8 @@ import time
 import json
 import random
 import os
-from datetime import datetime
+import threading
+from datetime import datetime, timezone
 
 try:
     import paho.mqtt.client as mqtt
@@ -59,6 +60,52 @@ state = {
 
 start_time = time.time()
 
+# INT01-R1: idempotency - remember recently executed commandIds and their ACK so a
+# redelivered (QoS1 duplicate) command is never executed twice.
+RECENT_COMMANDS = {}
+RECENT_COMMANDS_MAX = 200
+
+# INT01-R1: opt-in fault injection for deterministic negative-path tests (default: none).
+# Format: "misting=FAILED,heater=ERROR,fan=NOACK,alarm=DELAY:20"
+#   FAILED / ERROR -> do not actuate, reply ACK with that status
+#   NOACK          -> actuate nothing and send no ACK (server must reach TIMEOUT)
+#   DELAY:<s>      -> actuate, then ACK SUCCESS after <s> seconds (late-ACK test)
+SIM_FAULT_MODE = os.getenv("SIM_FAULT_MODE", "").strip()
+
+
+def _parse_fault_mode(raw):
+    faults = {}
+    for item in [p.strip() for p in raw.split(",") if p.strip()]:
+        if "=" not in item:
+            continue
+        target, mode = [x.strip() for x in item.split("=", 1)]
+        faults[target] = mode.upper()
+    return faults
+
+
+FAULTS = _parse_fault_mode(SIM_FAULT_MODE)
+
+# INT01-R1: every value produced here is simulated. Declared explicitly so the platform
+# never presents it as a physical sensor reading (see IoT TelemetryProvenance).
+SIM_PROVENANCE = {
+    "source": "SIMULATED",
+    "sensors": {
+        "temperature": "SIMULATED",
+        "humidity": "SIMULATED",
+        "co2": "SIMULATED",
+        "lux": "SIMULATED",
+        "audio": "SIMULATED",
+        "networkRssi": "SIMULATED",
+    },
+}
+
+
+def _parse_iso_utc(value):
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+
 def on_connect(client, userdata, flags, rc, properties=None):
     if rc == 0:
         print(f"\n[OK] ESP32 ({DEVICE_ID}) da ket noi Broker thanh cong: {MQTT_BROKER}:{MQTT_PORT}")
@@ -72,6 +119,8 @@ def on_connect(client, userdata, flags, rc, properties=None):
 
 
 def _publish_ack(client, cmd_id: str, status_val: str, message: str):
+    if cmd_id in RECENT_COMMANDS:
+        RECENT_COMMANDS[cmd_id] = (status_val, message)
     ack_payload = {
         "commandId": cmd_id,
         "deviceId": DEVICE_ID,
@@ -95,11 +144,41 @@ def on_message(client, userdata, msg):
         cmd_id = payload.get("commandId", "00000000-0000-0000-0000-000000000000")
         action = payload.get("action")
 
+        # INT01-R1: duplicate delivery -> re-send the original ACK, never execute twice
+        if cmd_id in RECENT_COMMANDS:
+            prev = RECENT_COMMANDS[cmd_id]
+            print(f" -> [DUPLICATE] commandId {cmd_id} da xu ly; khong thuc thi lai")
+            if prev is not None:
+                _publish_ack(client, cmd_id, prev[0], prev[1])
+            return
+        RECENT_COMMANDS[cmd_id] = None
+        if len(RECENT_COMMANDS) > RECENT_COMMANDS_MAX:
+            RECENT_COMMANDS.pop(next(iter(RECENT_COMMANDS)))
+
+        # INT01-R1: fail-safe expiry - never execute a command past the server deadline
+        expires_at = _parse_iso_utc(payload.get("expiresAt")) if payload.get("expiresAt") else None
+        if expires_at is not None and datetime.now(timezone.utc) > expires_at:
+            print(f" -> [EXPIRED] Lenh {cmd_id} da het han ({payload.get('expiresAt')}); KHONG thuc thi")
+            _publish_ack(client, cmd_id, "FAILED", "COMMAND_EXPIRED: deadline passed before execution")
+            return
+
         if action == "SET_RELAY":
             target = payload.get("target")
             relay_state = bool(payload.get("state", 0))
+            fault = FAULTS.get(target, "")
 
-            if target in ["misting", "fan", "heater", "alarm"]:
+            if target in ["misting", "fan", "heater", "alarm"] and fault in ("FAILED", "ERROR"):
+                print(f" -> [FAULT INJECTION] {target}: {fault}")
+                _publish_ack(client, cmd_id, fault, f"SIM_FAULT_INJECTION: {target} relay {fault}")
+            elif target in ["misting", "fan", "heater", "alarm"] and fault == "NOACK":
+                print(f" -> [FAULT INJECTION] {target}: NOACK (khong thuc thi, khong gui ACK)")
+            elif target in ["misting", "fan", "heater", "alarm"] and fault.startswith("DELAY:"):
+                delay_s = float(fault.split(":", 1)[1] or 0)
+                state[target] = relay_state
+                state["mode"] = "MANUAL"
+                print(f" -> [FAULT INJECTION] {target}: ACK SUCCESS tre {delay_s}s")
+                threading.Timer(delay_s, _publish_ack, args=(client, cmd_id, "SUCCESS", f"Actuator {target} switched to {relay_state} (late ACK)")).start()
+            elif target in ["misting", "fan", "heater", "alarm"]:
                 state[target] = relay_state
                 state["mode"] = "MANUAL"
                 action_str = "BAT" if relay_state else "TAT"
@@ -211,9 +290,10 @@ def main():
                 },
                 "state": {
                     "mode": state["mode"],
-                    "networkRssi": -62,
+                    "networkRssi": -62,  # SIMULATED constant (declared in provenance), not a radio measurement
                     "freeHeap": 221440
-                }
+                },
+                "provenance": SIM_PROVENANCE,
             }
 
             msg_str = json.dumps(telemetry_payload)

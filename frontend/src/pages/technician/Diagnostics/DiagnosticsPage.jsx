@@ -9,6 +9,7 @@ import { LoadingSpinner, ErrorMessage, EmptyState } from '../../../components/co
 import { diagnosticNodes as defaultDiagnosticNodes } from '../../../components/features/technician/diagnostics/diagnosticsMockData'
 
 import { useTechnicianData } from '../../../features/technicians/hooks/useTechnicianData'
+import { useNodeIoTDiagnostics } from '../../../features/technicians/hooks/useNodeIoTDiagnostics.js'
 import { formatFarmOptionLabel } from '../../../features/farms/adapters/farmAdapter.js'
 import { USE_MOCK } from '../../../api/config.js'
 
@@ -31,6 +32,8 @@ function DiagnosticsPage() {
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedNode, setSelectedNode] = useState(null)
+  // INT01-R1: enrich the selected node with real IoT presence + telemetry (no fabricated health)
+  const diagnosedNode = useNodeIoTDiagnostics(selectedNode)
 
   const effectiveNodes = useMemo(() => {
     if (devices.length > 0) {
@@ -47,18 +50,20 @@ function DiagnosticsPage() {
               ? 'WARNING'
               : d.status === 'OFFLINE'
                 ? 'OFFLINE'
-                : 'REGISTERED',
+                : d.status === 'UNAVAILABLE'
+                  ? 'UNAVAILABLE'
+                  : 'REGISTERED',
         nodeType: d.typeLabel || d.type,
         type: d.typeLabel || d.type,
-        ipAddress: d.ipAddress || '--',
+        ipAddress: d.ipAddress || '--', // registered IP (Management); live IP comes from IoT presence in detail
         firmware: d.firmware || '--',
         mqtt: d.mqttStatus || 'Chưa kết nối IoT',
         lastHeartbeat: d.lastSeen || 'Chưa có dữ liệu',
         connectivity: {
           mqtt: d.mqttStatus || 'Chưa kết nối IoT',
           wifi: '--',
-          rssi: d.signal,
-          ip: d.ipAddress || '--',
+          rssi: d.signal ?? null,
+          ip: null,
           lastHeartbeat: d.lastSeen || 'Chưa có dữ liệu',
         },
         sensors: [],
@@ -170,7 +175,8 @@ function DiagnosticsPage() {
                 {[
                   ['ALL', 'Tất cả'],
                   ['HEALTHY', 'Trực tuyến'],
-                  ['REGISTERED', 'Đã đăng ký (Chưa có IoT)'],
+                  ['REGISTERED', 'Chưa có heartbeat'],
+                  ['UNAVAILABLE', 'Không xác định (IoT)'],
                   ['WARNING', 'Cảnh báo'],
                   ['OFFLINE', 'Ngoại tuyến'],
                 ].map(([value, label]) => (
@@ -202,7 +208,7 @@ function DiagnosticsPage() {
             />
 
             <DiagnosticDetailPanel
-              node={selectedNode}
+              node={diagnosedNode}
               onClose={() => setSelectedNode(null)}
             />
           </>

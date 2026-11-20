@@ -3,6 +3,7 @@
  * Normalizes backend DTOs from Management Service, Gateway, and IoT Service
  * into presentation models expected by the 5 Admin UI screens.
  */
+import { resolveDeviceStatus } from '../../devices/deviceStatus.js'
 
 export const ADMIN_ROLE_LABELS = {
   ADMIN: 'Administrator',
@@ -37,7 +38,8 @@ export function normalizeAdminDevice(raw, farmsMap = {}) {
   const nodeId = raw.node_id || deviceId
   const rawType = raw.device_type || 'UNKNOWN'
   const displayType = ADMIN_DEVICE_TYPE_LABELS[rawType] || rawType
-  const status = raw.status === 'ONLINE' ? 'ONLINE' : 'OFFLINE'
+  // INT01-R1: keep UNKNOWN / UNAVAILABLE distinct from a confirmed OFFLINE
+  const status = resolveDeviceStatus(raw)
   const farmInfo = farmsMap[raw.farm_id] || {}
   const isZoneAssigned = Boolean(raw.zone_id)
 
@@ -70,7 +72,9 @@ export function normalizeAdminDevice(raw, farmsMap = {}) {
       name: isZoneAssigned ? (raw.zone_name || 'Khu vực') : 'Chưa phân bổ Zone',
       floor: raw.floor || (isZoneAssigned ? '--' : 'Chưa gán'),
     },
-    provisioning: status === 'ONLINE' ? 'PROVISIONED' : 'DISCONNECTED',
+    provisioning:
+      raw.provisioning_status ||
+      (status === 'ONLINE' ? 'PROVISIONED' : status === 'OFFLINE' ? 'DISCONNECTED' : 'UNKNOWN'),
   }
 }
 
@@ -193,75 +197,48 @@ export function normalizeAdminUser(user) {
   }
 }
 
+const SERVICE_DESCRIPTIONS = {
+  gateway: 'Điểm truy cập trung tâm, JWT Authentication & Reverse Proxy',
+  management: 'Quản lý Farm, Zone, Device, Identity & RBAC',
+  iot: 'Xử lý kết nối thiết bị MQTT, Presence, Telemetry & Command/ACK',
+  ai: 'Nhận diện chim yến, thiên địch và đếm lượt qua camera',
+  notification: 'Hệ thống cảnh báo thời gian thực & Push alerts',
+  analytics: 'Tổng hợp số liệu & phân tích xu hướng môi trường nhà yến',
+}
+
+const SERVICE_ORDER = ['gateway', 'management', 'iot', 'ai', 'notification', 'analytics']
+const KNOWN_STATES = ['HEALTHY', 'DEGRADED', 'UNAVAILABLE', 'NOT_DEPLOYED']
+
 /**
- * Normalizes Gateway /health response into System Overview service list
- * @param {Object} healthData - Raw /health payload
- * @returns {Array} List of normalized system services
+ * INT01-R1: normalizes GET /api/system/status (Gateway active probes) into UI service rows.
+ * States: HEALTHY | DEGRADED | UNAVAILABLE | NOT_DEPLOYED. HTTP 200 of a single /health is
+ * never used to infer that a service is integrated.
+ * When the status call itself failed (statusData null), every service is UNAVAILABLE (unknown),
+ * never "planned".
+ * @param {any} statusData
  */
-export function normalizeSystemServices(healthData, { managementOk = true, alertsOk = false } = {}) {
-  const isGatewayUp = Boolean(healthData && healthData.status === 'ok')
-  const upstreams = healthData?.upstreams || {}
-  const isRemoteUpstream = (key) =>
-    typeof upstreams[key] === 'string' &&
-    upstreams[key].length > 0 &&
-    !upstreams[key].includes('127.0.0.1') &&
-    !upstreams[key].includes('localhost')
+export function normalizeSystemServices(statusData) {
+  const byId = {}
+  for (const svc of Array.isArray(statusData?.services) ? statusData.services : []) {
+    if (svc && svc.id) byId[svc.id] = svc
+  }
+  const statusKnown = Object.keys(byId).length > 0
 
-  const iotDeployed = isGatewayUp && isRemoteUpstream('iot')
-  const aiDeployed = isGatewayUp && isRemoteUpstream('ai')
-  const notifDeployed = isGatewayUp && (alertsOk || isRemoteUpstream('notification'))
-  const analyticsDeployed = isGatewayUp && isRemoteUpstream('analytics')
-
-  return [
-    {
-      id: 'api-gateway',
-      name: 'API Gateway (:8000)',
-      description: 'Điểm truy cập trung tâm, JWT Authentication & Reverse Proxy',
-      status: isGatewayUp ? 'HEALTHY' : 'DOWN',
-      latency: isGatewayUp ? 'Online' : null,
-      tier: 'CURRENT',
-    },
-    {
-      id: 'management',
-      name: 'Management Service (:8001)',
-      description: 'Quản lý Farm, Zone, Device, Identity & RBAC',
-      status: managementOk ? 'HEALTHY' : 'DOWN',
-      latency: managementOk ? 'Online' : null,
-      tier: 'CURRENT',
-    },
-    {
-      id: 'iot',
-      name: 'IoT Service (:8002)',
-      description: 'Xử lý kết nối thiết bị MQTT, Presence & Telemetry',
-      status: iotDeployed ? 'HEALTHY' : 'PLANNED',
-      latency: iotDeployed ? 'Online' : null,
-      tier: iotDeployed ? 'CURRENT' : 'PLANNED',
-    },
-    {
-      id: 'ai-vision',
-      name: 'AI Vision Service (:8003)',
-      description: 'Nhận diện chim yến, thiên địch và đếm lượt qua camera',
-      status: aiDeployed ? 'HEALTHY' : 'PLANNED',
-      latency: aiDeployed ? 'Online' : null,
-      tier: aiDeployed ? 'CURRENT' : 'PLANNED',
-    },
-    {
-      id: 'notification',
-      name: 'Notification Service (:8004)',
-      description: 'Hệ thống cảnh báo thời gian thực & Push alerts',
-      status: notifDeployed ? (alertsOk ? 'HEALTHY' : 'DOWN') : 'PLANNED',
-      latency: notifDeployed && alertsOk ? 'Online' : null,
-      tier: notifDeployed ? 'CURRENT' : 'PLANNED',
-    },
-    {
-      id: 'analytics',
-      name: 'Analytics Service (:8005)',
-      description: 'Tổng hợp số liệu & phân tích xu hướng môi trường nhà yến',
-      status: analyticsDeployed ? 'HEALTHY' : 'PLANNED',
-      latency: analyticsDeployed ? 'Online' : null,
-      tier: analyticsDeployed ? 'CURRENT' : 'PLANNED',
-    },
-  ]
+  return SERVICE_ORDER.map((id) => {
+    const svc = byId[id]
+    const status = svc && KNOWN_STATES.includes(svc.status) ? svc.status : 'UNAVAILABLE'
+    const deployed = svc ? svc.deployed !== false : true
+    return {
+      id: id === 'gateway' ? 'api-gateway' : id === 'ai' ? 'ai-vision' : id,
+      name: svc?.name || id,
+      description: SERVICE_DESCRIPTIONS[id],
+      status,
+      detail: svc?.detail || (statusKnown ? null : 'Không lấy được trạng thái từ API Gateway'),
+      latency: svc?.latencyMs != null && status !== 'NOT_DEPLOYED' && status !== 'UNAVAILABLE' ? `${svc.latencyMs} ms` : null,
+      deployed,
+      tier: deployed ? 'CURRENT' : 'PLANNED',
+    }
+  })
 }
 
 /**

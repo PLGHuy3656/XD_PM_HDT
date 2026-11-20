@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import NotificationPopover from '../common/NotificationPopover'
 import { useAuth } from '../../context/AuthContext'
-import { useTelemetryWebSocket } from '../../features/telemetry/hooks/useTelemetryWebSocket'
 import { formatHeaderEnvironment } from '../../features/telemetry/adapters/telemetryAdapter'
+import { useFarmTelemetry } from '../../features/telemetry/farmTelemetryPoller'
+import { isSimulatedTelemetry, formatRelativeTime } from '../../features/telemetry/provenance'
+import { clearActiveFarm, useActiveFarm } from '../../features/farms/activeFarmStore'
+import { USE_MOCK } from '../../api/config'
 import './Header.css'
 
 function SearchIcon() {
@@ -27,29 +30,6 @@ const roleLabels = {
   TECHNICIAN: 'Kỹ thuật viên',
   ADMIN: 'Quản trị viên',
 }
-
-const environmentData = [
-  {
-    id: 'temperature',
-    label: 'Nhiệt độ',
-    value: '28.5°C',
-  },
-  {
-    id: 'humidity',
-    label: 'Độ ẩm',
-    value: '78%',
-  },
-  {
-    id: 'co2',
-    label: 'CO₂',
-    value: '620 ppm',
-  },
-  {
-    id: 'light',
-    label: 'Ánh sáng',
-    value: '120 lux',
-  },
-]
 
 const roleSearchTargets = {
   ADMIN: [
@@ -85,7 +65,29 @@ const roleSearchTargets = {
 function Header() {
   const navigate = useNavigate()
   const { user, logout, isMockMode } = useAuth()
-  const { latestTelemetry } = useTelemetryWebSocket()
+  // INT01-R1: Header telemetry follows the farm the user selected on a page (never "first farm")
+  const activeFarm = useActiveFarm(user?.id)
+  const farmTelemetry = useFarmTelemetry(USE_MOCK ? null : activeFarm?.farmId || null)
+  const headerState = USE_MOCK
+    ? { kind: 'mock', label: 'Dữ liệu minh họa (Mock)' }
+    : !activeFarm
+      ? { kind: 'none', label: 'Chưa chọn nhà yến' }
+      : farmTelemetry.status === 'forbidden'
+        ? { kind: 'error', label: 'Không có quyền xem nhà yến này' }
+        : farmTelemetry.status === 'unavailable'
+          ? { kind: 'error', label: 'Mất kết nối dịch vụ IoT' }
+          : farmTelemetry.status === 'error'
+            ? { kind: 'error', label: 'Lỗi tải số liệu' }
+            : farmTelemetry.status === 'empty'
+              ? { kind: 'empty', label: 'Chưa có dữ liệu cảm biến' }
+              : farmTelemetry.status === 'loading'
+                ? { kind: 'loading', label: 'Đang tải…' }
+                : farmTelemetry.status === 'stale'
+                  ? { kind: 'stale', label: `Dữ liệu cũ · ${formatRelativeTime(farmTelemetry.telemetry?.timestamp)}` }
+                  : isSimulatedTelemetry(farmTelemetry.telemetry)
+                    ? { kind: 'simulated', label: 'Mô phỏng · ESP32 Simulator' }
+                    : { kind: 'live', label: 'Trực tiếp' }
+  const showValues = USE_MOCK || ['ok', 'stale'].includes(farmTelemetry.status)
 
   const [profileOpen, setProfileOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -97,7 +99,15 @@ function Header() {
 
   const displayName = user?.name || 'NestMate User'
   const roleLabel = roleLabels[user?.role] || 'Người dùng'
-  const displayEnvironment = formatHeaderEnvironment(latestTelemetry, isMockMode)
+  const displayEnvironment = formatHeaderEnvironment(
+    USE_MOCK ? null : showValues ? farmTelemetry.telemetry : null,
+    isMockMode,
+  )
+
+  useEffect(() => {
+    // A farm the Gateway refuses (e.g. reassigned) must not stay selected in the Header
+    if (!USE_MOCK && farmTelemetry.status === 'forbidden') clearActiveFarm()
+  }, [farmTelemetry.status])
 
   const initials = displayName
     .split(' ')
@@ -237,7 +247,16 @@ function Header() {
         )}
       </div>
 
-      <div className="header-environment">
+      <div
+        className={`header-environment header-environment--${headerState.kind}`}
+        data-testid="header-telemetry"
+        data-telemetry-state={headerState.kind}
+        title={activeFarm?.farmName ? `Số liệu của: ${activeFarm.farmName}` : headerState.label}
+      >
+        <div className="header-environment-context">
+          <span>{activeFarm?.farmName || (USE_MOCK ? 'Mock' : 'Nhà yến')}</span>
+          <strong>{headerState.label}</strong>
+        </div>
         {displayEnvironment.map((item) => (
           <div
             className="header-environment-item"

@@ -419,16 +419,25 @@ void Task_NetworkManager(void *pvParameters) {
     if (now - lastTelemetryTick >= pdMS_TO_TICKS(5000)) {
       lastTelemetryTick = now;
       if (xQueuePeek(sensorQueue, &sData, 0) == pdTRUE) {
-        StaticJsonDocument<512> doc;
+        StaticJsonDocument<1024> doc;
         doc["deviceId"] = DEVICE_ID;
 
         JsonObject metrics = doc.createNestedObject("metrics");
         metrics["temperature"] = serialized(String(sData.temperature, 2));
         metrics["humidity"] = serialized(String(sData.humidity, 2));
+#if USE_MOCK_SENSORS
         metrics["lux"] = serialized(String(sData.light_lux, 2));
         metrics["co2"] = round(sData.co2_ppm);
         metrics["audioRms"] = serialized(String((float)sData.soundRaw / 4095.0, 2));
         metrics["audioHealthy"] = sData.soundHealthy;
+#else
+        // INT01-R1: this node only has a DHT22 (temperature/humidity). There is no physical CO2,
+        // light or microphone sensor, so send null instead of the old fixed fallback values.
+        metrics["lux"] = nullptr;
+        metrics["co2"] = nullptr;
+        metrics["audioRms"] = nullptr;
+        metrics["audioHealthy"] = nullptr;
+#endif
 
         JsonObject relays = doc.createNestedObject("actuators");
         relays["misting"] = (digitalRead(PIN_MISTING) == RELAY_ACTIVE);
@@ -441,7 +450,27 @@ void Task_NetworkManager(void *pvParameters) {
         state["networkRssi"] = WiFi.RSSI();
         state["freeHeap"] = ESP.getFreeHeap();
 
-        char buf[512];
+        // INT01-R1: declare data provenance so the platform never shows simulated data as physical.
+        JsonObject prov = doc.createNestedObject("provenance");
+        JsonObject provSensors = prov.createNestedObject("sensors");
+#if USE_MOCK_SENSORS
+        prov["source"] = "MIXED";
+        provSensors["temperature"] = "SIMULATED";
+        provSensors["humidity"] = "SIMULATED";
+        provSensors["co2"] = "SIMULATED";
+        provSensors["lux"] = "SIMULATED";
+        provSensors["audio"] = "SIMULATED";
+#else
+        prov["source"] = "PHYSICAL";
+        provSensors["temperature"] = "PHYSICAL";
+        provSensors["humidity"] = "PHYSICAL";
+        provSensors["co2"] = "UNAVAILABLE";
+        provSensors["lux"] = "UNAVAILABLE";
+        provSensors["audio"] = "UNAVAILABLE";
+#endif
+        provSensors["networkRssi"] = "PHYSICAL";  // WiFi.RSSI() is a real radio measurement
+
+        char buf[768];
         serializeJson(doc, buf);
         mqttClient.publish(TOPIC_TELEMETRY, buf);
         Serial.print("[TELEMETRY] ");

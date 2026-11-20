@@ -4,6 +4,15 @@
  * @param {boolean} [isMockMode=false]
  * @returns {any}
  */
+const MOCK_SOURCES = {
+  temperature: 'SIMULATED',
+  humidity: 'SIMULATED',
+  co2: 'SIMULATED',
+  lux: 'SIMULATED',
+  audio: 'SIMULATED',
+  networkRssi: 'SIMULATED',
+}
+
 export function normalizeTelemetry(raw, isMockMode = false) {
   if (!raw) {
     return null
@@ -16,12 +25,13 @@ export function normalizeTelemetry(raw, isMockMode = false) {
   const co2 = metrics.co2 ?? metrics.co2_ppm
   const light = metrics.light ?? metrics.lux
 
+  // INT01-R1: only a server-provided timestamp; never fabricate "now" for missing data
   const rawTime =
     raw.receivedAt ||
     raw.received_at ||
     raw.timestamp ||
     raw.recorded_at ||
-    (raw.deviceId ? new Date().toISOString() : null)
+    null
 
   return {
     deviceId: raw.deviceId || raw.device_id || null,
@@ -33,6 +43,10 @@ export function normalizeTelemetry(raw, isMockMode = false) {
     co2: co2 != null ? Number(co2) : isMockMode ? 620 : null,
     light: light != null ? Number(light) : isMockMode ? 120 : null,
     timestamp: rawTime,
+    // INT01-R1 provenance (IoT metricSources / provenance); mock mode is explicitly simulated
+    sources: raw.metricSources || (isMockMode ? MOCK_SOURCES : null),
+    provenanceSource: raw.provenance?.source || (isMockMode ? 'SIMULATED' : null),
+    networkRssi: raw.state?.networkRssi ?? null,
     status:
       metrics.status ||
       (temp != null ? (Number(temp) > 31 ? 'Cảnh báo' : 'Ổn định') : isMockMode ? 'Ổn định' : 'Chưa có dữ liệu'),

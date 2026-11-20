@@ -14,6 +14,8 @@ import {
   environmentSummary as mockEnvSummary,
   environmentZones as mockEnvZones,
 } from '../../../components/features/technician/environment/environmentMockData.js'
+import { realNumberOrNull, resolveDeviceStatus } from '../../devices/deviceStatus.js'
+import { formatRelativeTime } from '../../telemetry/provenance.js'
 
 /**
  * Normalizes assigned farm DTO for technician
@@ -47,14 +49,8 @@ export function normalizeAssignedFarm(raw, isMockMode = false) {
 export function normalizeTechDevice(raw, farmName = '') {
   if (!raw) return null
 
-  const rawStatus = String(raw.presence_status || raw.status || 'UNKNOWN').toUpperCase()
-  const status = ['ONLINE', 'ACTIVE', 'HEALTHY'].includes(rawStatus)
-    ? 'ONLINE'
-    : ['WARNING', 'DEGRADED'].includes(rawStatus)
-      ? 'WARNING'
-      : rawStatus === 'OFFLINE'
-        ? 'OFFLINE'
-        : 'UNKNOWN'
+  // INT01-R1: shared vocabulary (UNKNOWN = never heartbeat, UNAVAILABLE = IoT presence unobtainable)
+  const status = resolveDeviceStatus(raw)
 
   const deviceId = raw.device_id || raw.id || 'unknown-device'
   const nodeId = raw.node_id || deviceId
@@ -91,14 +87,13 @@ export function normalizeTechDevice(raw, farmName = '') {
     firmware: raw.firmware_version || raw.firmware || '--',
     ipAddress: raw.ip_address || '--',
     mqttStatus:
-      raw.mqtt_status ||
-      (status === 'ONLINE'
-        ? 'Connected'
+      status === 'UNAVAILABLE'
+        ? 'Không xác định (IoT không khả dụng)'
         : status === 'UNKNOWN'
-          ? 'Chưa kết nối IoT'
-          : 'Disconnected'),
-    signal: raw.rssi != null ? Number(raw.rssi) : null,
-    lastSeen: raw.last_seen || raw.lastSeen || 'Chưa có dữ liệu',
+          ? 'Chưa từng kết nối'
+          : raw.mqtt_status || (status === 'ONLINE' ? 'Connected' : 'Disconnected'),
+    signal: realNumberOrNull(raw.rssi),
+    lastSeen: raw.last_seen || raw.lastSeen ? formatRelativeTime(raw.last_seen || raw.lastSeen) : 'Chưa có dữ liệu',
     sensors: status === 'ONLINE' ? (raw.sensors || '--') : 'Chưa kết nối IoT',
     description: raw.description || `Thiết bị ${name} (${nodeId}) tại ${effectiveFarmName}`,
   }

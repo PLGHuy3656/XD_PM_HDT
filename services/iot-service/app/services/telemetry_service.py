@@ -147,6 +147,7 @@ class TelemetryService:
             actuators=telemetry_payload.actuators,
             state=telemetry_payload.state,
             farm_id=resolved_farm_id,
+            provenance=telemetry_payload.provenance,
         )
 
         # Step 7: Save to repository abstraction

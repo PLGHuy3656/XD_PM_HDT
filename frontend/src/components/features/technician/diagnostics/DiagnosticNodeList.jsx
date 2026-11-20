@@ -1,8 +1,9 @@
 const statusLabels = {
   HEALTHY: 'Ổn định',
-  REGISTERED: 'Đã đăng ký (Chưa có IoT)',
+  REGISTERED: 'Chưa có heartbeat',
   WARNING: 'Cảnh báo',
   OFFLINE: 'Offline',
+  UNAVAILABLE: 'Không xác định (IoT)',
 }
 
 function DiagnosticNodeList({

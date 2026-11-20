@@ -1,8 +1,19 @@
 import { services } from './dashboardMockData'
 import { USE_MOCK } from '../../../../api/config.js'
 
+// INT01-R1: HEALTHY | DEGRADED | UNAVAILABLE | NOT_DEPLOYED
+const DOT_CLASS = {
+  healthy: 'healthy',
+  degraded: 'warning',
+  warning: 'warning',
+  unavailable: 'danger',
+  down: 'danger',
+  not_deployed: 'planned',
+  planned: 'planned',
+}
+
 function StatusDot({ status = 'healthy' }) {
-  return <span className={`admin-status-dot ${status}`} />
+  return <span className={`admin-status-dot ${DOT_CLASS[status] || 'danger'}`} />
 }
 
 function ArrowIcon() {
@@ -23,7 +34,10 @@ function ArrowIcon() {
 
 function SystemHealthPanel({ onOpen, services: propServices }) {
   const currentServices = propServices && propServices.length > 0 ? propServices : (USE_MOCK ? services : [])
-  const healthyCount = currentServices.filter(
+  const deployedServices = currentServices.filter(
+    (service) => service.status !== 'NOT_DEPLOYED' && service.tier !== 'PLANNED',
+  )
+  const healthyCount = deployedServices.filter(
     (service) => service.status === 'healthy' || service.status === 'HEALTHY',
   ).length
 
@@ -51,7 +65,7 @@ function SystemHealthPanel({ onOpen, services: propServices }) {
         <div>
           <StatusDot />
           <strong>
-            {healthyCount} / {currentServices.length}
+            {healthyCount} / {deployedServices.length}
           </strong>
           <span>Operational</span>
         </div>

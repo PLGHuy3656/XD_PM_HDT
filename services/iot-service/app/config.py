@@ -56,5 +56,34 @@ class Settings(BaseSettings):
     )
     metadata_negative_cache_ttl_seconds: float = 5.0
 
+    # INT01-R1: Inbound service-to-service authentication for /api/iot/* and /ws/iot.
+    # The same INT01 internal service key (INTERNAL_SERVICE_TOKEN) is presented by the
+    # API Gateway and Management Service in the X-Internal-Service-Key header.
+    # Fail-closed: when required and no key is configured, every protected route returns 503.
+    internal_api_auth_required: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("internal_api_auth_required", "IOT_INTERNAL_API_AUTH_REQUIRED"),
+    )
+
+    # INT01-R1: Server-authoritative command ACK deadline and runtime TIMEOUT sweeper.
+    command_ack_timeout_seconds: int = Field(
+        default=15,
+        ge=3,
+        le=300,
+        validation_alias=AliasChoices("command_ack_timeout_seconds", "COMMAND_ACK_TIMEOUT_SECONDS"),
+    )
+    command_timeout_sweep_interval_seconds: float = Field(
+        default=1.0,
+        gt=0,
+        le=30,
+        validation_alias=AliasChoices(
+            "command_timeout_sweep_interval_seconds", "COMMAND_TIMEOUT_SWEEP_INTERVAL_SECONDS"
+        ),
+    )
+    command_timeout_sweeper_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("command_timeout_sweeper_enabled", "COMMAND_TIMEOUT_SWEEPER_ENABLED"),
+    )
+
 
 settings = Settings()

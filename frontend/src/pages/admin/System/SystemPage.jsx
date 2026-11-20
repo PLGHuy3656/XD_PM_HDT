@@ -26,10 +26,12 @@ function SystemPage() {
     useState('overview')
   const { systemHealth, alerts, loading, error } = useAdminData()
 
-  const activeCount = (systemHealth || []).filter(
+  // INT01-R1: only services deployed in this environment count towards availability
+  const deployedServices = (systemHealth || []).filter((s) => s.status !== 'NOT_DEPLOYED' && s.tier !== 'PLANNED')
+  const activeCount = deployedServices.filter(
     (s) => s.status === 'HEALTHY' || s.status === 'healthy',
   ).length
-  const totalCount = (systemHealth || []).length
+  const totalCount = deployedServices.length
 
   return (
     <AppLayout>

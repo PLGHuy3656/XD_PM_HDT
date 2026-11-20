@@ -29,6 +29,17 @@ class GatewaySettings(BaseSettings):
     analytics_service_url: str = "http://127.0.0.1:8005"
     analytics_service_deployed: bool = False
 
+    # INT01-R1: deployment scope per upstream (drives GET /api/system/status). A service that
+    # is not deployed is reported NOT_DEPLOYED and never probed.
+    iot_service_deployed: bool = True
+    ai_service_deployed: bool = True
+    notification_service_deployed: bool = True
+    system_status_probe_timeout_seconds: float = 2.0
+
+    # INT01-R1: service-to-service key presented to IoT Service (X-Internal-Service-Key).
+    # Injected by the Gateway only after JWT + farm/device authorization; never taken from clients.
+    iot_internal_service_key: str = ""
+
     # Timeouts (seconds)
     default_timeout_seconds: float = 5.0
     management_timeout_seconds: float = 5.0

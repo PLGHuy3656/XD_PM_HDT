@@ -1,4 +1,6 @@
 import { devices as ownerDevicesMock } from '../../../components/features/farm-owner/devices/devicesMockData.js'
+import { realNumberOrNull, resolveDeviceStatus } from '../deviceStatus.js'
+import { formatRelativeTime } from '../../telemetry/provenance.js'
 
 const TYPE_LABELS = {
   CONTROLLER: 'ESP32 Controller',
@@ -16,12 +18,11 @@ const TYPE_LABELS = {
 export function normalizeDevice(raw) {
   if (!raw) return null
 
-  const rawStatus = String(raw.status || 'OFFLINE').toUpperCase()
-  const status = ['ONLINE', 'ACTIVE', 'HEALTHY'].includes(rawStatus)
-    ? 'ONLINE'
-    : ['WARNING', 'DEGRADED'].includes(rawStatus)
-      ? 'WARNING'
-      : 'OFFLINE'
+  // INT01-R1: UNKNOWN (never heartbeat) and UNAVAILABLE (IoT down) are no longer collapsed into OFFLINE
+  const status = resolveDeviceStatus(raw)
+  const health = raw.health_metadata || raw.healthMetadata || {}
+  const lastSeenIso = raw.lastSeenAt || raw.last_seen_at || health.lastSeen || null
+  const hasBeenSeen = Boolean(lastSeenIso) && ['ONLINE', 'WARNING', 'OFFLINE'].includes(status)
 
   const rawType = String(raw.type || raw.device_type || 'SENSOR').toUpperCase()
   const type =
@@ -52,9 +53,20 @@ export function normalizeDevice(raw) {
     zoneId: raw.zoneId || raw.zone_id || '',
     zoneName: raw.zoneName || raw.zone_name || '',
     status,
-    firmware: raw.firmware || raw.firmware_version || 'v1.0.0',
-    signal: raw.signal != null ? Number(raw.signal) : raw.rssi != null ? Number(raw.rssi) : -60,
-    lastSeen: raw.lastSeen || raw.last_seen || raw.last_ping || 'Vừa xong',
+    nodeId: raw.node_id || raw.nodeId || code,
+    firmware: raw.firmware || raw.firmware_version || '--',
+    // INT01-R1: never a fallback RSSI; Management does not report radio signal (detail panel reads telemetry)
+    signal: realNumberOrNull(raw.signal ?? raw.rssi),
+    lastSeenAt: lastSeenIso,
+    lastSeen:
+      lastSeenIso
+        ? formatRelativeTime(lastSeenIso)
+        : typeof raw.lastSeen === 'string' && !raw.health_metadata
+          ? raw.lastSeen // mock fixtures only
+          : '--',
+    registeredIp: raw.ip_address || null,
+    reportedIp: hasBeenSeen ? health.ip || null : null,
+    iotAvailable: raw.iot_available !== false,
     description:
       raw.description ||
       (type === 'CAMERA'

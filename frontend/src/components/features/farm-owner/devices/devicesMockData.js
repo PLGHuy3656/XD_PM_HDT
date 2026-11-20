@@ -164,6 +164,15 @@ export const statusMeta = {
     label: 'Offline',
     className: 'offline',
   },
+  // INT01-R1
+  UNKNOWN: {
+    label: 'Chưa có heartbeat',
+    className: 'unknown',
+  },
+  UNAVAILABLE: {
+    label: 'Không xác định',
+    className: 'unavailable',
+  },
 }
 
 export const typeFilters = [
@@ -179,4 +188,6 @@ export const statusFilters = [
   { value: 'ONLINE', label: 'Online' },
   { value: 'WARNING', label: 'Cần chú ý' },
   { value: 'OFFLINE', label: 'Offline' },
+  { value: 'UNKNOWN', label: 'Chưa có heartbeat' },
+  { value: 'UNAVAILABLE', label: 'Không xác định' },
 ]

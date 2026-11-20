@@ -22,6 +22,7 @@ import { formatFarmOptionLabel } from '../../../features/farms/adapters/farmAdap
 import { useDevices } from '../../../features/devices/hooks/useDevices'
 import { useAlerts } from '../../../features/alerts/hooks/useAlerts'
 import { useTelemetry } from '../../../features/telemetry/hooks/useTelemetry'
+import { metricSource, sourceLabel } from '../../../features/telemetry/provenance.js'
 import { useCameras } from '../../../features/cameras/hooks/useCameras'
 import { USE_MOCK } from '../../../api/config.js'
 
@@ -190,6 +191,18 @@ function EnvironmentPanel({ telemetry }) {
   }
 
   const effectiveMetrics = { ...defaultMetrics }
+  if (!USE_MOCK) {
+    // INT01-R1: real mode keeps only labels/ranges from the template — never its numbers or series
+    Object.keys(effectiveMetrics).forEach((k) => {
+      effectiveMetrics[k] = {
+        ...effectiveMetrics[k],
+        value: null,
+        displayValue: '--',
+        values: [],
+        source: metricSource(telemetry, k),
+      }
+    })
+  }
   if (telemetry) {
     if (telemetry.temperature != null) {
       effectiveMetrics.temperature = {
@@ -247,7 +260,9 @@ function EnvironmentPanel({ telemetry }) {
     ((metric.safeMin - metric.min) / (metric.max - metric.min || 1)) * 100
   const safeMaxPercent =
     ((metric.safeMax - metric.min) / (metric.max - metric.min || 1)) * 100
-  const currentPercent = Math.min(
+  const hasValue = metric.value != null && Number.isFinite(Number(metric.value))
+  const inRange = hasValue && metric.value >= metric.safeMin && metric.value <= metric.safeMax
+  const currentPercent = !hasValue ? null : Math.min(
     100,
     Math.max(
       0,
@@ -282,8 +297,17 @@ function EnvironmentPanel({ telemetry }) {
         <div>
           <span>Hiện tại</span>
           <strong>{metric.displayValue}</strong>
+          {metric.source && metric.source !== 'PHYSICAL' && (
+            <small data-testid="dashboard-metric-source">{sourceLabel(metric.source)}</small>
+          )}
         </div>
-        <StatusBadge status="normal">Trong ngưỡng</StatusBadge>
+        {!hasValue ? (
+          <StatusBadge status="offline">Chưa có dữ liệu</StatusBadge>
+        ) : inRange ? (
+          <StatusBadge status="normal">Trong ngưỡng</StatusBadge>
+        ) : (
+          <StatusBadge status="warning">Ngoài ngưỡng</StatusBadge>
+        )}
       </div>
 
       <div className="environment-range">
@@ -310,14 +334,16 @@ function EnvironmentPanel({ telemetry }) {
               width: `${safeMaxPercent - safeMinPercent}%`,
             }}
           />
-          <div
-            className="range-current-marker"
-            style={{
-              left: `${currentPercent}%`,
-            }}
-          >
-            <span />
-          </div>
+          {currentPercent != null && (
+            <div
+              className="range-current-marker"
+              style={{
+                left: `${currentPercent}%`,
+              }}
+            >
+              <span />
+            </div>
+          )}
         </div>
       </div>
 

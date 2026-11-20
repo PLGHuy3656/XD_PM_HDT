@@ -64,16 +64,12 @@ export function useAdminData() {
 
     try {
       // 1. Parallel fetch top-level resources
-      let alertsOk = true
       const [rawFarms, rawDevices, rawTechs, healthData, rawAlerts, rawUsers] = await Promise.all([
         farmsApi.getFarms(),
         devicesApi.getDevices(),
         techniciansApi.getTechnicians(),
-        systemApi.getHealth().catch(() => null),
-        alertsApi.getAlerts().catch(() => {
-          alertsOk = false
-          return []
-        }),
+        systemApi.getStatus().catch(() => null),
+        alertsApi.getAlerts().catch(() => []),
         usersApi.getUsers().catch(() => null),
       ])
 
@@ -161,11 +157,8 @@ export function useAdminData() {
         }))
       }
 
-      // 8. Normalize system services honestly from live probes
-      const normalizedServices = normalizeSystemServices(healthData, {
-        managementOk: true,
-        alertsOk,
-      })
+      // 8. Normalize system services honestly from Gateway live probes (INT01-R1 /api/system/status)
+      const normalizedServices = normalizeSystemServices(healthData)
 
       setFarms(normalizedFarms)
       setDevices(normalizedDevices)

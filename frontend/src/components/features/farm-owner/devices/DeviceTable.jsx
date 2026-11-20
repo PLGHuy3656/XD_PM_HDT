@@ -83,7 +83,7 @@ function DeviceTable({
 
       <div className="device-table-body">
         {devices.map((device) => {
-          const status = statusMeta[device.status]
+          const status = statusMeta[device.status] || statusMeta.UNKNOWN
 
           return (
             <button
@@ -106,7 +106,7 @@ function DeviceTable({
                 <span>
                   <strong>{device.name}</strong>
                   <small>
-                    {device.id} · {device.typeLabel}
+                    {device.nodeId || device.code || device.id} · {device.typeLabel}
                   </small>
                 </span>
               </span>

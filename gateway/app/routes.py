@@ -31,7 +31,7 @@ from app.auth import (
     revoke_token,
 )
 from app.config import settings
-from app.proxy import proxy_handler, validate_path_security
+from app.proxy import internal_service_headers_for, proxy_handler, validate_path_security
 from app.resource_guard import (
     extract_param_safe,
     is_valid_uuid,
@@ -904,6 +904,105 @@ async def proxy_device_delete(
 
 
 # =============================================================================
+# 1b. System Status (INT01-R1) — ADMIN only, active upstream probes
+# =============================================================================
+
+_SYSTEM_SERVICES = (
+    # id, display name, settings url attr, deployed attr (None = always deployed), probe path
+    ("management", "Management Service", "management_service_url", None, "/health"),
+    ("iot", "IoT Service", "iot_service_url", "iot_service_deployed", "/health/runtime"),
+    ("ai", "AI Vision Service", "ai_service_url", "ai_service_deployed", "/health"),
+    ("notification", "Notification Service", "notification_service_url", "notification_service_deployed", "/health"),
+    ("analytics", "Analytics Service", "analytics_service_url", "analytics_service_deployed", "/health"),
+)
+
+
+async def _probe_upstream(client: httpx.AsyncClient, service_id: str, base_url: str, path: str) -> Dict[str, Any]:
+    """Classifies one upstream as HEALTHY / DEGRADED / UNAVAILABLE.
+
+    HTTP 200 alone only proves the process answers; for IoT the MQTT broker link is also checked.
+    """
+    import time
+
+    url = f"{base_url.rstrip('/')}{path}"
+    started = time.perf_counter()
+    try:
+        resp = await client.get(url, timeout=settings.system_status_probe_timeout_seconds)
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
+        return {"status": "UNAVAILABLE", "detail": f"unreachable ({type(exc).__name__})", "latencyMs": None}
+    latency = int((time.perf_counter() - started) * 1000)
+    if resp.status_code == 404 and path != "/health":
+        # Older upstream without the runtime endpoint: process is up but dependencies are unverified
+        try:
+            legacy = await client.get(f"{base_url.rstrip('/')}/health", timeout=settings.system_status_probe_timeout_seconds)
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError):
+            return {"status": "UNAVAILABLE", "detail": "unreachable", "latencyMs": None}
+        if legacy.status_code == 200:
+            return {"status": "DEGRADED", "detail": "runtime dependency status not reported", "latencyMs": latency}
+        return {"status": "UNAVAILABLE", "detail": f"HTTP {legacy.status_code}", "latencyMs": latency}
+    if resp.status_code != 200:
+        return {"status": "UNAVAILABLE", "detail": f"HTTP {resp.status_code}", "latencyMs": latency}
+    if service_id == "iot":
+        try:
+            body = resp.json()
+        except ValueError:
+            body = {}
+        mqtt_state = body.get("mqtt") if isinstance(body, dict) else None
+        if mqtt_state == "connected":
+            return {"status": "HEALTHY", "detail": "MQTT connected", "latencyMs": latency}
+        return {"status": "DEGRADED", "detail": f"MQTT {mqtt_state or 'unknown'}", "latencyMs": latency}
+    return {"status": "HEALTHY", "detail": "health check OK", "latencyMs": latency}
+
+
+@router.get(
+    "/api/system/status",
+    tags=["System"],
+    summary="Live upstream service status (Admin only)",
+)
+async def system_status(
+    request: Request,
+    current_user: Dict[str, Any] = Depends(require_admin),
+) -> JSONResponse:
+    """Statuses: HEALTHY | DEGRADED | UNAVAILABLE | NOT_DEPLOYED. Exposes no URLs or secrets."""
+    import asyncio
+    from datetime import datetime, timezone
+
+    client = getattr(request.app.state, "http_client", None)
+    owns_client = client is None
+    if owns_client:
+        client = httpx.AsyncClient()
+    try:
+        results: list[Dict[str, Any]] = [
+            {"id": "gateway", "name": "API Gateway", "deployed": True, "status": "HEALTHY",
+             "detail": "serving this request", "latencyMs": 0},
+        ]
+        probes = []
+        for sid, name, url_attr, deployed_attr, path in _SYSTEM_SERVICES:
+            deployed = True if deployed_attr is None else bool(getattr(settings, deployed_attr))
+            entry: Dict[str, Any] = {"id": sid, "name": name, "deployed": deployed}
+            results.append(entry)
+            if not deployed:
+                entry.update({"status": "NOT_DEPLOYED", "detail": "not part of this deployment", "latencyMs": None})
+            else:
+                probes.append((entry, _probe_upstream(client, sid, getattr(settings, url_attr), path)))
+        outcomes = await asyncio.gather(*(coro for _, coro in probes))
+        for (entry, _), outcome in zip(probes, outcomes):
+            entry.update(outcome)
+    finally:
+        if owns_client:
+            await client.aclose()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "environment": settings.environment,
+            "checkedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "services": results,
+        },
+    )
+
+
+# =============================================================================
 # 2. IoT Service Routes (/api/iot/*)
 # =============================================================================
 
@@ -1038,7 +1137,11 @@ async def proxy_iot_command_status(
         client = httpx.AsyncClient()
     cmd_url = f"{settings.iot_service_url.rstrip('/')}/api/iot/{path}"
     try:
-        resp = await client.get(cmd_url, timeout=settings.iot_timeout_seconds)
+        resp = await client.get(
+            cmd_url,
+            headers=internal_service_headers_for(settings.iot_service_url),
+            timeout=settings.iot_timeout_seconds,
+        )
     except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

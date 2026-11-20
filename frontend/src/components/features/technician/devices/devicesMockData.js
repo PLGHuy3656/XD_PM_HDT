@@ -171,8 +171,12 @@ export const statusMeta = {
     className: 'offline',
   },
   UNKNOWN: {
-    label: 'Chưa kết nối IoT',
-    className: 'offline',
+    label: 'Chưa có heartbeat',
+    className: 'unknown',
+  },
+  UNAVAILABLE: {
+    label: 'Không xác định (IoT)',
+    className: 'unknown',
   },
 }
 
@@ -181,7 +185,8 @@ export const statusOptions = [
   { value: 'ONLINE', label: 'Online' },
   { value: 'WARNING', label: 'Warning' },
   { value: 'OFFLINE', label: 'Offline' },
-  { value: 'UNKNOWN', label: 'Chưa kết nối IoT' },
+  { value: 'UNKNOWN', label: 'Chưa có heartbeat' },
+  { value: 'UNAVAILABLE', label: 'Không xác định (IoT)' },
 ]
 
 export const typeOptions = [

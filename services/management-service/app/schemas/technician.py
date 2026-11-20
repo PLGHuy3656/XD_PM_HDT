@@ -36,6 +36,8 @@ class TechnicianDeviceResponse(BaseModel):
     zone_name: str | None = None
 
     status: str
+    # INT01-R1: False when IoT presence could not be obtained (client shows UNAVAILABLE)
+    iot_available: bool | None = None
     rssi: int | None = None
     mqtt_status: str
 

@@ -1,118 +1,70 @@
-import { useCallback, useEffect, useState } from 'react'
-import { telemetryApi } from '../../../api/modules/telemetryApi.js'
+import { useCallback, useMemo } from 'react'
 import { USE_MOCK } from '../../../api/config.js'
-import {
-  SERVICE_STATE,
-  classifyServiceError,
-  useRevalidateOnFocus,
-} from '../../../api/serviceStatus.js'
+import { SERVICE_STATE } from '../../../api/serviceStatus.js'
 import { normalizeTelemetry } from '../adapters/telemetryAdapter.js'
+import { useFarmTelemetry } from '../farmTelemetryPoller.js'
 
+const STATUS_TO_SERVICE_STATE = {
+  idle: SERVICE_STATE.UNKNOWN,
+  loading: SERVICE_STATE.LOADING,
+  ok: SERVICE_STATE.AVAILABLE,
+  stale: SERVICE_STATE.AVAILABLE,
+  empty: SERVICE_STATE.EMPTY,
+  forbidden: SERVICE_STATE.ERROR,
+  unavailable: SERVICE_STATE.UNAVAILABLE,
+  error: SERVICE_STATE.ERROR,
+}
+
+/**
+ * Farm-scoped latest telemetry.
+ *
+ * INT01-R1: real mode subscribes to the shared farm poller (one loop per farm for the whole app),
+ * exposes `isStale`, `pollStatus` and provenance-carrying telemetry. Return shape is unchanged.
+ */
 export function useTelemetry(farmId) {
-  const [telemetry, setTelemetry] = useState(() => normalizeTelemetry(null, USE_MOCK))
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [hasData, setHasData] = useState(false)
-  const [serviceState, setServiceState] = useState(
-    USE_MOCK ? SERVICE_STATE.AVAILABLE : SERVICE_STATE.LOADING,
-  )
+  const live = useFarmTelemetry(USE_MOCK ? null : farmId)
 
-  const fetchTelemetry = useCallback(async (signal, { silent = false } = {}) => {
-    if (!farmId) {
-      setLoading(false)
-      setTelemetry(normalizeTelemetry(null, USE_MOCK))
-      setHasData(false)
-      setError(null)
-      setServiceState(USE_MOCK ? SERVICE_STATE.AVAILABLE : SERVICE_STATE.UNKNOWN)
-      return
+  const mockTelemetry = useMemo(() => (USE_MOCK ? normalizeTelemetry(null, true) : null), [])
+  const refetch = useCallback(() => {
+    if (!USE_MOCK) live.refresh()
+  }, [live])
+
+  if (USE_MOCK) {
+    return {
+      telemetry: farmId ? mockTelemetry : normalizeTelemetry(null, true),
+      hasData: Boolean(farmId),
+      loading: false,
+      error: null,
+      serviceState: SERVICE_STATE.AVAILABLE,
+      isStale: false,
+      pollStatus: 'ok',
+      refetch,
     }
+  }
 
-    try {
-      if (!silent) {
-        setLoading(true)
-        setError(null)
-        if (!USE_MOCK) {
-          setTelemetry(null)
-          setHasData(false)
-          setServiceState(SERVICE_STATE.LOADING)
-        }
-      }
-
-      if (USE_MOCK) {
-        setTelemetry(normalizeTelemetry(null, true))
-        setHasData(true)
-        setServiceState(SERVICE_STATE.AVAILABLE)
-        return
-      }
-
-      const response = await telemetryApi.getFarmLatest(farmId, { signal })
-      const normalized = normalizeTelemetry(response, false)
-      const hasAnyMetric =
-        normalized &&
-        (normalized.temperature != null ||
-          normalized.humidity != null ||
-          normalized.co2 != null ||
-          normalized.light != null)
-      setTelemetry(normalized)
-      setHasData(Boolean(hasAnyMetric))
-      setError(null)
-      setServiceState(hasAnyMetric ? SERVICE_STATE.AVAILABLE : SERVICE_STATE.EMPTY)
-    } catch (err) {
-      if (err?.code !== 'ABORTED') {
-        if (err?.status === 404 || err?.statusCode === 404) {
-          setTelemetry(normalizeTelemetry(null, false))
-          setHasData(false)
-          setError(null)
-          setServiceState(SERVICE_STATE.EMPTY)
-        } else {
-          const classified = classifyServiceError(err) || SERVICE_STATE.ERROR
-          setServiceState(classified)
-          setError(err?.message || 'Không thể tải số liệu cảm biến.')
-        }
-      }
-    } finally {
-      setLoading(false)
+  if (!farmId) {
+    return {
+      telemetry: null,
+      hasData: false,
+      loading: false,
+      error: null,
+      serviceState: SERVICE_STATE.UNKNOWN,
+      isStale: false,
+      pollStatus: 'idle',
+      refetch,
     }
-  }, [farmId])
+  }
 
-  useEffect(() => {
-    const controller = new AbortController()
-    queueMicrotask(() => {
-      if (!controller.signal.aborted) {
-        fetchTelemetry(controller.signal)
-      }
-    })
-
-    // Background 3s polling for live ESP32 telemetry when a real farmId is selected
-    let pollInterval = null
-    if (!USE_MOCK && farmId) {
-      pollInterval = setInterval(() => {
-        if (!controller.signal.aborted) {
-          fetchTelemetry(controller.signal, { silent: true })
-        }
-      }, 3000)
-    }
-
-    return () => {
-      controller.abort()
-      if (pollInterval) clearInterval(pollInterval)
-    }
-  }, [fetchTelemetry, farmId])
-
-  useRevalidateOnFocus(
-    useCallback(() => {
-      fetchTelemetry()
-    }, [fetchTelemetry]),
-    { enabled: !USE_MOCK && Boolean(farmId) },
-  )
-
+  const status = live.status
   return {
-    telemetry,
-    hasData,
-    loading,
-    error,
-    serviceState,
-    refetch: () => fetchTelemetry(),
+    telemetry: live.telemetry,
+    hasData: Boolean(live.telemetry) && (status === 'ok' || status === 'stale'),
+    loading: status === 'loading',
+    error: status === 'unavailable' || status === 'error' || status === 'forbidden' ? live.error : null,
+    serviceState: STATUS_TO_SERVICE_STATE[status] || SERVICE_STATE.UNKNOWN,
+    isStale: status === 'stale',
+    pollStatus: status,
+    refetch,
   }
 }
 

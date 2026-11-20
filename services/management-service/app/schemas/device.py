@@ -16,6 +16,8 @@ class DeviceRegistryResponse(BaseModel):
     presence_status: str | None = None
     provisioning_status: str | None = None
     health_metadata: dict | None = None
+    # INT01-R1: False when IoT presence could not be obtained (client shows UNAVAILABLE)
+    iot_available: bool | None = None
     created_at: str | None = None
 
 

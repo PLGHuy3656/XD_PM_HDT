@@ -67,7 +67,7 @@ function EnvironmentZoneTable({ zones, onSelect }) {
             <span
               className={`tech-env-badge ${zone.status.toLowerCase()}`}
             >
-              {zone.status === 'NORMAL' ? 'Ổn định' : 'Kiểm tra'}
+              {zone.status === 'NORMAL' ? 'Ổn định' : zone.status === 'WARNING' ? 'Kiểm tra' : 'Không có dữ liệu'}
             </span>
           </button>
         ))}

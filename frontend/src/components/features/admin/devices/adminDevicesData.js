@@ -4,12 +4,15 @@ export const deviceStatusLabels = {
   ONLINE: 'Online',
   WARNING: 'Cần chú ý',
   OFFLINE: 'Offline',
+  UNKNOWN: 'Chưa có heartbeat',
+  UNAVAILABLE: 'Không xác định (IoT)',
 }
 
 export const provisioningLabels = {
   PROVISIONED: 'Đã kích hoạt',
   ATTENTION: 'Cần kiểm tra',
   DISCONNECTED: 'Mất kết nối',
+  UNKNOWN: 'Chưa xác nhận kết nối',
 }
 
 export function getDeviceProvisioningStatus(device) {
@@ -21,7 +24,12 @@ export function getDeviceProvisioningStatus(device) {
     return 'ATTENTION'
   }
 
-  return 'PROVISIONED'
+  // INT01-R1: never claim PROVISIONED without a heartbeat
+  if (device.status === 'ONLINE') {
+    return 'PROVISIONED'
+  }
+
+  return 'UNKNOWN'
 }
 
 export function getAdminDevices(farms = adminFarms) {

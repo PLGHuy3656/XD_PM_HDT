@@ -63,8 +63,10 @@ services:
     container_name: swiftletcare-int01-mosquitto
     hostname: mosquitto
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:${INT01_MQTT_PORT:-21883}:1883"
+    # INT01-R1: no host port. The broker is anonymous inside int01-net, so publishing it on the
+    # host would let any local client inject commands/ACKs. Use `docker exec swiftletcare-int01-mosquitto
+    # mosquitto_sub/mosquitto_pub` for diagnostics. A LAN-reachable authenticated listener for a
+    # physical ESP32 is out of INT01 scope.
     volumes:
       - ./infrastructure/mosquitto/mosquitto.int01.conf:/mosquitto/config/mosquitto.conf:ro
     healthcheck:
@@ -114,8 +116,8 @@ services:
     container_name: swiftletcare-int01-iot
     hostname: iot-service
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:${INT01_IOT_PORT:-28002}:8002"
+    # INT01-R1: no host port. IoT is reachable only inside int01-net (Gateway/Management/simulator);
+    # every /api/iot/* call additionally requires X-Internal-Service-Key.
     environment:
       IOT_SERVICE_HOST: 0.0.0.0
       IOT_SERVICE_PORT: 8002
@@ -125,6 +127,9 @@ services:
       MANAGEMENT_SERVICE_URL: http://management-service:8001
       INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       METADATA_CACHE_TTL_SECONDS: ${METADATA_CACHE_TTL_SECONDS:-30}
+      IOT_INTERNAL_API_AUTH_REQUIRED: "true"
+      COMMAND_ACK_TIMEOUT_SECONDS: ${INT01_COMMAND_ACK_TIMEOUT_SECONDS:-15}
+      COMMAND_TIMEOUT_SWEEP_INTERVAL_SECONDS: "1"
     depends_on:
       mosquitto:
         condition: service_healthy
@@ -156,6 +161,11 @@ services:
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       MANAGEMENT_SERVICE_URL: http://management-service:8001
       IOT_SERVICE_URL: http://iot-service:8002
+      IOT_INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      # INT01 deployment scope (drives Admin service status; AI/Notification/Analytics join in INT02-04)
+      IOT_SERVICE_DEPLOYED: "true"
+      AI_SERVICE_DEPLOYED: "false"
+      NOTIFICATION_SERVICE_DEPLOYED: "false"
       ANALYTICS_SERVICE_DEPLOYED: "false"
       REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/1
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:23000,http://127.0.0.1:23000}
@@ -212,6 +222,9 @@ services:
       MQTT_BROKER_PORT: 1883
       DEVICE_ID: ${INT01_SIMULATOR_DEVICE_ID:-SWC-INT01-NODE-01}
       PYTHONUNBUFFERED: "1"
+      # INT01-R1 opt-in negative-path testing only (default empty = normal behaviour),
+      # e.g. INT01_SIM_FAULT_MODE="heater=FAILED,alarm=ERROR,fan=NOACK"
+      SIM_FAULT_MODE: ${INT01_SIM_FAULT_MODE:-}
     volumes:
       - ./firmware/esp32_simulator.py:/sim/esp32_simulator.py:ro
     depends_on:

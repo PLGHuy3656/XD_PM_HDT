@@ -2,6 +2,10 @@ const healthLabels = {
   HEALTHY: 'Ổn định',
   WARNING: 'Cảnh báo',
   UNAVAILABLE: 'Không khả dụng',
+  // INT01-R1: honest states when no self-test / feedback sensor exists
+  REPORTING: 'Đang gửi dữ liệu',
+  UNSUPPORTED: 'Chưa được hỗ trợ',
+  UNVERIFIED: 'Chưa xác minh',
 }
 
 function HealthItem({ item, showValue = false }) {
@@ -86,7 +90,7 @@ function DiagnosticDetailPanel({ node, onClose }) {
                 <strong>
                   {connectivity.rssi == null
                     ? '--'
-                    : `${connectivity.rssi} dBm`}
+                    : `${connectivity.rssi} dBm${connectivity.rssiSource ? ` (${connectivity.rssiSource})` : ''}`}
                 </strong>
               </div>
 
@@ -114,7 +118,7 @@ function DiagnosticDetailPanel({ node, onClose }) {
                 ))
               ) : (
                 <p className="diagnostic-empty">
-                  Chưa có dữ liệu cảm biến từ IoT Service.
+                  {node.loading ? 'Đang tải dữ liệu IoT…' : 'Chưa có dữ liệu cảm biến từ IoT Service.'}
                 </p>
               )}
             </div>
@@ -132,6 +136,7 @@ function DiagnosticDetailPanel({ node, onClose }) {
                   <HealthItem
                     key={actuator.name}
                     item={actuator}
+                    showValue={actuator.value !== undefined}
                   />
                 ))
               ) : (

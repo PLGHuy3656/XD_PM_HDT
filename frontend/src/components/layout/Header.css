@@ -207,8 +207,55 @@
   font-weight: 700;
 }
 
-.header-environment-item:first-child strong {
+.header-environment-context + .header-environment-item strong {
   color: var(--color-gold-600);
+}
+
+/* INT01-R1: farm context + data state (mock / none / simulated / stale / error) */
+.header-environment-context {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  max-width: 170px;
+  padding: 0 12px;
+  border-right: 1px solid rgba(16, 45, 70, 0.065);
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.header-environment-context span {
+  overflow: hidden;
+  color: var(--color-text-subtle);
+  font-size: 9px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.header-environment-context strong {
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 10px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+.header-environment--simulated .header-environment-context strong {
+  color: #8a5a00;
+}
+
+.header-environment--stale .header-environment-context strong,
+.header-environment--empty .header-environment-context strong,
+.header-environment--none .header-environment-context strong {
+  color: var(--color-text-subtle);
+}
+
+.header-environment--error .header-environment-context strong {
+  color: #b42318;
+}
+
+.header-environment--stale .header-environment-item strong {
+  opacity: 0.55;
 }
 
 .header-actions {
@@ -467,12 +514,12 @@
 }
 
 @media (max-width: 1000px) {
-  .header-environment-item:nth-child(3),
-  .header-environment-item:nth-child(4) {
+  .header-environment-item:nth-child(4),
+  .header-environment-item:nth-child(5) {
     display: none;
   }
 
-  .header-environment-item:nth-child(2)::after {
+  .header-environment-item:nth-child(3)::after {
     display: none;
   }
 }

@@ -7,6 +7,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 RelayTarget = Literal["misting", "fan", "heater", "alarm"]
 CommandAction = Literal["SET_RELAY", "UPDATE_THRESHOLDS"]
 CommandStatus = Literal["PENDING", "PUBLISHED", "SUCCESS", "FAILED", "ERROR", "TIMEOUT"]
+# INT01-R1: terminal states of the command state machine. Once terminal, a command never changes status again.
+TERMINAL_COMMAND_STATUSES: tuple[str, ...] = ("SUCCESS", "FAILED", "ERROR", "TIMEOUT")
+ACTIVE_COMMAND_STATUSES: tuple[str, ...] = ("PENDING", "PUBLISHED")
 AckStatus = Literal["SUCCESS", "FAILED", "ERROR"]
 ControlMode = Literal["AUTO", "MANUAL"]
 
@@ -19,6 +22,10 @@ class SetRelayPayload(BaseModel):
     action: Literal["SET_RELAY"] = "SET_RELAY"
     target: RelayTarget = Field(..., description="Actuator target relay")
     state: Literal[0, 1] = Field(..., description="0 = OFF, 1 = ON")
+    expiresAt: str | None = Field(
+        default=None,
+        description="INT01-R1: ISO-8601 UTC deadline. A device/simulator with a synchronized clock MUST NOT execute after it.",
+    )
 
 
 class UpdateThresholdsPayload(BaseModel):
@@ -42,6 +49,10 @@ class UpdateThresholdsPayload(BaseModel):
     isAutoMode: bool = Field(
         ...,
         description="True for local AUTO rule engine, False for MANUAL override",
+    )
+    expiresAt: str | None = Field(
+        default=None,
+        description="INT01-R1: ISO-8601 UTC deadline. A device/simulator with a synchronized clock MUST NOT execute after it.",
     )
 
 
@@ -80,3 +91,8 @@ class DeviceCommand(BaseModel):
     ack_status: AckStatus | None = None
     ack_message: str | None = None
     ack_mode: ControlMode | None = None
+    # INT01-R1: server-authoritative ACK deadline and late-ACK observability (never changes terminal status)
+    expires_at: datetime | None = None
+    late_ack_status: AckStatus | None = None
+    late_ack_at: datetime | None = None
+    late_ack_message: str | None = None

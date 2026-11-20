@@ -662,3 +662,40 @@
     text-align: left;
   }
 }
+
+/* INT01-R1: live service states */
+.admin-system-service__status--degraded {
+  background: #fdf4e3;
+  color: #8a5a00;
+}
+
+.admin-system-service__status--degraded i {
+  background: #d4a035;
+}
+
+.admin-system-service__status--unavailable,
+.admin-system-service__status--down {
+  background: #fdecea;
+  color: #a5372d;
+}
+
+.admin-system-service__status--unavailable i,
+.admin-system-service__status--down i {
+  background: #c85b51;
+}
+
+.admin-system-service__status--not_deployed {
+  background: #f3f1ec;
+  color: #736b5e;
+}
+
+.admin-system-service__status--not_deployed i {
+  background: #a59b8a;
+}
+
+.admin-system-service__detail {
+  display: block;
+  margin-top: 2px;
+  color: #8a8f94;
+  font-size: 11px;
+}

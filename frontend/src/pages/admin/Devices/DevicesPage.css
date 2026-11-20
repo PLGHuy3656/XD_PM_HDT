@@ -646,3 +646,15 @@
     padding: 22px 18px;
   }
 }
+
+/* INT01-R1 */
+.admin-device-status--unknown,
+.admin-device-status--unavailable {
+  background: #f1f3f5;
+  color: #5f6b76;
+}
+
+.admin-device-status--unknown i,
+.admin-device-status--unavailable i {
+  background: #9aa5af;
+}

@@ -1024,3 +1024,22 @@
   font-size: 13px;
   box-sizing: border-box;
 }
+
+/* INT01-R1: honest diagnostic states */
+.diagnostic-status-dot.reporting {
+  background: #4e9a73;
+}
+
+.diagnostic-status-dot.unsupported,
+.diagnostic-status-dot.unverified {
+  background: #9aa5af;
+}
+
+.diagnostic-health-state.reporting {
+  color: #387258;
+}
+
+.diagnostic-health-state.unsupported,
+.diagnostic-health-state.unverified {
+  color: #5f6b76;
+}

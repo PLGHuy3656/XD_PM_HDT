@@ -138,5 +138,7 @@ export const systemStatusLabels = {
   HEALTHY: 'Hoạt động tốt',
   DEGRADED: 'Suy giảm',
   DOWN: 'Ngừng hoạt động',
+  UNAVAILABLE: 'Không khả dụng',
+  NOT_DEPLOYED: 'Chưa triển khai',
   PLANNED: 'Chưa tích hợp',
 }

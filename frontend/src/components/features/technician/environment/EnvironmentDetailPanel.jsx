@@ -1,3 +1,5 @@
+import { sourceLabel } from '../../../../features/telemetry/provenance.js'
+
 const metricNames = {
   temperature: 'Nhiệt độ',
   humidity: 'Độ ẩm',
@@ -61,10 +63,13 @@ function EnvironmentDetailPanel({ zone, onClose }) {
 
                   <small>
                     {metric.status === 'NORMAL'
-                      ? 'Bình thường'
+                      ? 'Trong ngưỡng'
                       : metric.status === 'WARNING'
-                        ? 'Cần kiểm tra'
+                        ? 'Ngoài ngưỡng'
                         : 'Không có dữ liệu'}
+                    {metric.value !== null && metric.source && metric.source !== 'PHYSICAL'
+                      ? ` · ${sourceLabel(metric.source)}`
+                      : ''}
                   </small>
                 </article>
               ))}
@@ -87,8 +92,10 @@ function EnvironmentDetailPanel({ zone, onClose }) {
                 <span>Trạng thái khu vực</span>
                 <strong>
                   {zone.status === 'NORMAL'
-                    ? 'Ổn định'
-                    : 'Cần kiểm tra'}
+                    ? 'Trong ngưỡng'
+                    : zone.status === 'WARNING'
+                      ? 'Cần kiểm tra'
+                      : 'Không có dữ liệu'}
                 </strong>
               </div>
             </div>

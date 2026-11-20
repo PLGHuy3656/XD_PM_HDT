@@ -23,6 +23,11 @@ import {
 
 import { useFarms } from '../../../features/farms/hooks/useFarms'
 import { useTelemetry } from '../../../features/telemetry/hooks/useTelemetry'
+import {
+  formatRelativeTime,
+  isSimulatedTelemetry,
+  metricSource,
+} from '../../../features/telemetry/provenance.js'
 import { SERVICE_STATE } from '../../../api/serviceStatus.js'
 import { USE_MOCK } from '../../../api/config.js'
 
@@ -56,6 +61,7 @@ function EnvironmentPage() {
     hasData,
     error: telemetryError,
     serviceState: iotState,
+    isStale,
     refetch: refetchTelemetry,
   } = useTelemetry(selectedFarmId)
 
@@ -65,13 +71,17 @@ function EnvironmentPage() {
   const effectiveZones = useMemo(() => {
     if (zones.length > 0) {
       const baseMetrics = defaultMockFarms[0]?.zones[0]?.metrics || {}
-      return zones.map((z, idx) => {
+      return zones.map((z) => {
         const zMetrics = JSON.parse(JSON.stringify(baseMetrics))
-        if (!USE_MOCK && !hasData) {
+        if (!USE_MOCK) {
+          // INT01-R1: the mock template only provides labels/ranges. Real mode never keeps its numbers
+          // or its chart series (IoT keeps no telemetry history in INT01).
           Object.keys(zMetrics).forEach((k) => {
             zMetrics[k].values = []
             zMetrics[k].value = null
             zMetrics[k].hasData = false
+            zMetrics[k].displayValue = '--'
+            zMetrics[k].source = metricSource(telemetry, k)
           })
         }
         if (telemetry && telemetry.temperature != null) {
@@ -105,21 +115,22 @@ function EnvironmentPage() {
         return {
           id: z.id,
           name: z.name,
-          node: iotConnected ? `ENV-${String(idx + 1).padStart(2, '0')}` : 'Chưa kết nối',
+          // INT01-R1: real node id from telemetry, real age; no generated names / "Đã đồng bộ"
+          node: USE_MOCK ? z.node || '--' : telemetry?.deviceId || (iotConnected ? 'Chưa có node gửi dữ liệu' : 'Chưa kết nối'),
           lastSeen: hasData
             ? telemetry?.timestamp
-              ? 'Dữ liệu trực tiếp'
-              : 'Đã đồng bộ'
+              ? `${isStale ? 'Dữ liệu cũ · ' : 'Cập nhật '}${formatRelativeTime(telemetry.timestamp)}${isSimulatedTelemetry(telemetry) ? ' · Mô phỏng' : ''}`
+              : 'Chưa có thời điểm đo'
             : iotUnavailable
               ? 'Chưa kết nối dịch vụ IoT'
               : 'Chưa có dữ liệu cảm biến',
-          status: hasData ? 'live' : 'offline',
+          status: hasData && !isStale ? 'live' : 'offline',
           metrics: zMetrics,
         }
       })
     }
     return USE_MOCK ? defaultMockFarms[0]?.zones || [] : []
-  }, [zones, telemetry, hasData, iotConnected, iotUnavailable])
+  }, [zones, telemetry, hasData, iotConnected, iotUnavailable, isStale])
 
   const [zoneId, setZoneId] = useState('')
   const [selectedMetric, setSelectedMetric] = useState('temperature')

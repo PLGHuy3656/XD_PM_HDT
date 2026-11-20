@@ -944,3 +944,9 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* INT01-R1 */
+.tech-status.unknown {
+  background: #f1f3f5;
+  color: #5f6b76;
+}

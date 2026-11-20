@@ -3,7 +3,6 @@ import { techniciansApi } from '../../../api/modules/techniciansApi.js'
 import { farmsApi } from '../../../api/modules/farmsApi.js'
 import { devicesApi } from '../../../api/modules/devicesApi.js'
 import { alertsApi } from '../../../api/modules/alertsApi.js'
-import { telemetryApi } from '../../../api/modules/telemetryApi.js'
 import { USE_MOCK } from '../../../api/config.js'
 import { useRevalidateOnFocus } from '../../../api/serviceStatus.js'
 import { useAuth } from '../../../context/AuthContext.jsx'
@@ -16,7 +15,8 @@ import {
   normalizeTechAlert,
 } from '../adapters/technicianAdapter.js'
 import { normalizeZone } from '../../farms/adapters/farmAdapter.js'
-import { normalizeTelemetry } from '../../telemetry/adapters/telemetryAdapter.js'
+import { useFarmTelemetry } from '../../telemetry/farmTelemetryPoller.js'
+import { getActiveFarm, setActiveFarm } from '../../farms/activeFarmStore.js'
 
 export function useTechnicianData(overrideTechId = null) {
   const { user } = useAuth()
@@ -24,7 +24,10 @@ export function useTechnicianData(overrideTechId = null) {
 
   const [dashboardRaw, setDashboardRaw] = useState(null)
   const [farms, setFarms] = useState([])
-  const [selectedFarmId, setSelectedFarmId] = useState(null)
+  // INT01-R1: resume the farm this technician last selected (validated against the assigned list)
+  const [selectedFarmId, setSelectedFarmId] = useState(() =>
+    technicianId && technicianId === user?.id ? getActiveFarm(user.id)?.farmId || null : null,
+  )
   const [devices, setDevices] = useState([])
   const [zones, setZones] = useState([])
   const [alerts, setAlerts] = useState([])
@@ -119,7 +122,7 @@ export function useTechnicianData(overrideTechId = null) {
         const activeFarm = farms.find((f) => f.id === selectedFarmId)
         const farmName = activeFarm?.name || 'Nhà yến'
 
-        const [devResp, zonesResp, alertsResp, telemResp] = await Promise.allSettled([
+        const [devResp, zonesResp, alertsResp] = await Promise.allSettled([
           techniciansApi.getFarmDevices(technicianId, selectedFarmId, {
             signal: controller.signal,
           }),
@@ -128,7 +131,6 @@ export function useTechnicianData(overrideTechId = null) {
             params: { farmId: selectedFarmId },
             signal: controller.signal,
           }),
-          telemetryApi.getFarmLatest(selectedFarmId, { signal: controller.signal }),
         ])
 
         if (!isMounted) return
@@ -168,17 +170,7 @@ export function useTechnicianData(overrideTechId = null) {
           }
         }
 
-        // Telemetry
-        if (telemResp.status === 'fulfilled') {
-          setTelemetry(normalizeTelemetry(telemResp.value, false))
-          setTelemetryError(null)
-        } else {
-          setTelemetry(null)
-          const reason = telemResp.reason
-          if (reason?.code !== 'ABORTED' && reason?.status !== 404 && reason?.statusCode !== 404) {
-            setTelemetryError(reason?.message || 'Dịch vụ IoT chưa khả dụng.')
-          }
-        }
+        // Telemetry: INT01-R1 live, shared farm poller (see useFarmTelemetry below)
       } catch {
         // Ignore aborts
       }
@@ -283,6 +275,21 @@ export function useTechnicianData(overrideTechId = null) {
 
   const selectedFarm = farms.find((f) => f.id === selectedFarmId) || farms[0] || null
 
+  // INT01-R1: live farm telemetry from the shared poller (same snapshot as Header / Environment)
+  const liveTelemetry = useFarmTelemetry(USE_MOCK ? null : selectedFarm?.id || null)
+  const effectiveTelemetry = USE_MOCK ? telemetry : liveTelemetry.telemetry
+  const effectiveTelemetryError = USE_MOCK
+    ? telemetryError
+    : ['unavailable', 'error', 'forbidden'].includes(liveTelemetry.status)
+      ? liveTelemetry.error || 'Dịch vụ IoT chưa khả dụng.'
+      : null
+
+  useEffect(() => {
+    if (!USE_MOCK && technicianId && technicianId === user?.id && selectedFarm) {
+      setActiveFarm(technicianId, selectedFarm)
+    }
+  }, [technicianId, user?.id, selectedFarm])
+
   const systemStats = normalizeTechStats(dashboardRaw, USE_MOCK)
 
   return {
@@ -295,9 +302,10 @@ export function useTechnicianData(overrideTechId = null) {
     devices,
     zones,
     alerts,
-    telemetry,
+    telemetry: effectiveTelemetry,
+    telemetryStatus: USE_MOCK ? "ok" : liveTelemetry.status,
     alertsError,
-    telemetryError,
+    telemetryError: effectiveTelemetryError,
     loading,
     error,
     refetch: () => fetchTechData(),

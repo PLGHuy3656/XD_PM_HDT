@@ -12,6 +12,7 @@ from app.domain_events.evaluator import (
 from app.realtime.publisher import RealtimePublisher, ws_manager
 from app.repositories.command_repository import (
     CommandRepository,
+    compare_and_update,
     default_command_repository,
 )
 from app.schemas.api import CommandResponse, RealtimeEvent
@@ -113,11 +114,30 @@ class AckService:
             logger.warning("[ACK REJECTED] %s", msg)
             return AckProcessResult(success=False, error=msg)
 
+        # Step 7a (INT01-R1): an ACK arriving after the server deadline is late even if the sweeper
+        # has not run yet -> expire first, so it can never become SUCCESS.
+        now = datetime.now(timezone.utc)
+        if (
+            command.status in ("PENDING", "PUBLISHED")
+            and command.expires_at is not None
+            and now > command.expires_at
+        ):
+            from app.services.command_service import command_service as _cmd_svc
+
+            if _cmd_svc.repository is self.repository:
+                _cmd_svc.expire_if_due(command, now)
+            else:
+                compare_and_update(
+                    self.repository,
+                    command.command_id,
+                    ("PENDING", "PUBLISHED"),
+                    {"status": "TIMEOUT", "ack_message": "Command timed out waiting for device ACK"},
+                )
+            command = self.repository.get(command.command_id) or command
+
         # Step 7: Handle late ACK after TIMEOUT or duplicate terminal state idempotently
         if command.status == "TIMEOUT":
-            msg = f"Late ACK ignored: command '{command.command_id}' already timed out"
-            logger.warning("[ACK LATE] %s", msg)
-            return AckProcessResult(success=False, command=command, error=msg)
+            return self._record_late_ack(command, ack_payload, now)
 
         if command.status in ("SUCCESS", "FAILED", "ERROR"):
             logger.info(
@@ -127,18 +147,30 @@ class AckService:
             )
             return AckProcessResult(success=True, command=command)
 
-        # Step 8: Update command lifecycle
-        now = datetime.now(timezone.utc)
-        updated = command.model_copy(
-            update={
+        # Step 8: Update command lifecycle atomically (only from a non-terminal state)
+        updated = compare_and_update(
+            self.repository,
+            command.command_id,
+            ("PENDING", "PUBLISHED"),
+            {
                 "status": ack_payload.status,
                 "acknowledged_at": now,
                 "ack_status": ack_payload.status,
                 "ack_message": ack_payload.message,
                 "ack_mode": ack_payload.mode,
-            }
+            },
         )
-        self.repository.update(updated)
+        if updated is None:
+            # Lost a race with the TIMEOUT sweeper or a concurrent duplicate ACK.
+            current = self.repository.get(command.command_id) or command
+            if current.status == "TIMEOUT":
+                return self._record_late_ack(current, ack_payload, now)
+            logger.info(
+                "[ACK IDEMPOTENT] Command '%s' already in terminal state '%s'; ignoring duplicate ACK",
+                current.command_id,
+                current.status,
+            )
+            return AckProcessResult(success=True, command=current)
 
         logger.info(
             "[ACK CORRELATED] command_id='%s' status='%s' mode='%s'",
@@ -178,6 +210,26 @@ class AckService:
             )
 
         return AckProcessResult(success=True, command=updated)
+
+    def _record_late_ack(
+        self, command: DeviceCommand, ack_payload: AckPayload, now: datetime
+    ) -> AckProcessResult:
+        """INT01-R1: keep TIMEOUT terminal, but record what the device reported late (first late ACK only)."""
+        msg = f"Late ACK ignored: command '{command.command_id}' already timed out"
+        logger.warning("[ACK LATE] %s (device reported %s)", msg, ack_payload.status)
+        recorded = command
+        if command.late_ack_status is None:
+            recorded = compare_and_update(
+                self.repository,
+                command.command_id,
+                ("TIMEOUT",),
+                {
+                    "late_ack_status": ack_payload.status,
+                    "late_ack_at": now,
+                    "late_ack_message": ack_payload.message,
+                },
+            ) or command
+        return AckProcessResult(success=False, command=recorded, error=msg)
 
 
 ack_service = AckService()

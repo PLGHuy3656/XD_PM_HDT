@@ -41,29 +41,51 @@ const actuatorMeta = {
   },
 }
 
+// INT01-R1: terminal negative results are shown distinctly (never as a generic error or success)
+const NEGATIVE_BADGES = {
+  failed: { className: 'failed', label: 'THẤT BẠI · FAILED' },
+  error: { className: 'failed', label: 'LỖI THIẾT BỊ · ERROR' },
+  timeout: { className: 'timeout', label: 'HẾT HẠN · TIMEOUT' },
+  unconfirmed: { className: 'pending', label: 'CHƯA XÁC NHẬN' },
+}
+
 function ActuatorControlPanel({
   actuators,
   isManual,
   disabled = false,
   commandStatus = {},
   onActuatorChange,
+  simulated = false,
 }) {
   return (
     <section className="actuator-panel" aria-label="Điều khiển thiết bị thủ công">
+      {simulated && (
+        <div className="actuator-simulation-note" data-testid="actuator-simulation-note">
+          Điều khiển mô phỏng — ESP32 Simulator · không có actuator vật lý được kết nối
+        </div>
+      )}
       <div className="actuator-grid">
         {Object.entries(actuatorMeta).map(([key, actuator]) => {
           const isOn = disabled ? false : Boolean(actuators[key])
           const cmd = commandStatus[key] || { state: 'idle' }
           const isPending = cmd.state === 'pending'
-          const isFailed = cmd.state === 'failed'
+          const negative = NEGATIVE_BADGES[cmd.state] || null
+          const isFailed = Boolean(negative)
           const isAcked = cmd.state === 'acked'
+          // ACK received but the device-reported (telemetry) state has not caught up yet
+          // (the parent clears `awaitingConfirm` after a bounded window if telemetry never confirms)
+          const awaitingTelemetry =
+            isAcked &&
+            cmd.awaitingConfirm === true &&
+            typeof cmd.target === 'boolean' &&
+            cmd.target !== Boolean(isOn)
 
           const badgeClass = disabled
             ? 'stopped'
-            : isPending
+            : isPending || awaitingTelemetry
               ? 'pending'
-              : isFailed
-                ? 'failed'
+              : negative
+                ? negative.className
                 : isOn
                   ? 'running'
                   : 'stopped'
@@ -72,9 +94,11 @@ function ActuatorControlPanel({
             ? 'CHƯA KẾT NỐI'
             : isPending
               ? 'ĐANG CHỜ ACK'
-              : isFailed
-                ? 'LỖI LỆNH'
-                : isOn
+              : awaitingTelemetry
+                ? 'ĐÃ ACK · CHỜ TELEMETRY'
+                : negative
+                  ? negative.label
+                  : isOn
                   ? isAcked
                     ? 'ĐANG BẬT · ACK'
                     : 'ĐANG BẬT'
@@ -88,6 +112,9 @@ function ActuatorControlPanel({
             <article
               className={`actuator-card ${isOn && !disabled ? 'running' : ''}`.trim()}
               key={key}
+              data-testid={`actuator-${key}`}
+              data-command-state={cmd.state}
+              data-command-status={cmd.status || ''}
             >
               <div className="actuator-card-top">
                 <span className="actuator-icon">{actuator.icon}</span>

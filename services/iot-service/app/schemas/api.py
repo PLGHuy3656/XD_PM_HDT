@@ -10,6 +10,7 @@ from app.schemas.command import (
     ControlMode,
     DeviceCommand,
     RelayTarget,
+    TERMINAL_COMMAND_STATUSES,
 )
 from app.schemas.presence import DevicePresence
 from app.schemas.telemetry import (
@@ -17,6 +18,8 @@ from app.schemas.telemetry import (
     ActuatorState,
     DeviceRuntimeState,
     TelemetryMetrics,
+    TelemetryProvenance,
+    resolve_metric_sources,
 )
 
 
@@ -30,6 +33,9 @@ class TelemetryResponse(BaseModel):
     actuators: ActuatorState
     state: DeviceRuntimeState
     farmId: str | None = None
+    # INT01-R1: data provenance. metricSources is always present: PHYSICAL | SIMULATED | UNAVAILABLE | UNVERIFIED
+    provenance: TelemetryProvenance | None = None
+    metricSources: dict[str, str] = Field(default_factory=dict)
 
     @classmethod
     def from_domain(cls, telemetry: AcceptedTelemetry) -> "TelemetryResponse":
@@ -40,6 +46,10 @@ class TelemetryResponse(BaseModel):
             actuators=telemetry.actuators,
             state=telemetry.state,
             farmId=telemetry.farm_id,
+            provenance=telemetry.provenance,
+            metricSources=resolve_metric_sources(
+                telemetry.metrics, telemetry.state, telemetry.provenance
+            ),
         )
 
 
@@ -125,6 +135,12 @@ class CommandResponse(BaseModel):
     ackStatus: AckStatus | None = None
     ackMessage: str | None = None
     ackMode: ControlMode | None = None
+    # INT01-R1: server-authoritative deadline and terminal-state flag for clients
+    expiresAt: datetime | None = None
+    isTerminal: bool = False
+    lateAckStatus: AckStatus | None = None
+    lateAckAt: datetime | None = None
+    lateAckMessage: str | None = None
 
     @classmethod
     def from_domain(cls, cmd: DeviceCommand) -> "CommandResponse":
@@ -140,6 +156,11 @@ class CommandResponse(BaseModel):
             ackStatus=cmd.ack_status,
             ackMessage=cmd.ack_message,
             ackMode=cmd.ack_mode,
+            expiresAt=cmd.expires_at,
+            isTerminal=cmd.status in TERMINAL_COMMAND_STATUSES,
+            lateAckStatus=cmd.late_ack_status,
+            lateAckAt=cmd.late_ack_at,
+            lateAckMessage=cmd.late_ack_message,
         )
 
 

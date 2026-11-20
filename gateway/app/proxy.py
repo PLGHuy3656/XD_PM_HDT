@@ -99,6 +99,14 @@ def validate_path_security(request: Request, path: str = "") -> None:
             )
 
 
+def internal_service_headers_for(upstream_base_url: str) -> dict[str, str]:
+    """INT01-R1: trusted service-to-service credential for upstreams that require it (IoT Service)."""
+    key = (settings.iot_internal_service_key or "").strip()
+    if key and upstream_base_url.rstrip("/") == settings.iot_service_url.rstrip("/"):
+        return {"X-Internal-Service-Key": key}
+    return {}
+
+
 def extract_hop_by_hop_headers(raw_headers: list[tuple[bytes, bytes]]) -> Set[str]:
     """Extracts standard hop-by-hop headers plus all headers dynamically listed
 
@@ -176,6 +184,11 @@ class ReverseProxyHandler:
             ):
                 continue
             forward_headers.append((k, v))
+
+        # INT01-R1: authenticate the Gateway to IoT Service (client-supplied X-Internal-* already stripped)
+        iot_key = internal_service_headers_for(upstream_base_url)
+        for hk, hv in iot_key.items():
+            forward_headers.append((hk.lower().encode("latin1"), hv.encode("latin1")))
 
         # Inject trusted tracing & proxy headers
         forward_headers.append((b"x-correlation-id", correlation_id.encode("latin1")))

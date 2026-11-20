@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { farmsApi } from '../../../api/modules/farmsApi.js'
 import { USE_MOCK } from '../../../api/config.js'
+import { useAuth } from '../../../context/AuthContext.jsx'
 import { getMockFarms, normalizeFarm, normalizeZone } from '../adapters/farmAdapter.js'
+import { getActiveFarm, setActiveFarm } from '../activeFarmStore.js'
 
 export function useFarms() {
+  const { user } = useAuth()
+  const userId = user?.id || null
   const [farms, setFarms] = useState([])
-  const [selectedFarmId, setSelectedFarmId] = useState(null)
+  // INT01-R1: start from the farm this user last worked on (validated against the scoped list below)
+  const [selectedFarmId, setSelectedFarmId] = useState(() => getActiveFarm(userId)?.farmId || null)
   const [zones, setZones] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -96,6 +101,13 @@ export function useFarms() {
   }, [fetchFarms])
 
   const selectedFarm = farms.find((f) => f.id === selectedFarmId) || farms[0] || null
+
+  // INT01-R1: share the page's (RBAC-scoped) farm selection with the Header telemetry strip
+  useEffect(() => {
+    if (userId && selectedFarm && farms.some((f) => f.id === selectedFarm.id)) {
+      setActiveFarm(userId, selectedFarm)
+    }
+  }, [userId, selectedFarm, farms])
 
   const selectedFarmWithZones = selectedFarm
     ? {

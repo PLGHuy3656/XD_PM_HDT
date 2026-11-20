@@ -218,15 +218,17 @@ class IoTConditionEvaluator:
                 }):
                     emitted.append(ev)
 
-        # 5. Audio Fault Condition
-        if not state.audio_fault_active:
+        # 5. Audio Fault Condition (INT01-R1: no audio data -> never infer a fault or a recovery)
+        if audio_ok is None:
+            pass
+        elif not state.audio_fault_active:
             if not audio_ok:
                 state.audio_fault_active = True
                 ev = "iot.audio.fault.started"
                 if self._emit(ev, device_id, now, {
                     "metric": "audio",
                     "value": "FAULT",
-                    "audioRms": round(metrics.audioRms, 2),
+                    "audioRms": round(metrics.audioRms, 2) if metrics.audioRms is not None else None,
                     "reason": "Acoustic sensor detected audio wire break or speaker silence",
                 }):
                     emitted.append(ev)
@@ -237,7 +239,7 @@ class IoTConditionEvaluator:
                 if self._emit(ev, device_id, now, {
                     "metric": "audio",
                     "value": "NORMAL",
-                    "audioRms": round(metrics.audioRms, 2),
+                    "audioRms": round(metrics.audioRms, 2) if metrics.audioRms is not None else None,
                     "reason": "Swiftlet nesting audio sound restored to healthy level",
                 }):
                     emitted.append(ev)

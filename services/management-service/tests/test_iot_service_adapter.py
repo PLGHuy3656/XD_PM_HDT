@@ -160,8 +160,10 @@ def test_device_and_technician_repositories_use_http_adapter_not_legacy_sql():
         assert devices[0]["status"] == "ONLINE"
         assert devices[0]["presence_status"] == "ONLINE"
         assert devices[1]["node_id"] == "ESP32-NODE-02"
-        assert devices[1]["status"] == "OFFLINE"
-        assert devices[1]["presence_status"] == "OFFLINE"
+        # INT01-R1 (TV4 approved): a device that never sent a heartbeat is UNKNOWN, not OFFLINE
+        assert devices[1]["status"] == "UNKNOWN"
+        assert devices[1]["presence_status"] == "UNKNOWN"
+        assert devices[1]["iot_available"] is True
 
         mock_cur.fetchone.return_value = fake_device_rows[0]
         single_dev = dev_repo.get_device_by_id("uuid-dev-1")
@@ -180,7 +182,9 @@ def test_device_and_technician_repositories_use_http_adapter_not_legacy_sql():
         summary = tech_repo.get_dashboard_summary("tech-001")
         assert summary["device_count"] == 2
         assert summary["online_device_count"] == 1
-        assert summary["offline_device_count"] == 1
+        # INT01-R1 (TV4 approved): ESP32-NODE-02 never reported presence -> UNKNOWN, not OFFLINE
+        assert summary["offline_device_count"] == 0
+        assert summary["unknown_device_count"] == 1
 
 
 def test_legacy_iot_adapter_shim_has_no_sql_and_delegates_to_http_adapter():
@@ -400,8 +404,9 @@ def test_technician_dashboard_and_devices_when_iot_service_up_mixed():
         summary = tech_repo.get_dashboard_summary("tech-001")
         assert summary["device_count"] == 4
         assert summary["online_device_count"] == 1
-        assert summary["offline_device_count"] == 3
-        assert summary["unknown_device_count"] == 0
+        # INT01-R1 (TV4 approved): NODE-02 OFFLINE + NODE-03 STALE are offline; NODE-04 never reported -> UNKNOWN
+        assert summary["offline_device_count"] == 2
+        assert summary["unknown_device_count"] == 1
 
 
 def test_device_repository_stale_presence_maps_to_offline_and_presence_status():

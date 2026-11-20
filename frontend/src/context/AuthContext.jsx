@@ -8,6 +8,7 @@ import {
 
 import { authApi, setAuthToken, setUnauthorizedHandler } from '../api'
 import { USE_MOCK } from '../api/config'
+import { clearActiveFarm } from '../features/farms/activeFarmStore.js'
 import {
   MOCK_USERS,
   STORAGE_KEY_LEGACY_USER,
@@ -64,6 +65,7 @@ export function AuthProvider({ children }) {
     setUser(null)
     setTokenState(null)
     setAuthToken(null)
+    clearActiveFarm()
     localStorage.removeItem(STORAGE_KEY_USER)
     localStorage.removeItem(STORAGE_KEY_LEGACY_USER)
     localStorage.removeItem(STORAGE_KEY_TOKEN)

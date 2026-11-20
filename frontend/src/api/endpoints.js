@@ -87,6 +87,8 @@ export const ENDPOINTS = {
 
   SYSTEM: {
     HEALTH: '/health',
+    // INT01-R1: ADMIN-only live upstream status (HEALTHY | DEGRADED | UNAVAILABLE | NOT_DEPLOYED)
+    STATUS: '/api/system/status',
   },
 }
 

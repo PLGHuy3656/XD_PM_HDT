@@ -11,9 +11,12 @@ Implements the frozen CP8.0 service-to-service boundary contract:
 Management Service NEVER queries `iot_db`, IoT Redis keys, or legacy `swiftletcare.device_latest_state`.
 """
 
+import concurrent.futures
 from datetime import datetime
 import json
 import logging
+import socket
+import time
 from typing import Any, Callable
 import urllib.error
 import urllib.parse
@@ -26,10 +29,41 @@ logger = logging.getLogger(__name__)
 HttpGetCallable = Callable[[str, float], tuple[int, Any]]
 
 
+# INT01-R1: bounded DNS resolution. When the IoT container is stopped, Docker's embedded DNS
+# can take ~8s to fail, which urllib's socket timeout does not cover -> Management (and the
+# Gateway, 5s) time out instead of reporting IoT as unavailable. Resolve with a deadline and
+# remember a failure briefly so one request does not wait repeatedly.
+_DNS_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="iot-dns")
+_DNS_NEGATIVE_CACHE: dict[str, float] = {}
+_DNS_NEGATIVE_TTL_SECONDS = 5.0
+
+
+def _ensure_resolvable(url: str, timeout: float) -> None:
+    host = urllib.parse.urlsplit(url).hostname
+    if not host:
+        return
+    now = time.monotonic()
+    if _DNS_NEGATIVE_CACHE.get(host, 0.0) > now:
+        raise OSError(f"IoT host '{host}' recently unresolvable")
+    future = _DNS_EXECUTOR.submit(socket.getaddrinfo, host, None)
+    try:
+        future.result(timeout=timeout)
+        _DNS_NEGATIVE_CACHE.pop(host, None)
+    except Exception as exc:
+        _DNS_NEGATIVE_CACHE[host] = now + _DNS_NEGATIVE_TTL_SECONDS
+        raise OSError(f"IoT host '{host}' unresolvable within {timeout}s") from exc
+
+
 def _default_http_get(url: str, timeout: float) -> tuple[int, Any]:
+    _ensure_resolvable(url, timeout)
+    headers = {"Accept": "application/json"}
+    # INT01-R1: IoT Service API requires the internal service key (service-to-service auth).
+    service_key = (settings.internal_service_token or "").strip()
+    if service_key:
+        headers["X-Internal-Service-Key"] = service_key
     req = urllib.request.Request(
         url,
-        headers={"Accept": "application/json"},
+        headers=headers,
         method="GET",
     )
     try:
@@ -131,7 +165,8 @@ class IoTServiceAdapter:
             - status "ONLINE" -> ("ONLINE", "Connected", rssi, recorded_at)
             - status "OFFLINE" or "STALE" -> ("OFFLINE", "Disconnected", rssi, recorded_at)
             - other/unknown -> ("UNKNOWN", "Unknown", rssi, recorded_at)
-        - If presence_info is None (IoT reachable but device not reporting) -> ("OFFLINE", "Disconnected", None, None)
+        - If presence_info is None (IoT reachable but device never reported) -> ("UNKNOWN", "Unknown", None, None)
+          INT01-R1: a device that never sent a heartbeat is UNKNOWN, not a confirmed OFFLINE.
         """
         if not iot_reachable:
             return "UNKNOWN", "Unknown", None, None
@@ -148,7 +183,16 @@ class IoTServiceAdapter:
                 return "OFFLINE", "Disconnected", rssi, recorded_at
             return "UNKNOWN", "Unknown", rssi, recorded_at
 
-        return "OFFLINE", "Disconnected", None, None
+        return "UNKNOWN", "Unknown", None, None
+
+    @staticmethod
+    def is_presence_source_available(presence: dict[str, Any] | None) -> bool:
+        """INT01-R1: False when IoT presence could not be obtained at all (unreachable, unconfigured,
+        auth/HTTP error) so clients can show UNAVAILABLE instead of a device-level verdict."""
+        if presence is None:
+            return False
+        reason = str(presence.get("reason") or "")
+        return not (reason in ("IOT_SERVICE_UNREACHABLE", "UNCONFIGURED") or reason.startswith("HTTP_"))
 
     def resolve_device_presence(self, device_id: str) -> dict[str, Any]:
         """

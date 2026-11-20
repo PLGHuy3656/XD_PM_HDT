@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.security import require_internal_service
+
 from app.mqtt.topics import TopicParseError
 from app.routes.dependencies import (
     get_command_service,
@@ -28,7 +30,12 @@ from app.services.diagnostics_service import (
 from app.services.presence_service import DevicePresenceService
 from app.services.telemetry_service import TelemetryService
 
-router = APIRouter(prefix="/api/iot", tags=["IoT"])
+# INT01-R1: every IoT API route requires the internal service key (Gateway/Management only).
+router = APIRouter(
+    prefix="/api/iot",
+    tags=["IoT"],
+    dependencies=[Depends(require_internal_service)],
+)
 
 
 @router.get(
@@ -135,6 +142,24 @@ def get_device_presence(
     return PresenceResponse.from_domain(presence)
 
 
+def _ensure_registered_command_target(device_id: str) -> None:
+    """INT01-R1 defense in depth: never publish a command to a node_id Management does not know.
+
+    Enforced whenever the authoritative Management lookup is configured (INT01/production).
+    Fail-closed: unregistered/inactive device or unreachable Management -> no MQTT publish.
+    """
+    from app.config import settings as _settings
+    from app.domain_events.metadata_resolver import default_metadata_resolver
+
+    if not (_settings.management_service_url or "").strip():
+        return  # offline unit-test mode (no authoritative registry configured)
+    if default_metadata_resolver.resolve(device_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Device '{device_id}' is not a registered active device",
+        )
+
+
 @router.post(
     "/devices/{device_id}/commands/relay",
     response_model=CommandResponse,
@@ -146,6 +171,7 @@ def create_relay_command(
     body: RelayCommandRequest,
     svc: DeviceCommandService = Depends(get_command_service),
 ) -> CommandResponse:
+    _ensure_registered_command_target(device_id)
     try:
         cmd = svc.send_set_relay_command(
             device_id=device_id,
@@ -171,6 +197,7 @@ def create_config_command(
     body: ConfigCommandRequest,
     svc: DeviceCommandService = Depends(get_command_service),
 ) -> CommandResponse:
+    _ensure_registered_command_target(device_id)
     try:
         cmd = svc.send_update_thresholds_command(
             device_id=device_id,
