@@ -164,14 +164,18 @@ Installation is a dedicated Technician module.
 
 Its direction includes:
 
-- Farm/Zone selection;
-- device registration;
-- device activation;
-- sensor/node configuration;
-- connectivity verification;
-- installation validation.
+The backend workflow has five ordered steps:
 
-Exact workflow must be checked against requirements and the reference project before implementation.
+1. Register a device in a Farm and optional Zone assigned to the Technician.
+2. Save non-empty sensor/node configuration metadata.
+3. Activate the device in the registry.
+4. Validate the Farm/Zone link, configuration, activation, and runtime connectivity.
+5. Hand over the installation after validation passes.
+
+Each installation records its Technician, device, assigned location, lifecycle
+status, configuration, validation report, and step timestamps. Technician APIs
+are scoped to the authenticated Technician and active Farm assignments; this
+workflow does not include an Administrator assignment interface.
 
 ---
 

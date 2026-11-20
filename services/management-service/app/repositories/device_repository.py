@@ -222,16 +222,28 @@ class DeviceRepository:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    UPDATE devices AS d
-                    SET zone_id = z.id,
-                        updated_at = NOW()
-                    FROM zones AS z
-                    WHERE (d.id::text = %s OR d.node_id = %s)
-                      AND d.farm_id::text = %s
-                      AND z.farm_id = d.farm_id
-                      AND (z.id::text = %s OR z.zone_code = %s)
-                      AND d.is_active = TRUE
-                    RETURNING d.id
+                    WITH updated_device AS (
+                        UPDATE devices AS d
+                        SET zone_id = z.id,
+                            updated_at = NOW()
+                        FROM zones AS z
+                        WHERE (d.id::text = %s OR d.node_id = %s)
+                          AND d.farm_id::text = %s
+                          AND z.farm_id = d.farm_id
+                          AND (z.id::text = %s OR z.zone_code = %s)
+                          AND d.is_active = TRUE
+                        RETURNING d.id, d.zone_id
+                    ),
+                    updated_installation AS (
+                        UPDATE technician_installations AS installation
+                        SET zone_id = updated_device.zone_id,
+                            updated_at = NOW()
+                        FROM updated_device
+                        WHERE installation.device_id = updated_device.id
+                          AND installation.status <> 'HANDED_OVER'
+                        RETURNING installation.device_id
+                    )
+                    SELECT id FROM updated_device
                     """,
                     (
                         device_id,

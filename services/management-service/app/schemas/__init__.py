@@ -10,6 +10,13 @@ from app.schemas.technician import (
     TechnicianFarmDetailResponse,
     TechnicianProfileResponse,
 )
+from app.schemas.technician_installation import (
+    TechnicianInstallationConfigurationRequest,
+    TechnicianInstallationCreateRequest,
+    TechnicianInstallationResponse,
+    TechnicianInstallationValidationChecks,
+    TechnicianInstallationValidationResponse,
+)
 from app.schemas.user import RoleEnum
 from app.schemas.zone import ZoneResponse
 
@@ -27,6 +34,11 @@ __all__ = [
     "TechnicianDeviceResponse",
     "TechnicianFarmDetailResponse",
     "TechnicianProfileResponse",
+    "TechnicianInstallationConfigurationRequest",
+    "TechnicianInstallationCreateRequest",
+    "TechnicianInstallationResponse",
+    "TechnicianInstallationValidationChecks",
+    "TechnicianInstallationValidationResponse",
     "RoleEnum",
     "ZoneResponse",
 ]

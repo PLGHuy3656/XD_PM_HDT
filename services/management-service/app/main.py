@@ -9,6 +9,9 @@ from app.routes.auth_routes import router as auth_router
 from app.routes.device_routes import router as device_router
 from app.routes.farm_routes import router as farm_router
 from app.routes.technician_routes import router as technician_router
+from app.routes.technician_installation_routes import (
+    router as technician_installation_router,
+)
 from app.routes.zone_routes import router as zone_router
 from app.routes.authorization_routes import router as authorization_router
 from app.services.event_publisher import EventOutboxPublisher
@@ -62,6 +65,7 @@ app.include_router(farm_router)
 app.include_router(zone_router)
 app.include_router(device_router)
 app.include_router(technician_router)
+app.include_router(technician_installation_router)
 
 
 @app.get("/health")
