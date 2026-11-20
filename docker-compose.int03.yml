@@ -1,0 +1,339 @@
+# ==============================================================================
+# SwiftletCare — INT03 Notification Integration Stack (inherits INT02 accepted 994eef4)
+# Scope: INT02 (Frontend + Gateway + Management + IoT + Mosquitto + Simulator + AI)
+#        + RabbitMQ (swiftlet.domain.events) + Notification Service (notification_db)
+# Fully isolated from INT01/INT02: own project, containers, ports (3xxxx), network and volumes.
+#
+#   docker compose -p swiftletcare-int03 -f docker-compose.int03.yml --env-file .env.int03 --profile simulator up -d --build
+# ==============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: swiftletcare-int03-postgres
+    hostname: postgres
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${INT03_POSTGRES_PORT:-35432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-swiftlet_int03}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-swiftletcare_int03}
+    volumes:
+      - int03_pg_data:/var/lib/postgresql/data
+      # INT03: the management DB is restored from a read-only pg_dump of the accepted INT01/INT02 data
+      # (same users/farms/devices); only the isolated notification_db is created here.
+      - ./infrastructure/postgres/int03_notification_db.sh:/docker-entrypoint-initdb.d/10_notification_db.sh:ro
+      - ./services/notification-service/database/schema.sql:/docker-entrypoint-initdb.d/notification_schema.sql.in:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-swiftlet_int03} -d $${POSTGRES_DB:-swiftletcare_int03}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - int03-net
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: swiftletcare-int03-redis
+    hostname: redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${INT03_REDIS_PORT:-36379}:6379"
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    volumes:
+      - int03_redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - int03-net
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: swiftletcare-int03-mosquitto
+    hostname: mosquitto
+    restart: unless-stopped
+    # INT01-R1: no host port. The broker is anonymous inside the stack network, so publishing it on the
+    # host would let any local client inject commands/ACKs. Use `docker exec swiftletcare-int03-mosquitto
+    # mosquitto_sub/mosquitto_pub` for diagnostics. A LAN-reachable authenticated listener for a
+    # physical ESP32 is out of INT01 scope.
+    volumes:
+      - ./infrastructure/mosquitto/mosquitto.int01.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub -h 127.0.0.1 -p 1883 -t health/check -m ok || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - int03-net
+
+  management-service:
+    build:
+      context: ./services/management-service
+      dockerfile: Dockerfile
+    container_name: swiftletcare-int03-management
+    hostname: management-service
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${INT03_MANAGEMENT_PORT:-38001}:8001"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-swiftlet_int03}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-swiftletcare_int03}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      SERVICE_HOST: 0.0.0.0
+      SERVICE_PORT: 8001
+      IOT_SERVICE_BASE_URL: http://iot-service:8002
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      ENVIRONMENT: ${ENVIRONMENT:-int03}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - int03-net
+
+  iot-service:
+    build:
+      context: ./services/iot-service
+      dockerfile: Dockerfile
+    container_name: swiftletcare-int03-iot
+    hostname: iot-service
+    restart: unless-stopped
+    # INT01-R1: no host port. IoT is reachable only inside int03-net (Gateway/Management/simulator);
+    # every /api/iot/* call additionally requires X-Internal-Service-Key.
+    environment:
+      IOT_SERVICE_HOST: 0.0.0.0
+      IOT_SERVICE_PORT: 8002
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: 1883
+      MQTT_AUTO_START: "true"
+      MANAGEMENT_SERVICE_URL: http://management-service:8001
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      METADATA_CACHE_TTL_SECONDS: ${METADATA_CACHE_TTL_SECONDS:-30}
+      IOT_INTERNAL_API_AUTH_REQUIRED: "true"
+      COMMAND_ACK_TIMEOUT_SECONDS: ${INT03_COMMAND_ACK_TIMEOUT_SECONDS:-15}
+      COMMAND_TIMEOUT_SWEEP_INTERVAL_SECONDS: "1"
+      # INT03: canonical iot.* domain events -> RabbitMQ
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:-swiftlet_int03}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      management-service:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - int03-net
+
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: swiftletcare-int03-gateway
+    hostname: gateway
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${INT03_GATEWAY_PORT:-38000}:8000"
+    environment:
+      GATEWAY_HOST: 0.0.0.0
+      GATEWAY_PORT: 8000
+      ENVIRONMENT: ${ENVIRONMENT:-int03}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      MANAGEMENT_SERVICE_URL: http://management-service:8001
+      IOT_SERVICE_URL: http://iot-service:8002
+      IOT_INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      # INT02: AI Service joins the stack (internal network only)
+      AI_SERVICE_URL: http://ai-service:8003
+      AI_INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      # Deployment scope (drives Admin service status; Notification joins in INT03, Analytics in INT04)
+      IOT_SERVICE_DEPLOYED: "true"
+      AI_SERVICE_DEPLOYED: "true"
+      NOTIFICATION_SERVICE_DEPLOYED: "true"
+      NOTIFICATION_SERVICE_URL: http://notification-service:8004
+      ANALYTICS_SERVICE_DEPLOYED: "false"
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/1
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:33000,http://127.0.0.1:33000}
+    depends_on:
+      management-service:
+        condition: service_healthy
+      iot-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - int03-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: swiftletcare-int03-frontend
+    hostname: frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${INT03_FRONTEND_PORT:-33000}:80"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - int03-net
+
+  # INT02: AI Service (YOLO26n best.pt + ByteTrack + line counting). No host port: reachable only
+  # through the API Gateway (JWT + camera ownership via Management). In-memory runtime state:
+  # ai_db / Redis / RabbitMQ are intentionally not used in INT02 (Notification = INT03).
+  ai-service:
+    build:
+      context: .
+      dockerfile: services/ai-service/Dockerfile
+    container_name: swiftletcare-int03-ai
+    hostname: ai-service
+    restart: unless-stopped
+    environment:
+      AI_LOAD_CONFIGURED_CAMERAS: "false"
+      # INT03: only ai.predator.detected (PREDATOR_DETECTED AIEvent) is published; counts never are
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:-swiftlet_int03}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      AI_REDIS_ENABLED: "false"
+      AI_BACKEND_ENABLED: "false"
+      AI_RUNTIME_INTERNAL_ENABLED: "false"
+      AI_CAMERA_CONTROL_REQUIRE_AUTH: "true"
+      AI_INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      AI_MANAGEMENT_SERVICE_URL: http://management-service:8001
+      AI_LOCAL_FRAME_MIN_INTERVAL_S: "0.15"
+      AI_LOCAL_SESSION_IDLE_TIMEOUT_S: "20"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - int03-net
+
+  esp32-simulator:
+    profiles: ["simulator"]
+    build:
+      context: ./services/iot-service
+      dockerfile: Dockerfile
+    container_name: swiftletcare-int03-simulator
+    hostname: esp32-simulator
+    restart: unless-stopped
+    command: ["python", "/sim/esp32_simulator.py"]
+    healthcheck:
+      disable: true
+    environment:
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: 1883
+      DEVICE_ID: ${INT03_SIMULATOR_DEVICE_ID:-SWC-INT01-NODE-01}
+      PYTHONUNBUFFERED: "1"
+      # INT01-R1 opt-in negative-path testing only (default empty = normal behaviour),
+      # e.g. INT03_SIM_FAULT_MODE="heater=FAILED,alarm=ERROR,fan=NOACK"
+      SIM_FAULT_MODE: ${INT03_SIM_FAULT_MODE:-}
+    volumes:
+      - ./firmware/esp32_simulator.py:/sim/esp32_simulator.py:ro
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      iot-service:
+        condition: service_healthy
+    networks:
+      - int03-net
+
+  # INT03: event bus. No host port (management UI not exposed); reachable only inside int03-net.
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: swiftletcare-int03-rabbitmq
+    hostname: rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-swiftlet_int03}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+    volumes:
+      - int03_rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    networks:
+      - int03-net
+
+  # INT03: Notification Service (TV-owned code, unchanged contract): consumes swiftlet.domain.events,
+  # persists per-user notifications in notification_db, REST/WebSocket behind the Gateway only.
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: swiftletcare-int03-notification
+    hostname: notification-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-swiftlet_int03}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/notification_db
+      MANAGEMENT_SERVICE_URL: http://management-service:8001
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:-swiftlet_int03}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      EVENT_EXCHANGE: swiftlet.domain.events
+      NOTIFICATION_QUEUE: swiftletcare.int03.notifications
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      management-service:
+        condition: service_healthy
+    networks:
+      - int03-net
+
+volumes:
+  int03_pg_data:
+    name: swiftletcare_int03_pg_data
+  int03_redis_data:
+    name: swiftletcare_int03_redis_data
+  int03_rabbitmq_data:
+    name: swiftletcare_int03_rabbitmq_data
+
+networks:
+  int03-net:
+    name: swiftletcare-int03-net
+    driver: bridge

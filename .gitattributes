@@ -1,0 +1,2 @@
+# INT03: shell scripts executed inside Linux containers must keep LF line endings
+infrastructure/postgres/*.sh text eol=lf

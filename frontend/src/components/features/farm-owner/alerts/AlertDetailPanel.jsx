@@ -9,6 +9,8 @@ function AlertDetailPanel({
   onClose,
   onAcknowledge,
   onResolve,
+  canResolve = true,
+  acknowledgeLabel = 'Xác nhận cảnh báo',
 }) {
   if (!alert) {
     return null
@@ -126,10 +128,11 @@ function AlertDetailPanel({
                 className="alert-secondary-action"
                 onClick={() => onAcknowledge(alert.id)}
               >
-                Xác nhận cảnh báo
+                {acknowledgeLabel}
               </button>
             )}
 
+            {canResolve && (
             <button
               type="button"
               className="alert-primary-action"
@@ -137,6 +140,7 @@ function AlertDetailPanel({
             >
               Đánh dấu đã xử lý
             </button>
+            )}
           </footer>
         )}
       </aside>

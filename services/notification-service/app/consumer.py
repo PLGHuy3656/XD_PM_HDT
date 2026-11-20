@@ -97,17 +97,23 @@ async def resolve_farm_recipients(farm_id: str) -> list[str]:
     """Resolve authorized recipient user UUIDs for a farm from Management Service."""
     if not farm_id or not settings.management_service_url:
         return []
-    url = f"{settings.management_service_url.rstrip('/')}/api/internal/farms/{farm_id}/recipients"
+    url = f"{settings.management_service_url.rstrip('/')}/internal/v1/farms/{farm_id}/recipients"
     headers = {}
     if settings.internal_service_token:
-        headers["X-Internal-Service-Token"] = settings.internal_service_token
+        # INT03: Management internal routes accept ONLY X-Internal-Service-Key (service_auth.py)
+        headers["X-Internal-Service-Key"] = settings.internal_service_token
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             resp = await client.get(url, headers=headers)
         if resp.status_code != 200:
+            logger.warning("Farm recipient lookup for '%s' returned HTTP %s", farm_id, resp.status_code)
             return []
         body = resp.json()
+        # Management contract (InternalFarmRecipientsResponse): owner_id + technician_ids
+        # (technician ids are user ids). Legacy shapes are still accepted.
         raw_ids = body.get("recipient_user_ids") or body.get("recipients") or []
+        if not raw_ids:
+            raw_ids = ([body.get("owner_id")] if body.get("owner_id") else []) + list(body.get("technician_ids") or [])
         valid: list[str] = []
         for item in raw_ids:
             uid = item.get("user_id") or item.get("id") if isinstance(item, dict) else item

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import urllib.parse
+import uuid
 from typing import Any, Dict, Optional
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -2013,18 +2014,25 @@ async def proxy_notifications_root(
 ) -> Response:
     """List notifications. Requires caller's own userId (alertId-only queries forbidden for non-admins)."""
     _check_path_security(request, "")
-    user_id = verify_notification_user_query(request, current_user)
+    verify_notification_user_query(request, current_user)
 
-    # Canonicalize query: ensure upstream Notification receives userId
-    query_dict = dict(request.query_params)
-    query_dict.pop("user_id", None)
-    query_dict["userId"] = user_id
+    # INT03: Notification Service derives the user from the forwarded bearer token (Management
+    # /api/auth/me) and only returns that user's rows; only its own query params are forwarded.
+    query_dict = {}
+    limit = request.query_params.get("limit")
+    if limit is not None:
+        if not limit.isdigit() or not (1 <= int(limit) <= 100):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="limit must be 1-100")
+        query_dict["limit"] = limit
+    unread_only = request.query_params.get("unread_only") or request.query_params.get("unreadOnly")
+    if unread_only is not None:
+        query_dict["unread_only"] = "true" if unread_only.lower() in ("1", "true", "yes") else "false"
     canonical_qs = urllib.parse.urlencode(query_dict)
 
     return await proxy_handler.forward(
         request=request,
         upstream_base_url=settings.notification_service_url,
-        upstream_path="/api/v1/notifications",
+        upstream_path="/api/notifications",
         timeout=settings.notification_timeout_seconds,
         canonical_query=canonical_qs,
     )
@@ -2032,36 +2040,48 @@ async def proxy_notifications_root(
 
 @router.post(
     "/api/v1/notifications/read-all",
-    tags=["Notification - Items (Locked)"],
-    summary="Mark all notifications as read (Locked)",
+    tags=["Notification - Items"],
+    summary="Mark all of the CALLER's notifications as read",
 )
-async def proxy_notifications_read_all_locked(
+async def proxy_notifications_read_all(
     request: Request,
     current_user: Dict[str, Any] = Depends(require_any_authenticated),
 ) -> Response:
-    """Read-all notification mutation is locked pending user-scoped notification resolver."""
+    """INT03: user-scoped resolver = Notification Service itself (user from the bearer token;
+    UPDATE ... WHERE user_id = caller). No body/user id from the client is forwarded."""
     _check_path_security(request, "read-all")
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Forbidden: Notification read-all is temporarily locked pending user-scoped notification resolver",
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.notification_service_url,
+        upstream_path="/api/notifications/read-all",
+        timeout=settings.notification_timeout_seconds,
+        canonical_query="",
     )
 
 
 @router.post(
     "/api/v1/notifications/{notification_id}/read",
-    tags=["Notification - Items (Locked)"],
-    summary="Mark single notification as read (Locked)",
+    tags=["Notification - Items"],
+    summary="Mark one of the CALLER's notifications as read",
 )
-async def proxy_notifications_item_read_locked(
+async def proxy_notifications_item_read(
     request: Request,
     notification_id: str,
     current_user: Dict[str, Any] = Depends(require_any_authenticated),
 ) -> Response:
-    """Single notification read mutation is locked pending user-scoped notification resolver."""
+    """INT03: Notification Service only updates the row when it belongs to the token's user
+    (another user's id -> 404). Ids must be UUIDs."""
     _check_path_security(request, f"{notification_id}/read")
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Forbidden: Notification item read is temporarily locked pending user-scoped notification resolver",
+    try:
+        canonical_id = str(uuid.UUID(notification_id))
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid notification id")
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.notification_service_url,
+        upstream_path=f"/api/notifications/{canonical_id}/read",
+        timeout=settings.notification_timeout_seconds,
+        canonical_query="",
     )
 
 

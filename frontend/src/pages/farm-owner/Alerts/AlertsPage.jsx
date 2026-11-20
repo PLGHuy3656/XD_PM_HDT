@@ -44,13 +44,26 @@ function AlertsPage() {
     resolveAlert,
   } = useAlerts(selectedFarmId)
 
-  const effectiveZones = zones.length > 0 ? zones : selectedFarm?.zones || []
+  const effectiveZones = useMemo(
+    () => (zones.length > 0 ? zones : selectedFarm?.zones || []),
+    [zones, selectedFarm],
+  )
+  // INT03: zone names come from Management (notifications only carry ids)
+  const namedAlerts = useMemo(
+    () =>
+      alerts.map((a) => ({
+        ...a,
+        zoneName: effectiveZones.find((z) => z.id === a.zoneId)?.name || a.zoneName,
+        farmName: a.farmName || selectedFarm?.name || '',
+      })),
+    [alerts, effectiveZones, selectedFarm],
+  )
 
   const selectedAlert =
-    alerts.find((alert) => alert.id === selectedAlertId) ?? null
+    namedAlerts.find((alert) => alert.id === selectedAlertId) ?? null
 
   const filteredAlerts = useMemo(() => {
-    return alerts.filter((alert) => {
+    return namedAlerts.filter((alert) => {
       const matchesZone = zoneId === 'all' || alert.zoneId === zoneId
 
       const matchesStatus =
@@ -61,7 +74,7 @@ function AlertsPage() {
 
       return matchesZone && matchesStatus && matchesSeverity
     })
-  }, [alerts, zoneId, statusFilter, severityFilter])
+  }, [namedAlerts, zoneId, statusFilter, severityFilter])
 
   function handleFarmChange(nextFarmId) {
     setSelectedFarmId(nextFarmId)
@@ -188,7 +201,7 @@ function AlertsPage() {
               <AlertList
                 alerts={filteredAlerts}
                 selectedAlertId={selectedAlertId}
-                onSelectAlert={(alert) => setSelectedAlertId(alert.id)}
+                onViewDetail={(alert) => setSelectedAlertId(alert.id)}
                 onAcknowledge={handleAcknowledge}
                 onResolve={handleResolve}
               />
@@ -201,6 +214,8 @@ function AlertsPage() {
               onClose={() => setSelectedAlertId(null)}
               onAcknowledge={handleAcknowledge}
               onResolve={handleResolve}
+              canResolve={USE_MOCK}
+              acknowledgeLabel={USE_MOCK ? 'Xác nhận cảnh báo' : 'Đánh dấu đã đọc'}
             />
           </aside>
         </div>

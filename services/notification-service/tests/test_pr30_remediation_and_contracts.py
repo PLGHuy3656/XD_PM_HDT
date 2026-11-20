@@ -198,3 +198,49 @@ class TestSecurityRbacAndSanitization:
         assert "REFERENCES users(" not in sql
         assert "UNIQUE (event_id, user_id)" in sql
         assert "schema_migrations" in sql
+
+
+class TestInt03ManagementRecipientContract:
+    """INT03: the real Management contract (path, header, response shape) — not mocked away."""
+
+    @pytest.mark.asyncio
+    async def test_resolve_farm_recipients_uses_management_internal_contract(self):
+        import httpx as _httpx
+        from app import consumer
+        owner = "00000000-0000-0000-0000-00000000000a"
+        tech = "00000000-0000-0000-0000-00000000000c"
+        seen = {}
+
+        def handler(request):
+            seen["url"] = str(request.url)
+            seen["headers"] = dict(request.headers)
+            return _httpx.Response(200, json={"farm_id": "F", "farm_code": "C", "owner_id": owner, "technician_ids": [tech, "not-a-uuid"]})
+
+        real_client = _httpx.AsyncClient
+
+        def fake_client(*args, **kwargs):
+            kwargs["transport"] = _httpx.MockTransport(handler)
+            return real_client(*args, **kwargs)
+
+        with patch.object(consumer.settings, "management_service_url", "http://mgmt:8001"), \
+             patch.object(consumer.settings, "internal_service_token", "k" * 40), \
+             patch.object(consumer.httpx, "AsyncClient", side_effect=fake_client):
+            ids = await consumer.resolve_farm_recipients("F")
+        assert ids == [owner, tech]
+        assert seen["url"].endswith("/internal/v1/farms/F/recipients")
+        assert seen["headers"].get("x-internal-service-key") == "k" * 40
+        assert "x-internal-service-token" not in seen["headers"]
+
+    @pytest.mark.asyncio
+    async def test_resolve_farm_recipients_fail_closed_on_error(self):
+        import httpx as _httpx
+        from app import consumer
+        real_client = _httpx.AsyncClient
+
+        def fake_client(*args, **kwargs):
+            kwargs["transport"] = _httpx.MockTransport(lambda r: _httpx.Response(401, json={}))
+            return real_client(*args, **kwargs)
+
+        with patch.object(consumer.settings, "management_service_url", "http://mgmt:8001"), \
+             patch.object(consumer.httpx, "AsyncClient", side_effect=fake_client):
+            assert await consumer.resolve_farm_recipients("F") == []

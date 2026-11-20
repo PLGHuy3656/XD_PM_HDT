@@ -6,3 +6,4 @@ paho-mqtt
 websockets
 httpx
 pytest
+pika

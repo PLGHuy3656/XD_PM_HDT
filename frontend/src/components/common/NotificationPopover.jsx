@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../../context/AuthContext'
-import { alertsApi } from '../../api/modules/alertsApi'
+import apiClient from '../../api/client.js'
+import { useNotifications } from '../../features/notifications/useNotifications.js'
+import { toPopoverItem } from '../../features/notifications/notificationAdapter.js'
 import { USE_MOCK } from '../../api/config'
 
 import './NotificationPopover.css'
@@ -155,9 +157,32 @@ function NotificationPopover() {
   const containerRef = useRef(null)
 
   const [open, setOpen] = useState(false)
-  const [notifications, setNotifications] = useState(() =>
+  const [mockNotifications, setMockNotifications] = useState(() =>
     USE_MOCK ? getNotificationsByRole(user?.role) : [],
   )
+  const [actionError, setActionError] = useState(null)
+  const [farmNames, setFarmNames] = useState({})
+
+  // INT03: real notifications of the CALLER (server-scoped); no mock fallback in real mode
+  const currentUserId = USE_MOCK ? null : user?.id || user?.user_id || user?.sub || null
+  const live = useNotifications(currentUserId)
+
+  useEffect(() => {
+    if (USE_MOCK || !currentUserId) return undefined
+    const controller = new AbortController()
+    apiClient
+      .get('/api/farms', { signal: controller.signal, retries: 0 })
+      .then((list) => {
+        const arr = Array.isArray(list) ? list : list?.items || []
+        setFarmNames(Object.fromEntries(arr.map((f) => [f.farm_id || f.id, f.farm_name || f.name])))
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [currentUserId])
+
+  const notifications = USE_MOCK
+    ? mockNotifications
+    : live.items.map((n) => toPopoverItem(n, { farmNames }))
 
   const viewAllConfig = getViewAllConfig(user?.role)
 
@@ -168,54 +193,6 @@ function NotificationPopover() {
       ).length,
     [notifications],
   )
-
-  useEffect(() => {
-    let cancelled = false
-
-    if (!USE_MOCK) {
-      if (!user) {
-        setNotifications([])
-        return
-      }
-
-      const currentUserId = user.id || user.user_id || user.sub
-      if (!currentUserId) {
-        setNotifications([])
-        return
-      }
-
-      alertsApi
-        .getNotifications({ params: { userId: currentUserId } })
-        .then((res) => {
-          if (cancelled) return
-          const raw = Array.isArray(res) ? res : res?.items || []
-          setNotifications(
-            raw.map((item) => ({
-              id: item.id || String(Math.random()),
-              type: item.severity?.toLowerCase() || item.type || 'info',
-              title: item.title || 'Thông báo',
-              message: item.message || item.detail || '',
-              time: item.time || item.created_at || 'Vừa xong',
-              unread: !item.read,
-            })),
-          )
-        })
-        .catch(() => {
-          if (!cancelled) {
-            // In real mode on error, do NOT show fake mock notifications
-            setNotifications([])
-          }
-        })
-    } else {
-      setNotifications(getNotificationsByRole(user?.role))
-    }
-
-    setOpen(false)
-
-    return () => {
-      cancelled = true
-    }
-  }, [user])
 
   useEffect(() => {
     if (!open) {
@@ -252,26 +229,24 @@ function NotificationPopover() {
     }
   }, [open])
 
-  const handleNotificationClick = (id) => {
-    setNotifications((current) =>
-      current.map((notification) =>
-        notification.id === id
-          ? {
-              ...notification,
-              unread: false,
-            }
-          : notification,
-      ),
-    )
+  const handleNotificationClick = async (id) => {
+    if (USE_MOCK) {
+      setMockNotifications((current) => current.map((n) => (n.id === id ? { ...n, unread: false } : n)))
+      return
+    }
+    const item = notifications.find((n) => n.id === id)
+    if (!item?.unread) return
+    const res = await live.markRead(id)
+    setActionError(res.success ? null : res.message)
   }
 
-  const handleMarkAllRead = () => {
-    setNotifications((current) =>
-      current.map((notification) => ({
-        ...notification,
-        unread: false,
-      })),
-    )
+  const handleMarkAllRead = async () => {
+    if (USE_MOCK) {
+      setMockNotifications((current) => current.map((n) => ({ ...n, unread: false })))
+      return
+    }
+    const res = await live.markAllRead()
+    setActionError(res.success ? null : res.message)
   }
 
   const handleViewAll = () => {
@@ -342,8 +317,24 @@ function NotificationPopover() {
             </button>
           </div>
 
-          <div className="notification-list">
-            {notifications.length === 0 ? (
+          {actionError && (
+            <div className="notification-error" style={{ padding: '8px 16px', color: '#b42318', fontSize: '12px' }}>
+              {actionError}
+            </div>
+          )}
+
+          <div className="notification-list" data-testid="notification-list" data-state={USE_MOCK ? 'MOCK' : live.state}>
+            {!USE_MOCK && live.state === 'LOADING' && notifications.length === 0 ? (
+              <div className="notification-empty" style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-secondary, #64748b)', fontSize: '13px' }}>
+                Đang tải thông báo…
+              </div>
+            ) : !USE_MOCK && (live.state === 'UNAVAILABLE' || live.state === 'ERROR') && notifications.length === 0 ? (
+              <div className="notification-empty" data-testid="notification-unavailable" style={{ padding: '24px 16px', textAlign: 'center', color: '#b42318', fontSize: '13px' }}>
+                {live.state === 'UNAVAILABLE'
+                  ? 'Dịch vụ thông báo (Notification Service) hiện không khả dụng.'
+                  : live.error || 'Không tải được thông báo.'}
+              </div>
+            ) : notifications.length === 0 ? (
               <div
                 className="notification-empty"
                 style={{
@@ -353,7 +344,7 @@ function NotificationPopover() {
                   fontSize: '13px',
                 }}
               >
-                Không có thông báo mới.
+                Chưa có thông báo nào.
               </div>
             ) : (
               notifications.map((notification) => (
@@ -391,6 +382,8 @@ function NotificationPopover() {
                     </span>
 
                     <span className="notification-item__time">
+                      {notification.source ? `${notification.source} · ` : ''}
+                      {notification.farmName ? `${notification.farmName} · ` : ''}
                       {notification.time}
                     </span>
                   </span>

@@ -422,8 +422,8 @@ def test_notification_alert_id_only_query_blocked_for_non_admin(repro_test_env):
 @pytest.mark.parametrize(
     "path",
     [
-        "/api/v1/notifications/read-all",
-        "/api/v1/notifications/NOTIF-001/read",
+        # INT03: notification read/read-all are forwarded (user-scoped by Notification Service);
+        # see tests/test_int03_notifications.py. Alert detail/resolve stay locked.
         "/api/v1/alerts/ALERT-001",
         "/api/v1/alerts/ALERT-001/resolve",
     ],

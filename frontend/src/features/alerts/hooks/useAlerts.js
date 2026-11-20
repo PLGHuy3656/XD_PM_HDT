@@ -6,9 +6,19 @@ import {
   classifyServiceError,
   useRevalidateOnFocus,
 } from '../../../api/serviceStatus.js'
-import { getMockAlerts, normalizeAlert } from '../adapters/alertAdapter.js'
+import { getMockAlerts } from '../adapters/alertAdapter.js'
+import { useAuth } from '../../../context/AuthContext'
+import { useNotifications } from '../../notifications/useNotifications.js'
+import { notificationFarmId, toAlertRow } from '../../notifications/notificationAdapter.js'
 
+/**
+ * INT03: in real mode alerts ARE the caller's notifications (Notification Service, server-scoped
+ * recipients) for the selected farm. The current contract supports read/unread only:
+ * "acknowledge" = mark read; "resolve" does not exist yet and is reported as such.
+ */
 export function useAlerts(farmId = null, filterSeverity = 'ALL') {
+  const { user } = useAuth()
+  const live = useNotifications(USE_MOCK ? null : user?.id || user?.user_id || user?.sub || null)
   const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -16,7 +26,7 @@ export function useAlerts(farmId = null, filterSeverity = 'ALL') {
     USE_MOCK ? SERVICE_STATE.AVAILABLE : SERVICE_STATE.LOADING,
   )
 
-  const fetchAlerts = useCallback(async (signal) => {
+  const fetchAlerts = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -29,24 +39,7 @@ export function useAlerts(farmId = null, filterSeverity = 'ALL') {
         return
       }
 
-      if (!farmId) {
-        setAlerts([])
-        setServiceState(SERVICE_STATE.UNKNOWN)
-        setLoading(false)
-        return
-      }
-      setAlerts([])
-      setServiceState(SERVICE_STATE.LOADING)
-
-      const response = await alertsApi.getAlerts({
-        params: { farmId },
-        signal,
-      })
-      const rawList = Array.isArray(response) ? response : response?.items || response?.data || []
-      const normalized = rawList.map(normalizeAlert)
-      setAlerts(normalized)
-      setError(null)
-      setServiceState(normalized.length > 0 ? SERVICE_STATE.AVAILABLE : SERVICE_STATE.EMPTY)
+      // Real mode is driven by useNotifications below (no call to the non-existent /api/v1/alerts)
     } catch (err) {
       if (err?.code !== 'ABORTED') {
         if (err?.status === 403 || err?.status === 404) {
@@ -66,7 +59,7 @@ export function useAlerts(farmId = null, filterSeverity = 'ALL') {
   useEffect(() => {
     const controller = new AbortController()
     queueMicrotask(() => {
-      if (!controller.signal.aborted) {
+      if (USE_MOCK && !controller.signal.aborted) {
         fetchAlerts(controller.signal)
       }
     })
@@ -80,10 +73,11 @@ export function useAlerts(farmId = null, filterSeverity = 'ALL') {
     useCallback(() => {
       fetchAlerts()
     }, [fetchAlerts]),
-    { enabled: !USE_MOCK && Boolean(farmId) },
+    { enabled: false },
   )
 
   const acknowledgeAlert = async (alertId, note = '') => {
+    if (!USE_MOCK) return live.markRead(alertId)
     if (USE_MOCK) {
       setAlerts((prev) =>
         prev.map((a) => (a.id === alertId ? { ...a, status: 'ACKNOWLEDGED' } : a)),
@@ -103,6 +97,9 @@ export function useAlerts(farmId = null, filterSeverity = 'ALL') {
   }
 
   const resolveAlert = async (alertId, note = '') => {
+    if (!USE_MOCK) {
+      return { success: false, message: 'Contract Notification hiện hành chỉ hỗ trợ đã đọc/chưa đọc — chưa có trạng thái "đã xử lý".' }
+    }
     if (USE_MOCK) {
       setAlerts((prev) =>
         prev.map((a) => (a.id === alertId ? { ...a, status: 'RESOLVED' } : a)),
@@ -121,18 +118,34 @@ export function useAlerts(farmId = null, filterSeverity = 'ALL') {
     }
   }
 
+  const realAlerts = USE_MOCK
+    ? null
+    : farmId
+      ? live.items.filter((n) => notificationFarmId(n) === farmId).map((n) => toAlertRow(n))
+      : []
+  const effectiveAlerts = USE_MOCK ? alerts : realAlerts
   const filteredAlerts =
     filterSeverity === 'ALL'
-      ? alerts
-      : alerts.filter((a) => a.severity.toUpperCase() === filterSeverity.toUpperCase())
+      ? effectiveAlerts
+      : effectiveAlerts.filter((a) => a.severity.toUpperCase() === filterSeverity.toUpperCase())
+
+  const realState = live.state === 'UNAVAILABLE'
+    ? SERVICE_STATE.UNAVAILABLE
+    : live.state === 'ERROR'
+      ? SERVICE_STATE.ERROR
+      : live.state === 'LOADING'
+        ? SERVICE_STATE.LOADING
+        : realAlerts && realAlerts.length
+          ? SERVICE_STATE.AVAILABLE
+          : SERVICE_STATE.EMPTY
 
   return {
     alerts: filteredAlerts,
-    allAlerts: alerts,
-    loading,
-    error,
-    serviceState,
-    refetch: () => fetchAlerts(),
+    allAlerts: effectiveAlerts,
+    loading: USE_MOCK ? loading : live.state === 'LOADING',
+    error: USE_MOCK ? error : live.state === 'UNAVAILABLE' || live.state === 'ERROR' ? live.error || 'Notification Service unavailable' : null,
+    serviceState: USE_MOCK ? serviceState : realState,
+    refetch: () => (USE_MOCK ? fetchAlerts() : live.refresh()),
     acknowledgeAlert,
     resolveAlert,
   }
