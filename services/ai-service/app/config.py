@@ -250,6 +250,29 @@ class Settings(BaseSettings):
         default=20.0,
         validation_alias=AliasChoices("ai_local_session_idle_timeout_s", "AI_LOCAL_SESSION_IDLE_TIMEOUT_S"),
     )
+    # INT02-F02: user-uploaded video sessions (temp files, server-generated names, auto-deleted)
+    ai_upload_dir: str = Field(
+        default="/tmp/swiftletcare-ai-uploads",
+        validation_alias=AliasChoices("ai_upload_dir", "AI_UPLOAD_DIR"),
+    )
+    ai_upload_max_bytes: int = Field(
+        default=64 * 1024 * 1024,
+        validation_alias=AliasChoices("ai_upload_max_bytes", "AI_UPLOAD_MAX_BYTES"),
+    )
+    ai_upload_max_duration_s: float = Field(
+        default=300.0,
+        validation_alias=AliasChoices("ai_upload_max_duration_s", "AI_UPLOAD_MAX_DURATION_S"),
+    )
+    ai_upload_max_width: int = 1920
+    ai_upload_max_height: int = 1080
+    ai_upload_max_fps: float = Field(
+        default=10.0,
+        validation_alias=AliasChoices("ai_upload_max_fps", "AI_UPLOAD_MAX_FPS"),
+    )
+    ai_upload_max_sessions: int = Field(
+        default=2,
+        validation_alias=AliasChoices("ai_upload_max_sessions", "AI_UPLOAD_MAX_SESSIONS"),
+    )
     ai_allowed_source_dirs: list[str] = Field(
         default_factory=lambda: [str((AI_PIPELINE_DIR / "data" / "samples").resolve())],
         validation_alias=AliasChoices("ai_allowed_source_dirs", "AI_ALLOWED_SOURCE_DIRS"),

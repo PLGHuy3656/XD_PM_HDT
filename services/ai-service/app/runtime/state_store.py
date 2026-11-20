@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 import json
 import logging
 import threading
+import time
 from typing import Any, Deque, Dict, List, Optional
 
 from app.config import settings
@@ -208,6 +209,7 @@ class InMemoryAIRuntimeStateStore(BaseRuntimeSink):
         self._status_templates: Dict[str, CameraRuntimeStatus] = {}
         self._recent_events: Deque[AIEvent] = deque()
         self._events_by_id: Dict[str, AIEvent] = {}
+        self._session_started_us: Dict[str, int] = {}  # INT02: per-camera session boundary
         self.count_persistence_failures: int = 0
         self.event_persistence_failures: int = 0
 
@@ -483,9 +485,27 @@ class InMemoryAIRuntimeStateStore(BaseRuntimeSink):
     # ------------------------------------------------------------------
     # Read / query methods
     # ------------------------------------------------------------------
+    def mark_session_start(self, camera_id: str) -> None:
+        """INT02: results recorded before this instant belong to a previous session and are never
+        returned as 'latest' for the new one (history is kept untouched)."""
+        with self._lock:
+            self._session_started_us[camera_id] = int(time.time() * 1_000_000)
+
+    def _before_session(self, camera_id: str, iso_value: Optional[str]) -> bool:
+        started = self._session_started_us.get(camera_id)
+        if started is None or not iso_value:
+            return False
+        try:
+            return self._iso_to_epoch_us(iso_value) < started
+        except Exception:
+            return True
+
     def get_latest_detection(self, camera_id: str) -> Optional[DetectionResult]:
         with self._lock:
-            return self._latest_detections.get(camera_id)
+            latest = self._latest_detections.get(camera_id)
+        if latest is not None and self._before_session(camera_id, getattr(latest, "capturedAt", None)):
+            return None
+        return latest
 
     def get_latest_summary(self, camera_id: str) -> Optional[dict[str, Any]]:
         """Returns the bounded `ai:latest:{cameraId}` summary dict from Redis if valid."""
@@ -521,6 +541,12 @@ class InMemoryAIRuntimeStateStore(BaseRuntimeSink):
             return None
 
     def get_latest_count(self, camera_id: str) -> Optional[CountUpdate]:
+        latest = self._get_latest_count_unfiltered(camera_id)
+        if latest is not None and self._before_session(camera_id, latest.recordedAt):
+            return None
+        return latest
+
+    def _get_latest_count_unfiltered(self, camera_id: str) -> Optional[CountUpdate]:
         """Returns latest CountUpdate from Redis `ai:latest:{cameraId}`, falling back to PostgreSQL on miss/corrupt."""
         if self._redis_enabled:
             key = ai_latest_key(camera_id)

@@ -59,7 +59,7 @@ def env(monkeypatch):
         if str(settings.ai_service_url) in url:
             if not state["ai_online"]:
                 raise httpx.ConnectError("AI down")
-            body = request.content
+            body = await request.aread()
             state["ai_calls"].append({
                 "url": url, "key": request.headers.get("X-Internal-Service-Key"),
                 "auth": request.headers.get("Authorization"),
@@ -67,6 +67,13 @@ def env(monkeypatch):
             })
             if url.endswith("/frames"):
                 return httpx.Response(202, json={"accepted": True})
+            if "/uploads" in url:
+                return httpx.Response(200, json={"cameraId": url.split("/cameras/")[-1].split("/")[0], "status": "STARTING", "sourceMode": "UPLOADED_VIDEO"})
+            if "/api/v1/ai/events" in url:
+                return httpx.Response(200, json=[
+                    {"eventId": "E-A", "eventType": "PREDATOR_DETECTED", "cameraId": "CAM-01", "farmId": FARM_A, "class": "rat", "confidence": 0.8},
+                    {"eventId": "E-B", "eventType": "PREDATOR_DETECTED", "cameraId": "CAM-02", "farmId": FARM_B, "class": "snake", "confidence": 0.7},
+                ])
             return httpx.Response(200, json={"cameraId": url.split("/cameras/")[-1].split("/")[0], "status": "STARTING"})
         return httpx.Response(599, json={"detail": "unexpected upstream"})
 
@@ -165,3 +172,55 @@ def test_ai_down_returns_503(env):
     s["ai_online"] = False
     r = c.post("/api/v1/ai/cameras/CAM-01/session", json={"mode": "DEMO_VIDEO"}, headers=_h(OWNER_A, "FARM_OWNER"))
     assert r.status_code == 503
+
+
+MP4 = b"\x00\x00\x00\x18ftypmp42" + b"0" * 256
+
+
+def test_video_upload_forwards_authoritative_farm_and_key(env):
+    c, s = env
+    r = c.post("/api/v1/ai/cameras/CAM-01/video?farmId=forged&zoneId=forged", content=MP4,
+               headers={**_h(OWNER_A, "FARM_OWNER"), "Content-Type": "video/mp4"})
+    assert r.status_code == 200, r.text
+    call = s["ai_calls"][-1]
+    assert "/api/v1/ai/cameras/CAM-01/uploads" in call["url"]
+    assert f"farmId={FARM_A}" in call["url"] and "zoneId=ZONE-A1" in call["url"] and "forged" not in call["url"]
+    assert call["key"] == AI_KEY and call["body"] == len(MP4)
+
+
+def test_video_upload_cross_farm_type_and_auth(env):
+    c, s = env
+    h = _h(OWNER_A, "FARM_OWNER")
+    assert c.post("/api/v1/ai/cameras/CAM-02/video", content=MP4, headers={**h, "Content-Type": "video/mp4"}).status_code == 403
+    assert c.post("/api/v1/ai/cameras/CAM-01/video", content=MP4, headers={**h, "Content-Type": "video/x-msvideo"}).status_code == 415
+    assert c.post("/api/v1/ai/cameras/CAM-01/video", content=MP4, headers={"Content-Type": "video/mp4"}).status_code == 401
+    assert s["ai_calls"] == []
+
+
+def test_video_upload_oversize_rejected(env):
+    c, s = env
+    big = b"\x00" * (64 * 1024 * 1024 + 1)
+    r = c.post("/api/v1/ai/cameras/CAM-01/video", content=big, headers={**_h(OWNER_A, "FARM_OWNER"), "Content-Type": "video/mp4"})
+    assert r.status_code == 413
+    assert s["ai_calls"] == []
+
+
+def test_farm_events_scoped_and_filtered(env):
+    c, s = env
+    r = c.get(f"/api/v1/ai/farms/{FARM_A}/events", headers=_h(OWNER_A, "FARM_OWNER"))
+    assert r.status_code == 200
+    assert [e["eventId"] for e in r.json()] == ["E-A"]  # defence in depth: foreign event dropped
+    assert f"farmId={FARM_A}" in s["ai_calls"][-1]["url"]
+
+
+def test_farm_events_cross_farm_denied(env):
+    c, s = env
+    r = c.get(f"/api/v1/ai/farms/{FARM_A}/events", headers=_h(OWNER_B, "FARM_OWNER"))
+    assert r.status_code == 403
+    assert s["ai_calls"] == []
+
+
+def test_farm_events_technician_assigned_only(env):
+    c, _ = env
+    assert c.get(f"/api/v1/ai/farms/{FARM_A}/events", headers=_h(TECH_A, "TECHNICIAN")).status_code == 200
+    assert c.get(f"/api/v1/ai/farms/{FARM_B}/events", headers=_h(TECH_A, "TECHNICIAN")).status_code == 403

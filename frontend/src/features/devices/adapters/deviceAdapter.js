@@ -42,6 +42,8 @@ export function normalizeDevice(raw) {
     'Thiết bị IoT'
 
   const code = raw.node_id || raw.code || raw.device_code || raw.id || ''
+  // INT02-F04: a registered camera is REGISTERED (not "no heartbeat") — it never reports to IoT
+  const effectiveStatus = type === 'CAMERA' && (status === 'UNKNOWN' || status === 'UNAVAILABLE') ? 'REGISTERED' : status
 
   return {
     id: raw.id || raw.device_id || 'unknown-device',
@@ -52,7 +54,7 @@ export function normalizeDevice(raw) {
     farmId: raw.farmId || raw.farm_id || '',
     zoneId: raw.zoneId || raw.zone_id || '',
     zoneName: raw.zoneName || raw.zone_name || '',
-    status,
+    status: effectiveStatus,
     nodeId: raw.node_id || raw.nodeId || code,
     firmware: raw.firmware || raw.firmware_version || '--',
     // INT01-R1: never a fallback RSSI; Management does not report radio signal (detail panel reads telemetry)

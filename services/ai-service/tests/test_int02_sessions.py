@@ -116,3 +116,120 @@ def test_demo_video_real_inference_counts(secured):
     print("INT02_DEMO_COUNTS", counts)
     assert counts is not None, "real model produced no entry/exit on the bidirectional fixture"
     assert status["sourceMode"] == "DEMO_VIDEO"
+
+
+# ---------------------------------------------------------------- INT02-F02 uploaded video
+import os  # noqa: E402
+
+
+def _mp4_from_fixture(tmp_path, max_frames=None) -> bytes:
+    cap = cv2.VideoCapture(str(FIXTURE))
+    fps = cap.get(cv2.CAP_PROP_FPS) or 10.0
+    out_path = tmp_path / "upload.mp4"
+    writer = None
+    n = 0
+    while True:
+        ok, frame = cap.read()
+        if not ok or (max_frames and n >= max_frames):
+            break
+        if writer is None:
+            h, w = frame.shape[:2]
+            writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+        writer.write(frame)
+        n += 1
+    cap.release()
+    writer.release()
+    data = out_path.read_bytes()
+    assert data[4:8] == b"ftyp"
+    return data
+
+
+@pytest.fixture
+def upload_env(secured, monkeypatch, tmp_path):
+    updir = tmp_path / "uploads"
+    monkeypatch.setattr(settings, "ai_upload_dir", str(updir))
+    monkeypatch.setattr(settings, "ai_upload_max_fps", 50.0)
+    return secured, updir
+
+
+def _post_upload(client, cam, data, ctype="video/mp4", farm="F1"):
+    return client.post(f"/api/v1/ai/cameras/{cam}/uploads?farmId={farm}&zoneId=Z1", content=data, headers={**H, "Content-Type": ctype})
+
+
+def test_upload_requires_internal_key(upload_env):
+    client, _ = upload_env
+    r = client.post("/api/v1/ai/cameras/INT02-T1/uploads", content=b"x", headers={"Content-Type": "video/mp4"})
+    assert r.status_code == 403
+
+
+def test_upload_rejects_wrong_type_fake_and_oversize(upload_env, monkeypatch):
+    client, updir = upload_env
+    assert _post_upload(client, "INT02-T1", b"0" * 100, ctype="video/x-msvideo").status_code == 415
+    r = _post_upload(client, "INT02-T1", b"RIFF" + b"\x00" * 200)
+    assert r.status_code == 415 and r.json()["detail"]["code"] == "UNSUPPORTED_VIDEO_TYPE"
+    monkeypatch.setattr(settings, "ai_upload_max_bytes", 1000)
+    r = _post_upload(client, "INT02-T1", b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 2000)
+    assert r.status_code == 413
+    assert not updir.exists() or os.listdir(updir) == []
+
+
+def test_upload_rejects_corrupt_mp4(upload_env):
+    client, updir = upload_env
+    r = _post_upload(client, "INT02-T1", b"\x00\x00\x00\x18ftypmp42" + os.urandom(4096))
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "VIDEO_UNREADABLE"
+    assert os.listdir(updir) == []
+
+
+@pytest.mark.skipif(not FIXTURE.is_file(), reason="demo fixture not generated")
+def test_upload_real_inference_completes_and_cleans_up(upload_env):
+    client, updir = upload_env
+    data = _mp4_from_fixture(updir.parent)
+    r = _post_upload(client, "INT02-T3", data)
+    assert r.status_code == 200, r.text
+    assert r.json()["sourceMode"] == "UPLOADED_VIDEO"
+    assert len(os.listdir(updir)) == 1
+    deadline = time.time() + 120
+    status = None
+    while time.time() < deadline:
+        status = client.get("/api/v1/ai/cameras/INT02-T3/status").json()
+        if status.get("status") == "OFFLINE" and status.get("sessionEnded") == "COMPLETED":
+            break
+        time.sleep(1)
+    counts = client.get("/api/v1/ai/cameras/INT02-T3/counts/latest")
+    print("INT02_UPLOAD_STATUS", {k: status.get(k) for k in ("status", "sourceMode", "sessionEnded", "processedFrames", "modelVersion")})
+    print("INT02_UPLOAD_COUNTS", counts.json() if counts.status_code == 200 else counts.status_code)
+    assert status["sessionEnded"] == "COMPLETED" and status["sourceMode"] == "UPLOADED_VIDEO"
+    assert status["processedFrames"] > 0 and status["modelVersion"] == "best"
+    assert counts.status_code == 200 and counts.json()["entryCount"] >= 1 and counts.json()["exitCount"] >= 1
+    assert counts.json()["farmId"] == "F1"
+    assert os.listdir(updir) == []  # temp file deleted after processing
+
+
+@pytest.mark.skipif(not FIXTURE.is_file(), reason="demo fixture not generated")
+def test_upload_stop_deletes_file_and_new_session_hides_old_counts(upload_env, monkeypatch):
+    client, updir = upload_env
+    monkeypatch.setattr(settings, "ai_upload_max_fps", 2.0)  # slow so we can stop mid-way
+    r = _post_upload(client, "INT02-T2", _mp4_from_fixture(updir.parent))
+    assert r.status_code == 200
+    time.sleep(1.5)
+    assert client.post("/api/v1/ai/cameras/INT02-T2/stop", headers=H).status_code == 200
+    time.sleep(0.5)
+    assert os.listdir(updir) == []
+    st = client.get("/api/v1/ai/cameras/INT02-T2/status").json()
+    assert st.get("sessionEnded") is None  # stopped, not completed
+    # New (webcam) session on the same camera: no result of the previous session is "latest"
+    assert client.post("/api/v1/ai/cameras/INT02-T2/sessions", json={"mode": "LOCAL_CAMERA"}, headers=H).status_code == 200
+    assert client.get("/api/v1/ai/cameras/INT02-T2/counts/latest").status_code == 404
+    assert client.get("/api/v1/ai/cameras/INT02-T2/detections/latest").status_code == 404
+
+
+@pytest.mark.skipif(not FIXTURE.is_file(), reason="demo fixture not generated")
+def test_upload_concurrency_limit(upload_env, monkeypatch):
+    client, updir = upload_env
+    monkeypatch.setattr(settings, "ai_upload_max_sessions", 1)
+    monkeypatch.setattr(settings, "ai_upload_max_fps", 1.0)
+    data = _mp4_from_fixture(updir.parent)
+    assert _post_upload(client, "INT02-T1", data).status_code == 200
+    r = _post_upload(client, "INT02-T2", data)
+    assert r.status_code == 429 and r.json()["detail"]["code"] == "UPLOAD_CONCURRENCY_LIMIT"
+    client.post("/api/v1/ai/cameras/INT02-T1/stop", headers=H)

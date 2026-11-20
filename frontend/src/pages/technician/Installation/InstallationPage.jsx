@@ -9,18 +9,22 @@ import { formatFarmOptionLabel } from '../../../features/farms/adapters/farmAdap
 
 import '../TechnicianWorkspace.css'
 
-const DEVICE_TYPE_OPTIONS = [
-  { value: 'ENVIRONMENT_MONITOR', label: 'Cảm biến môi trường (ENVIRONMENT_MONITOR)' },
-  { value: 'CONTROLLER', label: 'Bộ điều khiển ESP32 (CONTROLLER)' },
-  { value: 'CAMERA', label: 'Camera AI (CAMERA)' },
-  { value: 'ACTUATOR', label: 'Thiết bị chấp hành (ACTUATOR)' },
-  { value: 'AUDIO_MONITOR', label: 'Giám sát âm thanh (AUDIO_MONITOR)' },
-]
+import {
+  REGISTERABLE_DEVICE_TYPES,
+  DEFAULT_REGISTER_TYPE,
+  registrationTypeMeta,
+  validateRegistration,
+  registeredNotice,
+  registrationErrorText,
+} from '../../../features/devices/deviceRegistration.js'
+
+// INT02-F04: only types with a real backend/hardware contract (shared with the Owner form)
+const DEVICE_TYPE_OPTIONS = REGISTERABLE_DEVICE_TYPES.map((t) => ({ value: t.value, label: t.label }))
 
 const EMPTY_REGISTER_FORM = {
   node_id: '',
   name: '',
-  device_type: 'ENVIRONMENT_MONITOR',
+  device_type: DEFAULT_REGISTER_TYPE,
   zone_id: '',
 }
 
@@ -84,12 +88,9 @@ function InstallationPage() {
 
     const cleanNodeId = registerForm.node_id.trim()
     const cleanName = registerForm.name.trim()
-    if (!cleanNodeId) {
-      setRegisterError('Vui lòng nhập Hardware Node ID từ nhãn thiết bị thực tế.')
-      return
-    }
-    if (!cleanName) {
-      setRegisterError('Vui lòng nhập tên thiết bị.')
+    const invalid = validateRegistration(registerForm, { requireName: true })
+    if (invalid) {
+      setRegisterError(invalid)
       return
     }
 
@@ -104,13 +105,13 @@ function InstallationPage() {
     setRegisterSubmitting(false)
 
     if (!res?.success) {
-      setRegisterError(res?.error || 'Không thể đăng ký thiết bị mới.')
+      setRegisterError(registrationErrorText(res?.error))
       return
     }
 
     const assignedZone = zones.find((z) => z.id === registerForm.zone_id)
     setNotice(
-      `Đã đăng ký thiết bị "${cleanName}" (Node ID: ${cleanNodeId}) tại ${selectedFarm?.name || 'nhà yến'} — ${assignedZone ? `Zone: ${assignedZone.name}` : 'Chưa phân bổ Zone'}.`,
+      `Đã đăng ký thiết bị "${cleanName}" (${cleanNodeId}) tại ${selectedFarm?.name || 'nhà yến'} — ${assignedZone ? `Zone: ${assignedZone.name}` : 'Chưa phân bổ Zone'}. ${registeredNotice(registerForm.device_type)}`,
     )
     setRegisterOpen(false)
     setRegisterForm(EMPTY_REGISTER_FORM)
@@ -375,17 +376,17 @@ function InstallationPage() {
                 </div>
 
                 <div className="tech-ws-form__field">
-                  <label htmlFor="tech-reg-node-id">Hardware Node ID *</label>
+                  <label htmlFor="tech-reg-node-id">{registrationTypeMeta(registerForm.device_type).nodeLabel} *</label>
                   <input
                     id="tech-reg-node-id"
                     className="tech-ws-form__input"
                     value={registerForm.node_id}
                     onChange={(e) => setRegisterForm((f) => ({ ...f, node_id: e.target.value }))}
-                    placeholder="Ví dụ: ESP32-NODE-01 hoặc CAM-03"
+                    placeholder={registrationTypeMeta(registerForm.device_type).placeholder}
                     disabled={registerSubmitting}
                   />
                   <span className="tech-ws-form__hint">
-                    Nhập chính xác định danh phần cứng/MQTT trên thiết bị thực tế (duy nhất toàn hệ thống).
+                    Duy nhất toàn hệ thống; chữ, số, - _ . (3–64 ký tự).
                   </span>
                 </div>
 
@@ -408,6 +409,9 @@ function InstallationPage() {
                     options={DEVICE_TYPE_OPTIONS}
                     onChange={(val) => setRegisterForm((f) => ({ ...f, device_type: val }))}
                   />
+                  <span className="tech-ws-form__hint" data-testid="tech-register-type-help">
+                    {registrationTypeMeta(registerForm.device_type).help}
+                  </span>
                 </div>
 
                 <div className="tech-ws-form__field">

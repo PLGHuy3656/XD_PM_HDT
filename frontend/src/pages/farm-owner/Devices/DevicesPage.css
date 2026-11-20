@@ -998,3 +998,7 @@
   font-weight: 700;
   vertical-align: middle;
 }
+/* INT02-F04 device registration */
+.device-register-help{display:block;margin:-4px 0 6px;color:#64748b;font-size:12px;line-height:1.45}
+.device-register-error{margin:6px 0;padding:8px 10px;border-radius:8px;background:#fdecec;color:#b42318;font-size:13px}
+.device-register-notice{margin:0 0 12px;padding:10px 12px;border-radius:10px;background:#e8f5ee;color:#126b3b;font-size:13px}

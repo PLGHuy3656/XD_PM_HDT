@@ -44,6 +44,7 @@ function DetectionOverlay({ detection, width, height, className }) {
 
 function LiveCameraCard({ camera, ai }) {
   const videoRef = useRef(null)
+  const fileRef = useRef(null)
   const cameraId = camera?.id && camera.id !== 'CAM-NONE' ? camera.id : null
 
   if (!cameraId || !ai) {
@@ -80,12 +81,32 @@ function LiveCameraCard({ camera, ai }) {
 
       <div className="ai-camera-actions">
         <button type="button" onClick={ai.startDemo} disabled={ai.sessionState === 'UNAVAILABLE' || webcamOn} data-testid="ai-start-demo">
-          Chạy video demo
+          Video kiểm thử tổng hợp
         </button>
         <button type="button" onClick={() => ai.startWebcam(videoRef.current)} disabled={ai.sessionState === 'UNAVAILABLE' || webcamOn} data-testid="ai-start-webcam">
           Bật webcam máy này
         </button>
-        <button type="button" onClick={ai.stopSession} disabled={!running && !webcamOn} data-testid="ai-stop">
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={ai.sessionState === 'UNAVAILABLE' || webcamOn || ai.upload.state === 'UPLOADING'}
+          data-testid="ai-upload-video"
+        >
+          Video từ máy
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="video/mp4,.mp4"
+          hidden
+          data-testid="ai-upload-input"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            e.target.value = ''
+            if (f) ai.startUpload(f)
+          }}
+        />
+        <button type="button" onClick={ai.stopSession} disabled={!running && !webcamOn && ai.upload.state !== 'UPLOADING'} data-testid="ai-stop">
           Dừng
         </button>
       </div>
@@ -101,10 +122,30 @@ function LiveCameraCard({ camera, ai }) {
         {sourceMode === 'LOCAL_CAMERA' && webcamOn && (
           <DetectionOverlay detection={detection} width={status?.width} height={status?.height} className="ai-camera-overlay" />
         )}
+        {sourceMode === 'UPLOADED_VIDEO' && ai.upload.objectUrl && (
+          <>
+            <video
+              className="ai-camera-video"
+              src={ai.upload.objectUrl}
+              muted
+              autoPlay
+              playsInline
+              controls
+              data-testid="ai-upload-preview"
+            />
+            {running && <DetectionOverlay detection={detection} width={status?.width} height={status?.height} className="ai-camera-overlay" />}
+          </>
+        )}
+        {sourceMode === 'UPLOADED_VIDEO' && !ai.upload.objectUrl && (
+          <div className="ai-camera-schematic">
+            <DetectionOverlay detection={detection} width={status?.width} height={status?.height} className="ai-camera-schematic-canvas" />
+            <small>Video được tải lên từ phiên khác — chỉ hiển thị sơ đồ vị trí phát hiện.</small>
+          </div>
+        )}
         {sourceMode === 'DEMO_VIDEO' && (
           <div className="ai-camera-schematic">
             <DetectionOverlay detection={detection} width={status?.width} height={status?.height} className="ai-camera-schematic-canvas" />
-            <small>Sơ đồ vị trí phát hiện của AI trên video demo (hình ảnh video không truyền về trình duyệt).</small>
+            <small>Sơ đồ vị trí phát hiện của AI trên video kiểm thử tổng hợp (hình ảnh không truyền về trình duyệt).</small>
           </div>
         )}
         {(sourceMode === 'UNAVAILABLE' || sourceMode === 'OFFLINE') && !webcamOn && (
@@ -113,13 +154,27 @@ function LiveCameraCard({ camera, ai }) {
             <span>
               {ai.sessionState === 'UNAVAILABLE'
                 ? 'Không kết nối được AI Service. Không có số liệu nào được hiển thị thay thế.'
-                : 'Camera chưa có phiên AI. Chọn "Chạy video demo" hoặc "Bật webcam máy này".'}
+                : 'Camera chưa có phiên AI. Chọn "Video từ máy", "Bật webcam máy này" hoặc "Video kiểm thử tổng hợp".'}
             </span>
           </div>
         )}
       </div>
 
       <p className="ai-camera-note">{source.note}</p>
+      {ai.upload.state !== 'IDLE' && (
+        <p className={ai.upload.error ? 'ai-camera-error' : 'ai-camera-note'} data-testid="ai-upload-status">
+          {ai.upload.fileName ? `${ai.upload.fileName} (${ai.upload.sizeMB} MB) · ` : ''}
+          {ai.upload.state === 'UPLOADING'
+            ? 'Đang tải video lên AI Service…'
+            : ai.upload.error
+              ? ai.upload.error
+              : view.phase === 'COMPLETED'
+                ? 'AI đã xử lý xong toàn bộ video — kết quả bên dưới thuộc phiên này.'
+                : running
+                  ? 'AI đang xử lý video (tốc độ thực, tối đa 10 khung/giây). Preview là bản phát cục bộ trên máy bạn.'
+                  : 'Phiên phân tích video đã kết thúc.'}
+        </p>
+      )}
       {(ai.webcam.error || ai.actionError || ai.error || status?.errorMessage) && (
         <p className="ai-camera-error" data-testid="ai-camera-error">
           {ai.webcam.error || ai.actionError || ai.error || `${status.errorCode}: ${status.errorMessage}`}
@@ -130,7 +185,7 @@ function LiveCameraCard({ camera, ai }) {
         <div><dt>Trạng thái AI</dt><dd>{view.runtimeLabel}</dd></div>
         <div><dt>Model / Tracker</dt><dd>{status ? `${status.modelVersion} · ${status.trackerType}` : '--'}</dd></div>
         <div><dt>FPS xử lý</dt><dd>{running ? status.fps.toFixed(1) : '--'}</dd></div>
-        <div><dt>Khung đã xử lý</dt><dd>{running ? status.processedFrames : '--'}</dd></div>
+        <div><dt>Khung đã xử lý</dt><dd>{view.status ? view.status.processedFrames : '--'}</dd></div>
         <div><dt>Khung hình gần nhất</dt><dd>{status?.lastFrameAt ? formatRelativeTime(status.lastFrameAt) : '--'}</dd></div>
         <div><dt>Webcam gửi / lỗi</dt><dd>{sourceMode === 'LOCAL_CAMERA' || webcamOn ? `${ai.webcam.sent} / ${ai.webcam.rejected}` : '--'}</dd></div>
       </dl>

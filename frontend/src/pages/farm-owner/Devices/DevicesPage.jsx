@@ -3,10 +3,17 @@ import { useMemo, useState } from 'react'
 import AppLayout from '../../../components/layout/AppLayout'
 import EnvironmentSelect from '../../../components/ui/Select'
 import {
-  statusMeta,
   typeFilters,
   statusFilters,
 } from '../../../components/features/farm-owner/devices/devicesMockData'
+import {
+  REGISTERABLE_DEVICE_TYPES,
+  DEFAULT_REGISTER_TYPE,
+  registrationTypeMeta,
+  validateRegistration,
+  registeredNotice,
+  registrationErrorText,
+} from '../../../features/devices/deviceRegistration.js'
 
 import DeviceDetailPanel from '../../../components/features/farm-owner/devices/DeviceDetailPanel'
 import DeviceTable from '../../../components/features/farm-owner/devices/DeviceTable'
@@ -43,7 +50,6 @@ function DevicesPage() {
     selectedFarmId,
     setSelectedFarmId,
     zones,
-    loading: farmsLoading,
     error: farmsError,
   } = useFarms()
 
@@ -65,7 +71,9 @@ function DevicesPage() {
   const [refreshLabel, setRefreshLabel] = useState('Làm mới')
   const [createOpen, setCreateOpen] = useState(false)
   const [editingDevice, setEditingDevice] = useState(null)
-  const [devForm, setDevForm] = useState({ node_id: '', name: '', zone_id: '', device_type: 'CONTROLLER' })
+  const [devForm, setDevForm] = useState({ node_id: '', name: '', zone_id: '', device_type: DEFAULT_REGISTER_TYPE })
+  const [formError, setFormError] = useState('')
+  const [registerNotice, setRegisterNotice] = useState('')
   const [actionError, setActionError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -125,9 +133,14 @@ function DevicesPage() {
     event.preventDefault()
     if (!selectedFarmId) return
     setActionError('')
-    if (!editingDevice && !devForm.node_id.trim()) {
-      setActionError('Vui lòng nhập Node ID thiết bị.')
-      return
+    setFormError('')
+    setRegisterNotice('')
+    if (!editingDevice) {
+      const invalid = validateRegistration(devForm, { requireName: true })
+      if (invalid) {
+        setFormError(invalid)
+        return
+      }
     }
     setSubmitting(true)
     let res
@@ -142,17 +155,21 @@ function DevicesPage() {
         node_id: devForm.node_id.trim(),
         farm_id: selectedFarmId,
         name: devForm.name.trim() || null,
-        device_type: devForm.device_type || 'CONTROLLER',
+        device_type: devForm.device_type,
       }
       if (devForm.zone_id) payload.zone_id = devForm.zone_id
       res = await createDevice(payload)
     }
     setSubmitting(false)
     if (!res?.success) {
-      setActionError(res?.error || 'Không thể lưu thiết bị.')
+      if (editingDevice) setActionError(res?.error || 'Không thể lưu thiết bị.')
+      else setFormError(registrationErrorText(res?.error))
       return
     }
-    setDevForm({ node_id: '', name: '', zone_id: '', device_type: 'CONTROLLER' })
+    if (!editingDevice) {
+      setRegisterNotice(`Đã đăng ký "${devForm.name.trim()}" (${devForm.node_id.trim()}). ${registeredNotice(devForm.device_type)}`)
+    }
+    setDevForm({ node_id: '', name: '', zone_id: '', device_type: DEFAULT_REGISTER_TYPE })
     setEditingDevice(null)
     setCreateOpen(false)
   }
@@ -206,8 +223,10 @@ function DevicesPage() {
                 className="farm-button farm-button--primary"
                 onClick={() => {
                   setActionError('')
+                  setFormError('')
                   setCreateOpen(true)
                 }}
+                data-testid="owner-register-device"
               >
                 + Thêm thiết bị
               </button>
@@ -225,6 +244,9 @@ function DevicesPage() {
 
         {farmsError && (
           <ErrorMessage title="Lỗi danh sách nhà yến" message={farmsError} />
+        )}
+        {registerNotice && (
+          <p className="device-register-notice" data-testid="owner-register-notice">{registerNotice}</p>
         )}
         {(devicesError || actionError) && (
           <ErrorMessage
@@ -383,17 +405,37 @@ function DevicesPage() {
             >
               <h3>{editingDevice ? 'Chỉnh sửa thiết bị' : 'Thêm thiết bị cho nhà yến'}</h3>
               {!editingDevice && (
-                <label>
-                  Node ID *
-                  <input
-                    value={devForm.node_id}
-                    onChange={(e) => setDevForm((c) => ({ ...c, node_id: e.target.value }))}
-                    placeholder="VD: SWC-NODE-004"
-                  />
-                </label>
+                <>
+                  <label>
+                    Nhà yến
+                    <input value={selectedFarm ? formatFarmOptionLabel(selectedFarm) : ''} disabled />
+                  </label>
+                  <label>
+                    Loại thiết bị *
+                    <select
+                      value={devForm.device_type}
+                      onChange={(e) => setDevForm((c) => ({ ...c, device_type: e.target.value }))}
+                      data-testid="owner-register-type"
+                    >
+                      {REGISTERABLE_DEVICE_TYPES.map((t) => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <small className="device-register-help">{registrationTypeMeta(devForm.device_type).help}</small>
+                  <label>
+                    {registrationTypeMeta(devForm.device_type).nodeLabel} *
+                    <input
+                      value={devForm.node_id}
+                      onChange={(e) => setDevForm((c) => ({ ...c, node_id: e.target.value }))}
+                      placeholder={registrationTypeMeta(devForm.device_type).placeholder}
+                      data-testid="owner-register-node"
+                    />
+                  </label>
+                </>
               )}
               <label>
-                Tên thiết bị
+                Tên thiết bị{editingDevice ? '' : ' *'}
                 <input
                   value={devForm.name}
                   onChange={(e) => setDevForm((c) => ({ ...c, name: e.target.value }))}
@@ -414,6 +456,7 @@ function DevicesPage() {
                   </select>
                 </label>
               )}
+              {formError && <p className="device-register-error" data-testid="owner-register-error">{formError}</p>}
               <div className="admin-farm-modal__actions">
                 <button type="button" className="admin-farm-modal__cancel" onClick={() => setCreateOpen(false)}>Hủy</button>
                 <button type="submit" className="admin-farm-modal__save" disabled={submitting}>{submitting ? 'Đang lưu...' : 'Thêm thiết bị'}</button>

@@ -54,6 +54,8 @@ export const ENDPOINTS = {
     CAMERA_SESSION: (cameraId) => `/api/v1/ai/cameras/${cameraId}/session`,
     CAMERA_SESSION_STOP: (cameraId) => `/api/v1/ai/cameras/${cameraId}/session/stop`,
     CAMERA_FRAMES: (cameraId) => `/api/v1/ai/cameras/${cameraId}/frames`,
+    CAMERA_VIDEO: (cameraId) => `/api/v1/ai/cameras/${cameraId}/video`,
+    FARM_EVENTS: (farmId) => `/api/v1/ai/farms/${farmId}/events`,
     EVENTS: '/api/v1/ai/events',
     EVENT_DETAIL: (eventId) => `/api/v1/ai/events/${eventId}`,
   },

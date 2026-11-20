@@ -166,7 +166,12 @@ export const statusMeta = {
   },
   // INT01-R1
   UNKNOWN: {
-    label: 'Chưa có heartbeat',
+    label: 'Đã đăng ký · chưa có heartbeat',
+    className: 'unknown',
+  },
+  // INT02-F04: registered camera (no MQTT heartbeat; AI state on the Swiftlets page)
+  REGISTERED: {
+    label: 'Đã đăng ký · Camera AI',
     className: 'unknown',
   },
   UNAVAILABLE: {
@@ -188,6 +193,7 @@ export const statusFilters = [
   { value: 'ONLINE', label: 'Online' },
   { value: 'WARNING', label: 'Cần chú ý' },
   { value: 'OFFLINE', label: 'Offline' },
-  { value: 'UNKNOWN', label: 'Chưa có heartbeat' },
+  { value: 'UNKNOWN', label: 'Đã đăng ký · chưa có heartbeat' },
+  { value: 'REGISTERED', label: 'Đã đăng ký · Camera AI' },
   { value: 'UNAVAILABLE', label: 'Không xác định' },
 ]

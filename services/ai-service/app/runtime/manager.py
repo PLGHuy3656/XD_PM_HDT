@@ -655,6 +655,14 @@ class AIRuntimeManager:
                 existing.close()
             except Exception:
                 pass
+            # Session sources (e.g. uploaded video temp files) must be released even if the
+            # pipeline never opened them.
+            old_src = getattr(getattr(existing, "camera_config", None), "source", None)
+            if hasattr(old_src, "close") and not isinstance(old_src, str):
+                try:
+                    old_src.close()
+                except Exception:
+                    pass
         self._threads.pop(camera_id, None)
         getattr(self, "_push_sources", {}).pop(camera_id, None)
 
@@ -666,8 +674,11 @@ class AIRuntimeManager:
         farm_id: Optional[str] = None,
         zone_id: Optional[str] = None,
         idle_timeout_s: float = 20.0,
+        uploaded_source: Optional[FrameSource] = None,
     ) -> CameraRuntimeStatus:
         """Start an INT02 interactive session on the real pipeline.
+
+        UPLOADED_VIDEO -> a validated user upload played once (UploadedVideoSource).
 
         DEMO_VIDEO   -> server-side demo video replayed in a loop.
         LOCAL_CAMERA -> frames pushed by the authorised client (browser webcam via Gateway).
@@ -684,8 +695,13 @@ class AIRuntimeManager:
             source = PushFrameSource(camera_id, idle_timeout_s=idle_timeout_s)
             source_type = "push"
             self._push_sources[camera_id] = source  # type: ignore[assignment]
+        elif mode == "UPLOADED_VIDEO" and uploaded_source is not None:
+            source = uploaded_source
+            source_type = "video"
         else:
             raise ValueError(f"Unsupported session mode: {mode}")
+        # Results recorded before now belong to the previous session of this camera
+        self.state_store.mark_session_start(camera_id)
         cam_cfg = RuntimeCameraConfig(
             camera_id=camera_id,
             source=source,
@@ -696,6 +712,14 @@ class AIRuntimeManager:
         )
         self.register_camera(cam_cfg)
         return self.start_camera(camera_id)
+
+    def active_upload_sessions(self) -> int:
+        """Number of running UPLOADED_VIDEO sessions (bounded concurrency)."""
+        return sum(
+            1
+            for cid, p in list(self._pipelines.items())
+            if getattr(p.camera_config, "source_mode", None) == "UPLOADED_VIDEO" and self.is_running(cid)
+        )
 
     def push_frame(self, camera_id: str, data: bytes) -> bool:
         """Feed one client JPEG frame into an active LOCAL_CAMERA session."""

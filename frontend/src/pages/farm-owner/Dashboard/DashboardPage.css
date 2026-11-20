@@ -1009,3 +1009,6 @@
 .dashboard-iot-source.source-physical{background:#e8f5ee;color:#126b3b;border-color:#8ad1a9}
 .status-badge.status-offline{background:#f1f5f9;color:#64748b}
 .status-badge.status-offline .status-badge-dot{background:#94a3b8}
+.dashboard-ai-events{display:flex;flex-direction:column;gap:4px;font-size:11px;color:#475569}
+.dashboard-ai-events ul{margin:0;padding-left:16px}
+.dashboard-ai-events small{color:#64748b}

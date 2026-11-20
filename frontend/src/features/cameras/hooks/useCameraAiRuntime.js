@@ -20,12 +20,25 @@ const FRAME_INTERVAL_MS = 250 // 4 FPS upper bound (AI rate limit 0.15s)
 const FRAME_W = 640
 const FRAME_H = 480
 const JPEG_QUALITY = 0.7
+export const MAX_UPLOAD_BYTES = 64 * 1024 * 1024
+const UPLOAD_IDLE = { state: 'IDLE', fileName: null, sizeMB: null, objectUrl: null, error: null }
+
+const UPLOAD_ERROR_TEXT = {
+  413: 'File vượt dung lượng cho phép (tối đa 64 MB).',
+  415: 'Định dạng không hỗ trợ — chỉ nhận video MP4.',
+  403: 'Không có quyền phân tích video trên camera này.',
+  429: 'Đang có quá nhiều phiên phân tích video, vui lòng thử lại sau.',
+  502: 'AI Service không khả dụng.',
+  503: 'AI Service không khả dụng.',
+  504: 'AI Service không phản hồi.',
+}
 
 function classify(err) {
   const s = Number(err?.status ?? err?.statusCode ?? 0)
   if (s === 404) return 'NONE'
   if (s === 401 || s === 403) return 'FORBIDDEN'
-  if (s === 0 || s === 502 || s === 503 || s === 504) return 'UNAVAILABLE'
+  // A timeout (408 / TIMEOUT) means the AI path is not responding — same as unreachable
+  if (s === 0 || s === 408 || s === 502 || s === 503 || s === 504 || err?.code === 'TIMEOUT') return 'UNAVAILABLE'
   return 'ERROR'
 }
 
@@ -33,6 +46,8 @@ export function useCameraAiRuntime(cameraId) {
   const [entry, setEntry] = useState({ cameraId: null, data: null })
   const [webcam, setWebcam] = useState({ state: 'OFF', error: null, sent: 0, rejected: 0 })
   const [actionError, setActionError] = useState(null)
+  const [upload, setUpload] = useState(UPLOAD_IDLE)
+  const objectUrlRef = useRef(null)
   const streamRef = useRef(null)
   const timerRef = useRef(null)
   const inFlightRef = useRef(false)
@@ -122,20 +137,81 @@ export function useCameraAiRuntime(cameraId) {
     }
   }, [stopWebcamCapture])
 
+  const releaseUploadPreview = useCallback(() => {
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+    objectUrlRef.current = null
+  }, [])
+
+  // INT02-F02: user-selected local MP4 -> authenticated upload -> real AI pipeline (one pass)
+  const startUpload = useCallback(async (file) => {
+    setActionError(null)
+    if (!file) return
+    const isMp4 = file.type === 'video/mp4' || /\.mp4$/i.test(file.name || '')
+    const sizeMB = Math.round((file.size / (1024 * 1024)) * 10) / 10
+    if (!isMp4) {
+      setUpload({ ...UPLOAD_IDLE, state: 'ERROR', fileName: file.name, sizeMB, error: UPLOAD_ERROR_TEXT[415] })
+      return
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setUpload({ ...UPLOAD_IDLE, state: 'ERROR', fileName: file.name, sizeMB, error: UPLOAD_ERROR_TEXT[413] })
+      return
+    }
+    stopWebcamCapture()
+    setWebcam({ state: 'OFF', error: null, sent: 0, rejected: 0 })
+    releaseUploadPreview()
+    setUpload({ ...UPLOAD_IDLE, state: 'UPLOADING', fileName: file.name, sizeMB })
+    let resp
+    try {
+      resp = await fetch(`${API_BASE_URL || ''}${ENDPOINTS.AI.CAMERA_VIDEO(cameraId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'video/mp4', Authorization: `Bearer ${getAuthToken()}` },
+        body: file,
+      })
+    } catch {
+      setUpload({ ...UPLOAD_IDLE, state: 'ERROR', fileName: file.name, sizeMB, error: 'Tải video lên thất bại (lỗi mạng).' })
+      return
+    }
+    if (!resp.ok) {
+      let detail
+      try {
+        const body = await resp.json()
+        detail = body?.detail?.message || (typeof body?.detail === 'string' ? body.detail : null)
+      } catch {
+        detail = null
+      }
+      setUpload({
+        ...UPLOAD_IDLE,
+        state: 'ERROR',
+        fileName: file.name,
+        sizeMB,
+        error: resp.status === 400 ? detail || 'Video hỏng hoặc không đọc được.' : UPLOAD_ERROR_TEXT[resp.status] || detail || `Tải video lên thất bại (HTTP ${resp.status}).`,
+      })
+      load(cameraId)
+      return
+    }
+    objectUrlRef.current = URL.createObjectURL(file)
+    setUpload({ state: 'PROCESSING', fileName: file.name, sizeMB, objectUrl: objectUrlRef.current, error: null })
+    load(cameraId)
+  }, [cameraId, load, releaseUploadPreview, stopWebcamCapture])
+
   const startDemo = useCallback(async () => {
     setActionError(null)
+    releaseUploadPreview()
+    setUpload(UPLOAD_IDLE)
     stopWebcamCapture()
     setWebcam({ state: 'OFF', error: null, sent: 0, rejected: 0 })
     try {
       await camerasApi.startSession(cameraId, 'DEMO_VIDEO')
       load(cameraId)
     } catch (err) {
-      setActionError(err?.message || 'Không khởi chạy được video demo.')
+      setActionError(err?.message || 'Không khởi chạy được video kiểm thử.')
     }
-  }, [cameraId, load, stopWebcamCapture])
+  }, [cameraId, load, releaseUploadPreview, stopWebcamCapture])
 
   const startWebcam = useCallback(async (videoElement) => {
     setActionError(null)
+    releaseUploadPreview()
+    setUpload(UPLOAD_IDLE)
     videoElRef.current = videoElement
     if (!navigator.mediaDevices?.getUserMedia) {
       setWebcam({ state: 'BLOCKED', error: 'Trình duyệt không hỗ trợ truy cập camera (cần HTTPS hoặc localhost).', sent: 0, rejected: 0 })
@@ -181,11 +257,12 @@ export function useCameraAiRuntime(cameraId) {
     setWebcam({ state: 'STREAMING', error: null, sent: 0, rejected: 0 })
     timerRef.current = setInterval(sendFrame, FRAME_INTERVAL_MS)
     load(cameraId)
-  }, [cameraId, load, sendFrame, stopWebcamCapture])
+  }, [cameraId, load, releaseUploadPreview, sendFrame, stopWebcamCapture])
 
   const stopSession = useCallback(async () => {
     setActionError(null)
     stopWebcamCapture()
+    setUpload((u) => (u.state === 'PROCESSING' || u.state === 'UPLOADING' ? { ...u, state: 'CANCELLED', error: 'Phiên phân tích video đã bị hủy.' } : u))
     setWebcam((w) => ({ ...w, state: 'OFF' }))
     try {
       await camerasApi.stopSession(cameraId)
@@ -200,6 +277,8 @@ export function useCameraAiRuntime(cameraId) {
     return () => {
       const hadStream = Boolean(streamRef.current)
       stopWebcamCapture()
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
       if (hadStream && cameraId) camerasApi.stopSession(cameraId).catch(() => {})
     }
   }, [cameraId, stopWebcamCapture])
@@ -214,8 +293,10 @@ export function useCameraAiRuntime(cameraId) {
     error: data?.error || null,
     fetchedAt: data?.fetchedAt || null,
     webcam,
+    upload,
     actionError,
     startDemo,
+    startUpload,
     startWebcam,
     stopSession,
   }

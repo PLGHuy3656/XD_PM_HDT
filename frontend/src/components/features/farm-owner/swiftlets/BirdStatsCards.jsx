@@ -47,7 +47,7 @@ function BirdStatsCards({ stats }) {
       <StatCard
         icon="↘"
         label={`Vào tổ ${stats.scope || 'hôm nay'}`}
-        hint={stats.sourceMode === 'DEMO_VIDEO' ? 'AI đếm trên VIDEO DEMO (không phải số liệu nhà yến)' : 'Lượt chim được AI ghi nhận'}
+        hint={stats.sourceMode === 'DEMO_VIDEO' ? 'AI đếm trên video kiểm thử tổng hợp (không phải số liệu nhà yến)' : stats.sourceMode === 'UPLOADED_VIDEO' ? 'AI đếm trên video bạn tải lên' : 'Lượt chim được AI ghi nhận'}
         value={stats.entries}
         unit="lượt"
         delta={stats.entriesDelta}

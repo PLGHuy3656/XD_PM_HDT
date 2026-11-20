@@ -1683,6 +1683,115 @@ async def proxy_ai_camera_frame(
     )
 
 
+MAX_AI_VIDEO_BYTES = 64 * 1024 * 1024
+
+
+@router.post(
+    "/api/v1/ai/cameras/{camera_id}/video",
+    tags=["AI Service - Camera Sessions (INT02)"],
+    summary="Upload a local MP4 video for real AI inference on an authorised camera",
+)
+async def proxy_ai_camera_video_upload(
+    request: Request,
+    camera_id: str,
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER", "TECHNICIAN")),
+) -> Response:
+    """Raw-body MP4 upload (no client filename, no client farm/zone, no URL source).
+
+    Authorisation and the authoritative farm/zone come from Management; the body is streamed
+    to the AI Service with a hard size cap. Query parameters from the client are ignored.
+    """
+    _check_path_security(request, f"cameras/{camera_id}/video")
+    ctype = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if ctype != "video/mp4":
+        raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="Chỉ hỗ trợ video MP4 (video/mp4)")
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_AI_VIDEO_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Video vượt giới hạn 64 MB")
+    ctx = await _resolve_camera_context(camera_id, request)
+
+    async def capped_body():
+        sent = 0
+        async for chunk in request.stream():
+            sent += len(chunk)
+            if sent > MAX_AI_VIDEO_BYTES:
+                raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Video vượt giới hạn 64 MB")
+            yield chunk
+
+    params = {"farmId": ctx["farmId"]}
+    if ctx["zoneId"]:
+        params["zoneId"] = ctx["zoneId"]
+    client = getattr(request.app.state, "http_client", None)
+    owns_client = client is None
+    if owns_client:
+        client = httpx.AsyncClient()
+    try:
+        resp = await client.post(
+            f"{settings.ai_service_url.rstrip('/')}/api/v1/ai/cameras/{ctx['cameraId']}/uploads",
+            params=params,
+            content=capped_body(),
+            headers={
+                **internal_service_headers_for(settings.ai_service_url),
+                "Content-Type": "video/mp4",
+                "X-Correlation-ID": getattr(request.state, "correlation_id", "unknown-cid"),
+            },
+            timeout=httpx.Timeout(120.0, connect=5.0),
+        )
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service Unavailable: AI Service unreachable") from exc
+    finally:
+        if owns_client:
+            await client.aclose()
+    try:
+        content = resp.json()
+    except ValueError:
+        content = {"detail": resp.text[:200]}
+    return JSONResponse(status_code=resp.status_code, content=content)
+
+
+@router.get(
+    "/api/v1/ai/farms/{farm_id}/events",
+    tags=["AI Service - Events (INT02)"],
+    summary="Recent AI events of one authorised farm",
+)
+async def proxy_ai_farm_events(
+    request: Request,
+    farm_id: str,
+    limit: int = Query(default=20, ge=1, le=100),
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER", "TECHNICIAN")),
+) -> Response:
+    """Farm access is checked server-side (Management); AI events carry the authoritative farmId
+    that the Gateway itself supplied when the session was started, so filtering by it is safe.
+    The browser never receives other farms' events."""
+    _check_path_security(request, f"farms/{farm_id}/events")
+    canonical_farm_id = await resolve_farm_access(farm_id, request)
+    client = getattr(request.app.state, "http_client", None)
+    owns_client = client is None
+    if owns_client:
+        client = httpx.AsyncClient()
+    try:
+        resp = await client.get(
+            f"{settings.ai_service_url.rstrip('/')}/api/v1/ai/events",
+            params={"farmId": canonical_farm_id, "limit": limit},
+            headers={
+                **internal_service_headers_for(settings.ai_service_url),
+                "X-Correlation-ID": getattr(request.state, "correlation_id", "unknown-cid"),
+            },
+            timeout=settings.ai_timeout_seconds,
+        )
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service Unavailable: AI Service unreachable") from exc
+    finally:
+        if owns_client:
+            await client.aclose()
+    if resp.status_code != status.HTTP_200_OK:
+        return JSONResponse(status_code=status.HTTP_502_BAD_GATEWAY, content={"detail": "AI events unavailable"})
+    events = resp.json() if resp.content else []
+    # Defence in depth: never return an event of another farm even if upstream misbehaves
+    safe = [e for e in events if isinstance(e, dict) and str(e.get("farmId") or "") == canonical_farm_id]
+    return JSONResponse(status_code=status.HTTP_200_OK, content=safe)
+
+
 @router.get(
     "/api/v1/ai/events",
     tags=["AI Service - Events (Locked)"],

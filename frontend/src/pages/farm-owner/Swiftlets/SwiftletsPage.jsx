@@ -19,6 +19,8 @@ import { useFarms } from '../../../features/farms/hooks/useFarms'
 import { formatFarmOptionLabel } from '../../../features/farms/adapters/farmAdapter.js'
 import { useCameras } from '../../../features/cameras/hooks/useCameras'
 import { useCameraAiRuntime } from '../../../features/cameras/hooks/useCameraAiRuntime.js'
+import { useFarmAiEvents } from '../../../features/cameras/hooks/useFarmAiEvents.js'
+import { mapAiEventToRow, resolveAiCameraView } from '../../../features/cameras/aiCameraState.js'
 import { USE_MOCK } from '../../../api/config.js'
 
 import './SwiftletsPage.css'
@@ -70,10 +72,21 @@ function SwiftletsPage() {
 
   // INT02: one AI runtime loop for the selected camera, shared by the camera card and the stats
   const ai = useCameraAiRuntime(!USE_MOCK && selectedCamera.id !== 'CAM-NONE' ? selectedCamera.id : null)
-  const aiRunning =
-    ai.sessionState === 'ACTIVE' && ['STARTING', 'ONLINE', 'DEGRADED'].includes(ai.status?.status)
-  // Counts of a stopped/previous session are never shown as current numbers.
-  const aiCounts = aiRunning && ai.counts && ai.counts.cameraId === selectedCamera.id ? ai.counts : null
+  // Same resolver as the Dashboard: counts of a stopped/previous session are never shown
+  const aiView = resolveAiCameraView(USE_MOCK ? null : ai, selectedCamera.id !== 'CAM-NONE' ? selectedCamera.id : null)
+  const aiRunning = aiView.running
+  const aiCounts = aiView.counts
+
+  // INT02-F03: farm-scoped AI events, names resolved from Management data already on the page
+  const aiEvents = useFarmAiEvents(USE_MOCK ? null : selectedFarmId)
+  const eventRows = USE_MOCK
+    ? events
+    : aiEvents.events.map((e) =>
+        mapAiEventToRow(e, {
+          cameraNames: Object.fromEntries(cameras.map((c) => [c.id, `${c.code || c.id} · ${c.name}`])),
+          zoneNames: Object.fromEntries(effectiveZones.map((z) => [z.id, z.name])),
+        }),
+      )
 
   const effectiveBirdStats = USE_MOCK
     ? birdStats || defaultMockStats
@@ -83,8 +96,8 @@ function SwiftletsPage() {
           exits: aiCounts.exitCount,
           returnRate:
             aiCounts.exitCount > 0 ? Math.round((aiCounts.entryCount / aiCounts.exitCount) * 100) : '—',
-          scope: 'phiên AI hiện tại',
-          sourceMode: ai.status?.sourceMode || null,
+          scope: aiView.completed ? 'video đã phân tích' : 'phiên AI hiện tại',
+          sourceMode: aiView.sourceMode,
         }
       : {
           totalCount: '—',
@@ -143,8 +156,10 @@ function SwiftletsPage() {
                   : ai.sessionState === 'UNAVAILABLE'
                     ? 'AI Service không khả dụng'
                     : aiRunning
-                      ? `AI đang xử lý · ${ai.status?.sourceMode === 'LOCAL_CAMERA' ? 'Webcam' : ai.status?.sourceMode === 'DEMO_VIDEO' ? 'Video demo' : 'nguồn cấu hình'}`
-                      : 'Camera chưa có phiên AI'}
+                      ? `AI đang xử lý · ${aiView.source.short}`
+                      : aiView.completed
+                        ? 'AI đã xử lý xong video tải lên'
+                        : 'Camera chưa có phiên AI'}
             </span>
           </div>
         </header>
@@ -223,7 +238,7 @@ function SwiftletsPage() {
               <BirdTrendChart data={USE_MOCK ? defaultMockTrend : []} />
             </div>
 
-            <AIEventsTable events={events} />
+            <AIEventsTable events={eventRows} state={USE_MOCK ? 'OK' : aiEvents.state} />
           </>
         )}
       </div>

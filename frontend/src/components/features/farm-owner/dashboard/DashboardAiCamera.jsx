@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 
 import EnvironmentSelect from '../../../ui/Select'
 import { useCameraAiRuntime } from '../../../../features/cameras/hooks/useCameraAiRuntime.js'
-import { AI_CLASS_LABEL, resolveAiCameraView } from '../../../../features/cameras/aiCameraState.js'
+import { AI_CLASS_LABEL, mapAiEventToRow, resolveAiCameraView } from '../../../../features/cameras/aiCameraState.js'
+import { useFarmAiEvents } from '../../../../features/cameras/hooks/useFarmAiEvents.js'
 import { formatRelativeTime } from '../../../../features/telemetry/provenance.js'
 import { USE_MOCK } from '../../../../api/config.js'
 
@@ -36,8 +37,25 @@ function boxStyle(bbox, width, height) {
   return { left: `${x1 * 100}%`, top: `${y1 * 100}%`, width: `${(x2 - x1) * 100}%`, height: `${(y2 - y1) * 100}%` }
 }
 
-function DashboardAiCamera({ cameras = [] }) {
+const EVENT_STATE_TEXT = {
+  LOADING: 'Đang tải…',
+  EMPTY: 'Chưa ghi nhận sự kiện AI',
+  FORBIDDEN: 'Không có quyền xem sự kiện AI',
+  UNAVAILABLE: 'AI Service không khả dụng',
+  ERROR: 'Không tải được sự kiện AI',
+  IDLE: '--',
+}
+
+const REMOTE_NOTE = {
+  LOCAL_CAMERA: 'Webcam đang gửi khung hình từ trang Giám sát chim yến của một trình duyệt khác — hình ảnh trực tiếp chỉ hiển thị tại đó.',
+  UPLOADED_VIDEO: 'Video tải lên đang được AI phân tích — bản xem trước chỉ có ở trình duyệt đã tải video.',
+  DEMO_VIDEO: 'Sơ đồ vị trí phát hiện trên video kiểm thử tổng hợp (không truyền hình ảnh về trình duyệt).',
+  LAN_CAMERA: 'Vị trí phát hiện mới nhất từ AI.',
+}
+
+function DashboardAiCamera({ cameras = [], farmId = null }) {
   const navigate = useNavigate()
+  const aiEvents = useFarmAiEvents(USE_MOCK ? null : farmId, 5)
   const [pickedId, setPickedId] = useState(null)
   const selected = cameras.find((c) => c.id === pickedId) || cameras[0] || null
   const ai = useCameraAiRuntime(selected && !USE_MOCK ? selected.id : null)
@@ -51,7 +69,10 @@ function DashboardAiCamera({ cameras = [] }) {
     )
   }
 
-  const { running, sourceMode, source, counts, detections, status } = view
+  const { running, completed, sourceMode, source, counts, detections, status } = view
+  const eventRows = aiEvents.events.slice(0, 3).map((e) =>
+    mapAiEventToRow(e, { cameraNames: Object.fromEntries(cameras.map((c) => [c.id, c.code || c.id])) }),
+  )
   const index = cameras.findIndex((c) => c.id === selected.id)
   const move = (offset) => setPickedId(cameras[(index + offset + cameras.length) % cameras.length].id)
   const openSwiftlets = () => navigate(`/owner/swiftlets?camera=${encodeURIComponent(selected.id)}`)
@@ -74,11 +95,7 @@ function DashboardAiCamera({ cameras = [] }) {
             <div className="camera-placeholder">
               <CameraIcon />
               <strong>AI đang xử lý · {source.short}</strong>
-              <span>
-                {sourceMode === 'DEMO_VIDEO'
-                  ? 'Sơ đồ vị trí phát hiện trên video demo (không truyền hình ảnh về trình duyệt)'
-                  : 'Vị trí phát hiện mới nhất từ AI'}
-              </span>
+              <span data-testid="dashboard-camera-note">{REMOTE_NOTE[sourceMode] || REMOTE_NOTE.LAN_CAMERA}</span>
             </div>
             {detections.slice(0, 6).map((d, i) => {
               const style = boxStyle(d.bbox, status?.width, status?.height)
@@ -95,8 +112,10 @@ function DashboardAiCamera({ cameras = [] }) {
         ) : (
           <div className="camera-placeholder camera-offline-placeholder" data-testid="dashboard-camera-idle">
             <CameraIcon />
-            <strong>{sourceMode === 'UNAVAILABLE' ? 'AI Service không khả dụng' : 'Camera chưa có phiên AI'}</strong>
-            <span>{source.note}</span>
+            <strong>
+              {sourceMode === 'UNAVAILABLE' ? 'AI Service không khả dụng' : completed ? 'AI đã xử lý xong video tải lên' : 'Camera chưa có phiên AI'}
+            </strong>
+            <span>{completed ? 'Kết quả bên cạnh thuộc phiên video vừa hoàn tất.' : source.note}</span>
           </div>
         )}
       </div>
@@ -120,13 +139,15 @@ function DashboardAiCamera({ cameras = [] }) {
             <strong>
               {running
                 ? `AI đang xử lý · ${source.short}`
-                : sourceMode === 'UNAVAILABLE'
+                : completed
+                  ? 'Đã xử lý xong · Video từ máy'
+                  : sourceMode === 'UNAVAILABLE'
                   ? 'AI không khả dụng'
                   : 'Camera OFFLINE · chưa có phiên'}
             </strong>
             <small>
               {selected.id} · {view.runtimeLabel}
-              {running && status ? ` · ${status.modelVersion} / ${status.trackerType} · ${status.fps.toFixed(1)} FPS` : ''}
+              {status ? ` · ${status.modelVersion} / ${status.trackerType}${running ? ` · ${status.fps.toFixed(1)} FPS` : ''}` : ''}
             </small>
           </div>
         </div>
@@ -137,7 +158,7 @@ function DashboardAiCamera({ cameras = [] }) {
           <article>
             <span>Chim vào</span>
             <strong data-testid="dashboard-count-entry">{counts ? counts.entryCount : '--'}</strong>
-            <small>{counts ? (sourceMode === 'DEMO_VIDEO' ? 'Phiên video demo' : 'Phiên AI hiện tại') : 'Chưa có phiên'}</small>
+            <small>{counts ? (completed ? 'Video đã phân tích' : sourceMode === 'DEMO_VIDEO' ? 'Video kiểm thử' : 'Phiên AI hiện tại') : 'Chưa có phiên'}</small>
           </article>
           <article>
             <span>Chim ra</span>
@@ -147,16 +168,31 @@ function DashboardAiCamera({ cameras = [] }) {
         </div>
 
         <p className="dashboard-ai-meta">
-          Phát hiện mới nhất: {running ? detections.length : '--'} · Khung đã xử lý: {running && status ? status.processedFrames : '--'}
+          Phát hiện mới nhất: {running ? detections.length : '--'} · Khung đã xử lý: {status ? status.processedFrames : '--'}
         </p>
+
+        <div className="dashboard-ai-events" data-testid="dashboard-ai-events" data-state={aiEvents.state}>
+          <strong>Sự kiện AI gần đây</strong>
+          {eventRows.length === 0 ? (
+            <small>{EVENT_STATE_TEXT[aiEvents.state] || '--'}</small>
+          ) : (
+            <ul>
+              {eventRows.map((r) => (
+                <li key={r.id}>
+                  {r.title} · {r.location} · {r.confidence != null ? `${r.confidence}%` : '--'} · {formatRelativeTime(r.detectedAt)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {!running && sourceMode !== 'UNAVAILABLE' && (
           <button type="button" className="dashboard-ai-demo-button" onClick={ai.startDemo} data-testid="dashboard-start-demo">
-            Chạy video demo
+            Chạy video kiểm thử tổng hợp
           </button>
         )}
         <button type="button" className="open-camera-button" onClick={openSwiftlets} data-testid="dashboard-open-swiftlets">
-          {running ? 'Xem chi tiết tại Giám sát chim yến' : 'Bật webcam / xem chi tiết'}
+          {running ? 'Xem chi tiết tại Giám sát chim yến' : 'Bật webcam / tải video / xem chi tiết'}
           <span>→</span>
         </button>
       </aside>

@@ -13,7 +13,9 @@ export const DEVICE_STATUS_META = {
   ONLINE: { label: 'Trực tuyến', className: 'online' },
   WARNING: { label: 'Cần chú ý', className: 'warning' },
   OFFLINE: { label: 'Ngoại tuyến', className: 'offline' },
-  UNKNOWN: { label: 'Chưa có heartbeat', className: 'unknown' },
+  UNKNOWN: { label: 'Đã đăng ký · chưa có heartbeat', className: 'unknown' },
+  // INT02-F04: cameras do not send MQTT heartbeats; their processing state lives in the AI runtime
+  REGISTERED: { label: 'Đã đăng ký · Camera AI', className: 'unknown' },
   UNAVAILABLE: { label: 'Không xác định (IoT không khả dụng)', className: 'unavailable' },
 }
 

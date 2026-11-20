@@ -152,6 +152,7 @@ class CameraPipeline:
             errorCode=self._error_code,
             errorMessage=self._error_message,
             sourceMode=getattr(self.camera_config, "source_mode", None),
+            sessionEnded="COMPLETED" if getattr(getattr(self.camera_config, "source", None), "completed", False) else None,
         )
 
     def _emit_status(self, updated_at: Optional[str] = None) -> CameraRuntimeStatus:

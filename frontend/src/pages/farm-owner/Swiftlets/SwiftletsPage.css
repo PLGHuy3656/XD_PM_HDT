@@ -887,3 +887,4 @@
 .ai-camera-video.is-hidden{display:none}
 /* INT02: keep the farm/zone/camera dropdown panels above the stats cards */
 .swiftlets-selectors{position:relative;z-index:20}
+.ai-events-empty{margin:12px 0 4px;padding:14px;border-radius:10px;background:#f8fafc;border:1px dashed #cbd5e1;color:#475569;font-size:14px}

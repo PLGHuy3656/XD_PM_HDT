@@ -9,12 +9,14 @@ passes the AUTHORITATIVE farmId/zoneId. This router:
 """
 from __future__ import annotations
 
+import os
 import threading
 import time
+import uuid
 from pathlib import Path as FsPath
 from typing import Dict, Literal, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.cameras import _require_camera_control_auth
@@ -109,3 +111,105 @@ async def push_camera_frame(
     if not ok:
         raise_ai_error(400, INVALID_IMAGE_PAYLOAD, "Frame could not be decoded or exceeds 1280x960")
     return {"accepted": True, "cameraId": cameraId}
+
+
+def _purge_stale_uploads(upload_dir: str, max_age_s: float) -> None:
+    """Remove leftover temp uploads (e.g. after a crash); only our own generated names."""
+    try:
+        now = time.time()
+        for name in os.listdir(upload_dir):
+            if not (name.startswith("upl-") and name.endswith(".mp4")):
+                continue
+            full = os.path.join(upload_dir, name)
+            try:
+                if now - os.path.getmtime(full) > max_age_s:
+                    os.remove(full)
+            except OSError:
+                pass
+    except FileNotFoundError:
+        pass
+
+
+def _upload_error(code: int, err: str, message: str) -> HTTPException:
+    return HTTPException(status_code=code, detail={"code": err, "message": message})
+
+
+@router.post(
+    "/{cameraId}/uploads",
+    response_model=CameraRuntimeStatus,
+    summary="Upload a user video (MP4) and start an UPLOADED_VIDEO session on the real pipeline",
+)
+async def upload_camera_video(
+    request: Request,
+    cameraId: str = Path(..., min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.\-]+$"),
+    farmId: Optional[str] = Query(default=None, max_length=64),
+    zoneId: Optional[str] = Query(default=None, max_length=64),
+    _: None = Depends(_require_camera_control_auth),
+    runtime_manager: AIRuntimeManager = Depends(get_runtime_manager),
+) -> CameraRuntimeStatus:
+    from app.runtime.session_sources import UploadedVideoError, UploadedVideoSource, probe_uploaded_video
+
+    ctype = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if ctype != "video/mp4":
+        raise _upload_error(415, "UNSUPPORTED_VIDEO_TYPE", "Chỉ hỗ trợ video MP4 (video/mp4)")
+    limit = int(settings.ai_upload_max_bytes)
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > limit:
+        raise _upload_error(413, "VIDEO_TOO_LARGE", f"Video vượt giới hạn {limit // (1024 * 1024)} MB")
+    if runtime_manager.active_upload_sessions() >= int(settings.ai_upload_max_sessions):
+        raise _upload_error(429, "UPLOAD_CONCURRENCY_LIMIT", "Đang có quá nhiều phiên phân tích video, thử lại sau")
+
+    upload_dir = settings.ai_upload_dir
+    os.makedirs(upload_dir, mode=0o700, exist_ok=True)
+    max_wall = float(settings.ai_upload_max_duration_s) * 3 + 60
+    _purge_stale_uploads(upload_dir, max_wall + 60)
+    # Server-generated name only: the client never influences the stored path
+    path = os.path.join(upload_dir, f"upl-{uuid.uuid4().hex}.mp4")
+    written = 0
+    keep = False
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as fh:
+            async for chunk in request.stream():
+                written += len(chunk)
+                if written > limit:
+                    raise _upload_error(413, "VIDEO_TOO_LARGE", f"Video vượt giới hạn {limit // (1024 * 1024)} MB")
+                fh.write(chunk)
+        if written < 16:
+            raise _upload_error(400, "VIDEO_UNREADABLE", "File video rỗng hoặc bị cắt")
+        with open(path, "rb") as fh:
+            head = fh.read(12)
+        if head[4:8] != b"ftyp":
+            raise _upload_error(415, "UNSUPPORTED_VIDEO_TYPE", "Nội dung file không phải video MP4")
+        try:
+            meta = probe_uploaded_video(
+                path,
+                max_duration_s=float(settings.ai_upload_max_duration_s),
+                max_width=int(settings.ai_upload_max_width),
+                max_height=int(settings.ai_upload_max_height),
+            )
+        except UploadedVideoError as exc:
+            raise _upload_error(400, exc.code, str(exc))
+        source = UploadedVideoSource(
+            cameraId,
+            path,
+            native_fps=meta["fps"],
+            max_fps=float(settings.ai_upload_max_fps),
+            max_wall_s=max_wall,
+        )
+        result = runtime_manager.start_session(
+            camera_id=cameraId,
+            mode="UPLOADED_VIDEO",
+            demo_video_path=settings.ai_demo_video_path,
+            farm_id=farmId,
+            zone_id=zoneId,
+            uploaded_source=source,
+        )
+        keep = True  # the source now owns the file and deletes it when done / stopped
+        return result
+    finally:
+        if not keep:
+            try:
+                os.remove(path)
+            except OSError:
+                pass

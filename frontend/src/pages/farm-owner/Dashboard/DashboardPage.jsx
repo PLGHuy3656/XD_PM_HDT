@@ -295,10 +295,9 @@ function OperationsOverview({ telemetry, devices = [], alerts = [], alertsError 
       ? iotDevices.slice(0, 4).map((d) => ({
           id: d.id,
           name: d.name,
-          zone: d.zoneName || d.zoneId || '--',
-          state: deviceStatusMeta(d.status).label,
-          status: d.status === 'ONLINE' ? 'normal' : d.status === 'OFFLINE' ? 'danger' : 'warning',
-          value: d.firmware || '--',
+          // DeviceQuickCard reads `description` / `connected`: presence must come from IoT, never default to online
+          description: `${d.zoneName || d.zoneId || '--'} · ${deviceStatusMeta(d.status).label}`,
+          connected: d.status === 'ONLINE' || d.status === 'WARNING',
         }))
       : (USE_MOCK ? mockDevices : [])
 
@@ -453,7 +452,7 @@ function DashboardPage() {
           subtitle="Trạng thái AI runtime, phát hiện và đếm chim — cùng nguồn với trang Giám sát chim yến"
           className="live-camera-card"
         >
-          <DashboardAiCamera key={selectedFarmId || 'none'} cameras={cameras} />
+          <DashboardAiCamera key={selectedFarmId || 'none'} cameras={cameras} farmId={selectedFarmId} />
         </SectionCard>
 
         <SectionCard
