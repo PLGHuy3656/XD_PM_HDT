@@ -105,11 +105,16 @@ async function getFirebaseMessagingInstance() {
 
 async function registerPushServiceWorker() {
   const existing = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js')
+  const reg =
+    existing ||
+    (await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' }))
   if (existing) {
     existing.update().catch(() => {})
-    return existing
   }
-  return navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })
+  if (!reg.active) {
+    await navigator.serviceWorker.ready
+  }
+  return reg
 }
 
 export function ensureForegroundPushListeners() {
