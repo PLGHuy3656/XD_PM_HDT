@@ -11,6 +11,7 @@ import {
   isBrowserPushSupported,
   isWebPushConfigured,
   readStoredFcmRegistration,
+  sendLocalTestBrowserNotification,
   syncExistingBrowserPush,
 } from './fcmClient.js'
 
@@ -71,6 +72,13 @@ export function useWebPush(userId) {
     return res
   }, [])
 
+  const testLocal = useCallback(async () => {
+    setDetail(null)
+    const res = await sendLocalTestBrowserNotification()
+    if (!res.ok) setDetail(res.message)
+    return res
+  }, [])
+
   return {
     status,
     statusLabel: WEB_PUSH_STATUS_LABELS[status] || status,
@@ -84,6 +92,7 @@ export function useWebPush(userId) {
     canDisable: !busy && status === WEB_PUSH_STATUS.ENABLED,
     enable,
     disable,
+    testLocal,
   }
 }
 

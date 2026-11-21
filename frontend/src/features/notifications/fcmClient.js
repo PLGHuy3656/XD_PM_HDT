@@ -212,12 +212,10 @@ export async function enableBrowserPush(userId) {
       }
     }
 
-    const stored = readStoredFcmRegistration()
-    const alreadySynced = stored && stored.userId === String(userId) && stored.token === fcmToken
-    if (!alreadySynced) {
-      await alertsApi.registerFcmToken(fcmToken, 'web')
-      writeStoredFcmRegistration(userId, fcmToken)
-    }
+    // INT03-R2: Always upsert token on explicit user click (idempotent on backend)
+    // so stale localStorage can never hide a missing server-side token row.
+    await alertsApi.registerFcmToken(fcmToken, 'web')
+    writeStoredFcmRegistration(userId, fcmToken)
 
     await bindFirebaseOnMessage()
     return { ok: true, status: WEB_PUSH_STATUS.ENABLED, message: null }
@@ -285,6 +283,33 @@ export async function disableBrowserPush() {
 
   clearStoredFcmRegistration()
   return { ok: true, status: WEB_PUSH_STATUS.DISABLED }
+}
+
+/**
+ * Explicitly triggered local browser notification test via ServiceWorkerRegistration.showNotification().
+ * Creates NO database records and sends NO backend/FCM requests; isolates OS/Chrome banner settings from FCM.
+ */
+export async function sendLocalTestBrowserNotification() {
+  if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) {
+    return { ok: false, message: 'Trình duyệt không hỗ trợ Notification / Service Worker.' }
+  }
+  if (Notification.permission !== 'granted') {
+    return { ok: false, message: 'Quyền thông báo trình duyệt chưa được cấp (permission != granted).' }
+  }
+  try {
+    const reg = await registerPushServiceWorker()
+    await reg.showNotification('SwiftletCare — Kiểm tra thông báo trình duyệt', {
+      body: 'Nếu bạn thấy banner này trên Windows, quyền Chrome/OS đã sẵn sàng nhận Web Push.',
+      icon: '/Logo.png',
+      badge: '/Logo.png',
+      tag: 'swiftletcare-local-test',
+      renotify: true,
+      data: { link: '/notifications' },
+    })
+    return { ok: true, message: null }
+  } catch (err) {
+    return { ok: false, message: err?.message || 'Không thể gọi ServiceWorkerRegistration.showNotification().' }
+  }
 }
 
 /**

@@ -52,15 +52,26 @@ function BrowserPushControl({ compact = false }) {
 
       <div className="fcm-push-control__actions">
         {push.status === WEB_PUSH_STATUS.ENABLED ? (
-          <button
-            type="button"
-            className="fcm-push-btn"
-            disabled={!push.canDisable}
-            onClick={push.disable}
-            data-testid="browser-push-disable-btn"
-          >
-            Tắt thông báo trình duyệt
-          </button>
+          <>
+            <button
+              type="button"
+              className="fcm-push-btn"
+              disabled={push.busy}
+              onClick={push.testLocal}
+              data-testid="browser-push-local-test-btn"
+            >
+              Thử thông báo cục bộ
+            </button>
+            <button
+              type="button"
+              className="fcm-push-btn"
+              disabled={!push.canDisable}
+              onClick={push.disable}
+              data-testid="browser-push-disable-btn"
+            >
+              Tắt thông báo trình duyệt
+            </button>
+          </>
         ) : (
           <button
             type="button"
