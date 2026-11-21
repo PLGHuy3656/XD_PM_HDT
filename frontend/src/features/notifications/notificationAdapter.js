@@ -118,6 +118,7 @@ export function toPopoverItem(n, { farmNames = {}, role } = {}) {
   const d = n.data || {}
   return {
     id: n.id,
+    eventId: n.event_id || null,
     type: severity === 'CRITICAL' ? 'danger' : severity === 'WARNING' ? 'warning' : 'info',
     severity,
     source: notificationSource(n.event_type),
@@ -134,6 +135,24 @@ export function toPopoverItem(n, { farmNames = {}, role } = {}) {
     unread: !n.read_at,
     readAt: n.read_at || null,
   }
+}
+
+/**
+ * Filter notification center items without ever merging distinct notifications/eventIds.
+ */
+export function filterNotifications(items, { readFilter = 'ALL', sourceFilter = 'ALL', query = '' } = {}) {
+  const q = String(query || '').trim().toLowerCase()
+  return items.filter((n) => {
+    if (readFilter === 'UNREAD' && !n.unread) return false
+    if (readFilter === 'READ' && n.unread) return false
+    if (sourceFilter !== 'ALL' && n.source !== sourceFilter) return false
+    if (!q) return true
+    const haystack = [n.title, n.message, n.source, n.eventTypeLabel, n.farmName, n.zoneLabel, n.device]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+    return haystack.includes(q)
+  })
 }
 
 /** Alerts page row (owner/technician operational alerts). Status = notification read state only. */

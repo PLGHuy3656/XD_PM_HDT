@@ -37,6 +37,7 @@ const roleSearchTargets = {
     { label: 'Quản lý người dùng', path: '/admin/users', keywords: 'users nguoi dung tai khoan' },
     { label: 'Quản lý nhà yến', path: '/admin/farms', keywords: 'farms nha yen phan cong' },
     { label: 'Quản lý thiết bị', path: '/admin/devices', keywords: 'devices thiet bi node' },
+    { label: 'Thông báo', path: '/notifications', keywords: 'notifications thong bao canh bao' },
     { label: 'Hệ thống & Hạ tầng', path: '/admin/system', keywords: 'system he thong ha tang' },
     { label: 'Cài đặt tài khoản', path: '/settings', keywords: 'settings cai dat' },
   ],

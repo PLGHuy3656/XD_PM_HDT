@@ -109,6 +109,12 @@ export const navigationByRole = {
       icon: 'device',
     },
     {
+      id: 'notifications',
+      label: 'Thông báo',
+      path: '/notifications',
+      icon: 'bell',
+    },
+    {
       id: 'system',
       label: 'Hệ thống',
       path: '/admin/system',
