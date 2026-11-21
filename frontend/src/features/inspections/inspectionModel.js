@@ -46,9 +46,32 @@ export function formatDateTime(iso) {
   return d.toLocaleString('vi-VN', { hour12: false })
 }
 
+export const MIN_INSPECTION_RESULT_LENGTH = 1
+export const MAX_INSPECTION_RESULT_LENGTH = 4000
+
+export function validateInspectionResult(value) {
+  const trimmed = String(value ?? '').trim()
+  if (trimmed.length < MIN_INSPECTION_RESULT_LENGTH) {
+    return {
+      valid: false,
+      trimmed,
+      message: 'Vui lòng nhập kết quả kiểm tra (không để trống) trước khi hoàn thành.',
+    }
+  }
+  if (trimmed.length > MAX_INSPECTION_RESULT_LENGTH) {
+    return {
+      valid: false,
+      trimmed,
+      message: `Kết quả kiểm tra tối đa ${MAX_INSPECTION_RESULT_LENGTH} ký tự.`,
+    }
+  }
+  return { valid: true, trimmed, message: null }
+}
+
 export function errorMessage(err, fallback) {
   const s = Number(err?.status ?? 0)
   if (s === 409) return err?.message || 'Trạng thái yêu cầu đã thay đổi. Vui lòng tải lại.'
+  if (s === 422) return err?.message || 'Dữ liệu nhập chưa hợp lệ. Vui lòng kiểm tra lại.'
   if (s === 403) return 'Bạn không có quyền thực hiện thao tác này.'
   if (s === 404) return 'Không tìm thấy yêu cầu hoặc bạn không có quyền xem.'
   if (s === 0 || s >= 502) return 'Dịch vụ quản lý hiện không khả dụng.'

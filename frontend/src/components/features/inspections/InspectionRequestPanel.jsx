@@ -8,9 +8,11 @@ import {
   INSPECTION_ACTION_LABELS,
   INSPECTION_PRIORITY_LABELS,
   INSPECTION_STATUS_LABELS,
+  MAX_INSPECTION_RESULT_LENGTH,
   availableActions,
   errorMessage,
   formatDateTime,
+  validateInspectionResult,
 } from '../../../features/inspections/inspectionModel.js'
 import './InspectionRequestPanel.css'
 
@@ -138,12 +140,18 @@ function Detail({ requestId, user, technicianOptions = [], onChanged, onClose })
   }, [needsTechs, req?.farm_id, technicianOptions.length])
   const assignCandidates = technicianOptions.length > 0 ? technicianOptions : farmTechs || []
 
+  const resultValidation = validateInspectionResult(resultNote)
+
   async function run(action) {
+    if (action === 'complete' && !resultValidation.valid) {
+      setError(resultValidation.message)
+      return
+    }
     setBusy(true)
     setError(null)
     try {
       let payload = {}
-      if (action === 'complete') payload = { result_note: resultNote.trim() }
+      if (action === 'complete') payload = { result_note: resultValidation.trimmed }
       if (action === 'assign') payload = { technician_id: assignee }
       const updated = await inspectionsApi.transition(req.id, action, payload)
       setReq(updated)
@@ -187,7 +195,21 @@ function Detail({ requestId, user, technicianOptions = [], onChanged, onClose })
       {actions.includes('complete') && (
         <label className="ir-form">
           <span>Kết quả kiểm tra *</span>
-          <textarea rows={3} value={resultNote} onChange={(e) => setResultNote(e.target.value)} placeholder="Mô tả kết quả kiểm tra, xử lý đã thực hiện" />
+          <textarea
+            rows={3}
+            maxLength={MAX_INSPECTION_RESULT_LENGTH}
+            value={resultNote}
+            onChange={(e) => {
+              setResultNote(e.target.value)
+              if (error) setError(null)
+            }}
+            placeholder="Mô tả kết quả kiểm tra, xử lý đã thực hiện (ví dụ: ổn, đã vệ sinh cảm biến)"
+          />
+          <small className="ir-muted" data-testid="inspection-result-hint">
+            {resultValidation.valid
+              ? `Hợp lệ (${resultValidation.trimmed.length}/${MAX_INSPECTION_RESULT_LENGTH} ký tự).`
+              : resultValidation.message}
+          </small>
         </label>
       )}
       {actions.includes('assign') && (
@@ -204,7 +226,18 @@ function Detail({ requestId, user, technicianOptions = [], onChanged, onClose })
       <div className="ir-actions">
         {actions.includes('accept') && <button type="button" className="ir-btn ir-btn--primary" disabled={busy} onClick={() => run('accept')}>Tiếp nhận</button>}
         {actions.includes('start') && <button type="button" className="ir-btn ir-btn--primary" disabled={busy} onClick={() => run('start')}>Bắt đầu kiểm tra</button>}
-        {actions.includes('complete') && <button type="button" className="ir-btn ir-btn--primary" disabled={busy || resultNote.trim().length < 3} onClick={() => run('complete')}>Hoàn thành</button>}
+        {actions.includes('complete') && (
+          <button
+            type="button"
+            className="ir-btn ir-btn--primary"
+            disabled={busy || !resultValidation.valid}
+            title={!resultValidation.valid ? resultValidation.message : ''}
+            data-testid="inspection-complete-button"
+            onClick={() => run('complete')}
+          >
+            {busy ? 'Đang xử lý…' : 'Hoàn thành'}
+          </button>
+        )}
         {actions.includes('assign') && <button type="button" className="ir-btn ir-btn--primary" disabled={busy || !assignee} onClick={() => run('assign')}>Phân công</button>}
         {actions.includes('cancel') && <button type="button" className="ir-btn ir-btn--danger" disabled={busy} onClick={() => run('cancel')}>Hủy yêu cầu</button>}
       </div>

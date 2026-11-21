@@ -248,3 +248,30 @@ def test_status_change_recipients_exclude_actor(monkeypatch):
     monkeypatch.setattr(events, "record_event", lambda t, p, r, c=None: recorded.append((t, p, sorted(r))))
     inspection_events.status_changed(_req("ACCEPTED"), TECH_1, "NEW")
     assert recorded[-1][2] == [OWNER_A]
+
+
+def test_complete_accepts_short_valid_result_note_and_trims(scope, monkeypatch):
+    captured = []
+    monkeypatch.setattr(ir_routes.inspection_repository, "get", lambda rid, with_history=False: _req("IN_PROGRESS"))
+
+    def fake_complete(rid, tid, note):
+        captured.append(note)
+        done = _req("COMPLETED")
+        done["result_note"] = note
+        return done
+
+    monkeypatch.setattr(ir_routes.inspection_repository, "complete", fake_complete)
+    payload = InspectionCompleteRequest(result_note="  ổn  ")
+    assert payload.result_note == "ổn"
+    res = ir_routes.complete_inspection_request(REQ_ID, payload, current_user={"id": TECH_1, "roles": ["TECHNICIAN"]})
+    assert res["status"] == "COMPLETED"
+    assert res["result_note"] == "ổn"
+    assert captured == ["ổn"]
+
+
+def test_complete_rejects_empty_or_whitespace_only_result_note():
+    from pydantic import ValidationError
+
+    for bad in ("", "   ", "\n\t  "):
+        with pytest.raises(ValidationError):
+            InspectionCompleteRequest(result_note=bad)

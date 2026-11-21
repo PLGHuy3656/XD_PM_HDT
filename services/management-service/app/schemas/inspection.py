@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 InspectionPriority = Literal["LOW", "MEDIUM", "HIGH", "URGENT"]
 InspectionStatus = Literal["NEW", "ACCEPTED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]
@@ -24,7 +24,14 @@ class InspectionNoteRequest(BaseModel):
 
 
 class InspectionCompleteRequest(BaseModel):
-    result_note: str = Field(..., min_length=3, max_length=4000)
+    result_note: str = Field(..., min_length=1, max_length=4000)
+
+    @field_validator("result_note", mode="before")
+    @classmethod
+    def strip_result_note(cls, value):
+        if isinstance(value, str):
+            return value.strip()
+        return value
 
 
 class InspectionHistoryItem(BaseModel):
