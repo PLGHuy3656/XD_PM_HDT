@@ -5,6 +5,9 @@ import FarmTable from '../../../components/features/admin/farms/FarmTable'
 import FarmDetailPanel from '../../../components/features/admin/farms/FarmDetailPanel'
 import FarmEditModal from '../../../components/features/admin/farms/FarmEditModal'
 import TechnicianAssignmentModal from '../../../components/features/admin/farms/TechnicianAssignmentModal'
+import InspectionRequestPanel from '../../../components/features/inspections/InspectionRequestPanel'
+import { USE_MOCK } from '../../../api/config.js'
+import { useAuth } from '../../../context/AuthContext'
 
 import {
   getFarmDeviceCount,
@@ -43,6 +46,7 @@ function FarmsPage() {
     error,
   } = useAdminData()
 
+  const { user } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
   const [healthFilter, setHealthFilter] = useState('ALL')
   const [approvalFilter, setApprovalFilter] = useState('ALL')
@@ -407,6 +411,10 @@ function FarmsPage() {
           }
           onSave={handleSaveFarm}
         />
+
+        {!USE_MOCK && (
+          <InspectionRequestPanel mode="admin" user={user} title="Yêu cầu kiểm tra cần phân công" />
+        )}
 
         <TechnicianAssignmentModal
           farm={assignmentFarm}

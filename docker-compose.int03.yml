@@ -93,6 +93,15 @@ services:
       IOT_SERVICE_BASE_URL: http://iot-service:8002
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       ENVIRONMENT: ${ENVIRONMENT:-int03}
+      # INT03-R1: Management business events -> swiftlet.domain.events (outbox + retry; Management
+      # stays up when RabbitMQ is down, events remain PENDING in management_event_outbox).
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:-swiftlet_int03}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      EVENT_EXCHANGE: swiftlet.domain.events
+      EVENTS_ENABLED: "true"
+      AUTO_APPLY_ADDITIVE_MIGRATIONS: "true"
     depends_on:
       postgres:
         condition: service_healthy

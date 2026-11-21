@@ -1,3 +1,4 @@
+from app import business_events
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.controllers.device_controller import device_controller
@@ -106,7 +107,7 @@ def create_device(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="zone_id does not belong to target farm",
             )
-    return device_controller.create_device(
+    device = device_controller.create_device(
         node_id=payload.node_id,
         farm_uuid=farm_uuid,
         zone_id=payload.zone_id,
@@ -115,6 +116,8 @@ def create_device(
         firmware_version=payload.firmware_version,
         ip_address=payload.ip_address,
     )
+    business_events.device_registered(device, current_user)
+    return device
 
 
 @router.put(

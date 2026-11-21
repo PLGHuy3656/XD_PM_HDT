@@ -113,8 +113,8 @@ class FarmRepository:
                         f.created_at,
                         COUNT(DISTINCT z.id) AS zone_count,
                         COUNT(DISTINCT d.id) AS device_count,
-                        t.id AS technician_id,
-                        t.full_name AS technician_name,
+                        NULL AS technician_id,
+                        NULL AS technician_name,
                         u.full_name AS owner_name,
                         u.phone AS owner_phone
                     FROM farms f
@@ -123,11 +123,6 @@ class FarmRepository:
                     LEFT JOIN devices d
                         ON d.farm_id = f.id
                        AND d.is_active = TRUE
-                    LEFT JOIN technician_assignments ta
-                        ON ta.farm_id = f.id
-                       AND ta.is_active = TRUE
-                    LEFT JOIN technicians t
-                        ON t.id = ta.technician_id
                     LEFT JOIN users u
                         ON u.id = f.owner_id
                     {where_clause}
@@ -142,19 +137,44 @@ class FarmRepository:
                         f.approved_at,
                         f.rejection_reason,
                         f.created_at,
-                        t.id,
-                        t.full_name,
                         u.full_name,
                         u.phone
                     """,
                     params,
                 )
                 row = cur.fetchone()
+                technicians = []
+                if row is not None:
+                    # INT03-R1 (R1-06): ALL active assignments, primary first. Previously the GROUP BY on
+                    # the technician produced one row per technician and fetchone() picked one arbitrarily.
+                    cur.execute(
+                        """
+                        SELECT t.id, t.full_name, t.phone, t.email, ta.is_primary, ta.assigned_at
+                        FROM technician_assignments ta
+                        JOIN technicians t ON t.id = ta.technician_id
+                        WHERE ta.farm_id = %s AND ta.is_active = TRUE
+                        ORDER BY ta.is_primary DESC, ta.assigned_at ASC
+                        """,
+                        (row[0],),
+                    )
+                    technicians = [
+                        {
+                            "technician_id": str(t[0]),
+                            "full_name": t[1],
+                            "phone": t[2],
+                            "email": t[3],
+                            "is_primary": bool(t[4]),
+                            "assignment_status": "ACTIVE",
+                            "assigned_at": t[5].isoformat() if t[5] else None,
+                        }
+                        for t in cur.fetchall()
+                    ]
 
         if row is None:
             return None
 
         return {
+            "technicians": technicians,
             "farm_id": str(row[0]),
             "farm_code": row[1],
             "farm_name": row[2],
@@ -169,8 +189,9 @@ class FarmRepository:
             "device_count": row[11],
             "owner_name": row[14],
             "owner_phone": row[15],
-            "technician_id": str(row[12]) if row[12] else None,
-            "technician_name": row[13] if row[13] else None,
+            # Backward compatible single fields = primary (or first) active technician.
+            "technician_id": technicians[0]["technician_id"] if technicians else None,
+            "technician_name": technicians[0]["full_name"] if technicians else None,
         }
 
     def create_farm(

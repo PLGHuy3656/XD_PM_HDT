@@ -9,9 +9,24 @@ import AlertDetailPanel from '../../../components/features/farm-owner/alerts/Ale
 import { LoadingSpinner, ErrorMessage, EmptyState } from '../../../components/common/feedback/index.js'
 
 import {
-  alertStatusOptions,
-  alertSeverityOptions,
+  alertStatusOptions as mockStatusOptions,
+  alertSeverityOptions as mockSeverityOptions,
 } from '../../../components/features/farm-owner/alerts/alertsMockData'
+
+// INT03-R1: real-mode filters reflect what the backend actually stores (notification read state)
+const realStatusOptions = [
+  { value: 'ALL', label: 'Tất cả' },
+  { value: 'UNREAD', label: 'Chưa đọc' },
+  { value: 'READ', label: 'Đã đọc' },
+]
+const realSeverityOptions = [
+  { value: 'ALL', label: 'Mọi mức' },
+  { value: 'CRITICAL', label: 'Nghiêm trọng' },
+  { value: 'WARNING', label: 'Cảnh báo' },
+  { value: 'INFO', label: 'Thông tin' },
+]
+const alertStatusOptions = USE_MOCK ? mockStatusOptions : realStatusOptions
+const alertSeverityOptions = USE_MOCK ? mockSeverityOptions : realSeverityOptions
 
 import { useFarms } from '../../../features/farms/hooks/useFarms'
 import { formatFarmOptionLabel } from '../../../features/farms/adapters/farmAdapter.js'
@@ -53,7 +68,9 @@ function AlertsPage() {
     () =>
       alerts.map((a) => ({
         ...a,
-        zoneName: effectiveZones.find((z) => z.id === a.zoneId)?.name || a.zoneName,
+        zoneName: a.zoneName && a.zoneName !== 'Không có thông tin khu vực'
+          ? a.zoneName
+          : effectiveZones.find((z) => z.id === a.zoneId)?.name || a.zoneName,
         farmName: a.farmName || selectedFarm?.name || '',
       })),
     [alerts, effectiveZones, selectedFarm],
@@ -215,6 +232,7 @@ function AlertsPage() {
               onAcknowledge={handleAcknowledge}
               onResolve={handleResolve}
               canResolve={USE_MOCK}
+              mock={USE_MOCK}
               acknowledgeLabel={USE_MOCK ? 'Xác nhận cảnh báo' : 'Đánh dấu đã đọc'}
             />
           </aside>

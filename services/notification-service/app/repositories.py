@@ -193,7 +193,7 @@ def notification_content(
         )
 
     if event_type == "iot.device.offline":
-        dev = data.get("deviceId") or data.get("node_id") or "Thiết bị"
+        dev = data.get("deviceName") or data.get("deviceId") or data.get("node_id") or "Thiết bị"
         return (
             "Thiết bị mất kết nối",
             f"Thiết bị {dev} đã mất kết nối hoặc quá hạn heartbeat.",
@@ -201,7 +201,7 @@ def notification_content(
         )
 
     if event_type == "iot.device.online":
-        dev = data.get("deviceId") or data.get("node_id") or "Thiết bị"
+        dev = data.get("deviceName") or data.get("deviceId") or data.get("node_id") or "Thiết bị"
         return (
             "Thiết bị kết nối trở lại",
             f"Thiết bị {dev} đã hoạt động trực tuyến trở lại.",
@@ -244,6 +244,95 @@ def notification_content(
         return (
             "Cập nhật yêu cầu công việc",
             f"Yêu cầu {request_id} đã chuyển sang trạng thái {new_status}.",
+            "info",
+        )
+
+    # ---------------- INT03-R1 Management business events ----------------
+    if event_type == "management.user.created":
+        name = data.get("fullName") or "Người dùng mới"
+        roles = ", ".join(data.get("roles") or []) or "chưa có vai trò"
+        return (
+            "Tài khoản mới được tạo",
+            f"Tài khoản {name} ({roles}) vừa được tạo trong hệ thống.",
+            "info",
+        )
+
+    if event_type == "management.farm.approval_requested":
+        farm = data.get("farmName") or "Nhà yến mới"
+        who = data.get("requestedByName") or "Chủ nhà yến"
+        return (
+            "Yêu cầu phê duyệt nhà yến",
+            f"{who} vừa gửi yêu cầu đăng ký nhà yến \"{farm}\" ({data.get('farmCode') or 'chưa có mã'}). Vui lòng xem xét phê duyệt.",
+            "warning",
+        )
+
+    if event_type in {"management.farm.approved", "management.farm.rejected"}:
+        farm = data.get("farmName") or "nhà yến"
+        if event_type == "management.farm.approved":
+            return ("Nhà yến đã được phê duyệt", f"Quản trị viên đã phê duyệt nhà yến \"{farm}\".", "info")
+        reason = data.get("rejectionReason")
+        reason_text = f" Lý do: {reason}" if reason else ""
+        return ("Nhà yến bị từ chối", f"Quản trị viên đã từ chối nhà yến \"{farm}\".{reason_text}", "warning")
+
+    if event_type in {"management.technician.assigned", "management.technician.unassigned"}:
+        farm = data.get("farmName") or "nhà yến"
+        tech = data.get("technicianName") or "Kỹ thuật viên"
+        assigned = event_type.endswith(".assigned")
+        if str(data.get("technicianId")) == user_id:
+            if assigned:
+                return ("Phân công nhà yến mới", f"Bạn được phân công phụ trách nhà yến \"{farm}\".", "info")
+            return ("Thu hồi phân công nhà yến", f"Bạn không còn phụ trách nhà yến \"{farm}\".", "warning")
+        if assigned:
+            return ("Kỹ thuật viên được phân công", f"{tech} được phân công phụ trách nhà yến \"{farm}\".", "info")
+        return ("Kỹ thuật viên thôi phụ trách", f"{tech} không còn phụ trách nhà yến \"{farm}\".", "warning")
+
+    if event_type == "management.device.registered":
+        farm = data.get("farmName") or "nhà yến"
+        dev = data.get("deviceName") or data.get("nodeId") or "Thiết bị"
+        dtype = data.get("deviceType") or "thiết bị"
+        zone = data.get("zoneName")
+        zone_text = f", khu vực {zone}" if zone else ", chưa phân bổ khu vực"
+        who = data.get("registeredByName") or "Kỹ thuật viên"
+        return (
+            "Thiết bị mới được đăng ký",
+            f"{who} đã đăng ký {dev} ({dtype}) tại \"{farm}\"{zone_text}. Trạng thái: đã đăng ký, chờ dữ liệu kết nối thực tế.",
+            "info",
+        )
+
+    if event_type.startswith("management.inspection_request."):
+        code = data.get("requestCode") or "yêu cầu kiểm tra"
+        farm = data.get("farmName") or "nhà yến"
+        title = data.get("title") or ""
+        priority = data.get("priority")
+        if event_type.endswith(".created"):
+            if data.get("queue") == "ADMIN":
+                return (
+                    "Yêu cầu kiểm tra chờ phân công",
+                    f"{code} tại \"{farm}\" ({title}) chưa có kỹ thuật viên phụ trách. Vui lòng phân công.",
+                    "warning",
+                )
+            return (
+                "Yêu cầu kiểm tra mới",
+                f"{code} tại \"{farm}\": {title}" + (f" — ưu tiên {priority}." if priority else "."),
+                "warning" if priority in {"HIGH", "URGENT"} else "info",
+            )
+        if event_type.endswith(".assigned"):
+            if str(data.get("assignedTechnicianId")) == user_id:
+                return ("Bạn được giao yêu cầu kiểm tra", f"{code} tại \"{farm}\": {title}.", "warning")
+            tech = data.get("assignedTechnicianName") or "Kỹ thuật viên"
+            return ("Yêu cầu kiểm tra đã được phân công", f"{code} tại \"{farm}\" được giao cho {tech}.", "info")
+        if event_type.endswith(".requeued"):
+            return (
+                "Yêu cầu kiểm tra cần phân công lại",
+                f"{code} tại \"{farm}\" đã trở về hàng chờ do kỹ thuật viên bị thu hồi phân công.",
+                "warning",
+            )
+        label = data.get("statusLabel") or data.get("status") or "được cập nhật"
+        result = data.get("resultNote")
+        result_text = f" Kết quả: {result}" if result else ""
+        return (
+            "Cập nhật yêu cầu kiểm tra",
+            f"{code} tại \"{farm}\" chuyển sang trạng thái \"{label}\".{result_text}",
             "info",
         )
 

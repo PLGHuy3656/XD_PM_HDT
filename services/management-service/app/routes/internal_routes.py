@@ -138,3 +138,59 @@ def get_internal_farm_recipients(
             detail="Farm not found",
         )
     return recipients
+
+
+@router.get(
+    "/devices/{node_id}/location",
+    summary="INT03-R1: authoritative farm/zone display location of a device (no PII)",
+)
+def get_internal_device_location(
+    node_id: str = Path(..., description="MQTT node_id or canonical device UUID"),
+    _service_auth: Dict[str, Any] = Depends(verify_internal_service),
+):
+    """Separate, additive endpoint so the accepted INT01/INT02 device-metadata contract is unchanged.
+
+    zoneId/zoneName are null when the device is not allocated to a zone (never guessed).
+    """
+    clean_id = str(node_id).strip()
+    if not clean_id or len(clean_id) > 100 or any(ord(c) < 32 or ord(c) == 127 for c in clean_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid device identifier")
+    import uuid as _uuid
+    from app.database import get_connection
+
+    try:
+        _uuid.UUID(clean_id)
+        where, params = "d.id = %s OR d.node_id = %s", (clean_id, clean_id)
+    except ValueError:
+        where, params = "d.node_id = %s", (clean_id,)
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT d.id, d.node_id, COALESCE(d.name, d.node_id), d.farm_id, f.name, z.id, z.name, z.zone_code
+                    FROM devices d JOIN farms f ON f.id = d.farm_id
+                    LEFT JOIN zones z ON z.id = d.zone_id
+                    WHERE {where}
+                    """,
+                    params,
+                )
+                rows = cur.fetchall()
+    except psycopg.Error as exc:
+        logger.error("[INTERNAL_ROUTES] device location lookup failed: %s", exc)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database service unavailable") from exc
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+    if len(rows) > 1:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ambiguous device identifier")
+    r = rows[0]
+    return {
+        "deviceId": str(r[0]),
+        "nodeId": r[1],
+        "deviceName": r[2],
+        "farmId": str(r[3]),
+        "farmName": r[4],
+        "zoneId": str(r[5]) if r[5] else None,
+        "zoneName": r[6],
+        "zoneCode": r[7],
+    }

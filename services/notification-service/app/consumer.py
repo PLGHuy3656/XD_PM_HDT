@@ -43,8 +43,21 @@ SUPPORTED_EVENT_TYPES = {
     "iot.device.online",
     "iot.command.failed",
     "ai.predator.detected",
+    # INT03-R1 Management business events (recipients resolved by Management, explicit recipientUserIds)
+    "management.user.created",
+    "management.farm.approval_requested",
+    "management.farm.approved",
+    "management.farm.rejected",
+    "management.technician.assigned",
+    "management.technician.unassigned",
+    "management.device.registered",
+    "management.inspection_request.created",
+    "management.inspection_request.assigned",
+    "management.inspection_request.status_changed",
+    "management.inspection_request.requeued",
 }
 SUPPORTED_CANONICAL_VERSIONS = {"1.0"}
+MANAGEMENT_PRODUCER = "management-service"
 MAX_RETRY_COUNT = 3
 RETRY_DELAY_MS = 5000
 MAX_DELIVERY_ATTEMPTS = 5
@@ -128,6 +141,62 @@ async def resolve_farm_recipients(farm_id: str) -> list[str]:
         return []
 
 
+async def resolve_device_location(device_ref: str) -> dict | None:
+    """INT03-R1 (R1-08): authoritative farm/zone display location of a device from Management.
+
+    Returns None when the lookup is not possible; never guesses a zone.
+    """
+    if not device_ref or not settings.management_service_url:
+        return None
+    url = f"{settings.management_service_url.rstrip('/')}/internal/v1/devices/{device_ref}/location"
+    headers = {}
+    if settings.internal_service_token:
+        headers["X-Internal-Service-Key"] = settings.internal_service_token
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(url, headers=headers)
+        if resp.status_code != 200:
+            return None
+        body = resp.json()
+        return body if isinstance(body, dict) else None
+    except Exception as exc:
+        logger.warning("Device location lookup for '%s' failed: %s", device_ref, exc)
+        return None
+
+
+async def enrich_location(event_type: str, payload: dict) -> dict:
+    """Add farmName/zoneId/zoneName/deviceName for IoT/AI events when Management confirms them.
+
+    The event's own farmId is authoritative: if Management reports a different farm the
+    enrichment is discarded (no cross-farm leakage). zoneLabel is set only when the device is
+    known to Management and has no zone ("Chưa phân bổ khu vực").
+    """
+    if not (event_type.startswith("iot.") or event_type.startswith("ai.") or event_type.startswith("device.")):
+        return payload
+    if payload.get("zoneName") or payload.get("zone_name"):
+        return payload
+    device_ref = payload.get("deviceId") or payload.get("device_id") or payload.get("cameraId") or payload.get("camera_id") or payload.get("node_id")
+    if not device_ref:
+        return payload
+    loc = await resolve_device_location(str(device_ref))
+    if not loc:
+        return payload
+    event_farm = str(payload.get("farmId") or payload.get("farm_id") or "")
+    if event_farm and loc.get("farmId") and str(loc["farmId"]) != event_farm:
+        logger.warning("Device %s location farm mismatch (event %s vs registry %s); not enriching", device_ref, event_farm, loc.get("farmId"))
+        return payload
+    enriched = dict(payload)
+    enriched.setdefault("farmName", loc.get("farmName"))
+    enriched.setdefault("deviceName", loc.get("deviceName"))
+    if loc.get("zoneId"):
+        enriched["zoneId"] = loc["zoneId"]
+        enriched["zoneName"] = loc.get("zoneName")
+    else:
+        enriched["zoneLabel"] = "Chưa phân bổ khu vực"
+    enriched["locationSource"] = "management"
+    return enriched
+
+
 async def adapt_incoming_event(event: dict) -> dict | None:
     """Adapt either Canonical Domain Event Envelope V1 or legacy snake_case event."""
     if "eventType" in event or "eventId" in event:
@@ -142,8 +211,17 @@ async def adapt_incoming_event(event: dict) -> dict | None:
             raise ValueError("Canonical event payload must be a JSON object")
 
         explicit_recipients = payload.get("recipientUserIds") or payload.get("recipient_user_ids")
-        if isinstance(explicit_recipients, list) and explicit_recipients:
+        # INT03-R1 security: explicit recipient lists are trusted ONLY for Management business events
+        # (Management resolves them from management_db). IoT/AI events are always farm-scoped via the
+        # Management recipients contract, so a producer cannot redirect alerts to arbitrary users.
+        trusts_explicit = (
+            str(event_type).startswith("management.")
+            and event.get("producer") == MANAGEMENT_PRODUCER
+        )
+        if trusts_explicit and isinstance(explicit_recipients, list) and explicit_recipients:
             recipients = [str(r) for r in explicit_recipients]
+        elif str(event_type).startswith("management."):
+            recipients = []  # management events without a trusted explicit list are not fanned out
         else:
             farm_id = payload.get("farmId") or payload.get("farm_id")
             recipients = await resolve_farm_recipients(str(farm_id)) if farm_id else []
@@ -156,13 +234,16 @@ async def adapt_incoming_event(event: dict) -> dict | None:
             )
             return None
 
+        payload = await enrich_location(event_type, payload)
+
         return {
             "event_id": event.get("eventId"),
             "event_type": event_type,
             "recipient_user_ids": recipients,
             "data": _sanitize_payload_data(
                 {
-                    **payload,
+                    # recipient lists are routing metadata; never persist other users' ids in a notification
+                    **{k: v for k, v in payload.items() if k not in ("recipientUserIds", "recipient_user_ids")},
                     "producer": event.get("producer"),
                     "occurredAt": event.get("occurredAt"),
                     "correlationId": event.get("correlationId"),

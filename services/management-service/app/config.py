@@ -33,6 +33,34 @@ class Settings(BaseSettings):
     # Comma-separated list of active service tokens to support bounded key rotation (minimum 32 bytes each)
     internal_service_tokens: str = ""
 
+
+    # INT03-R1: business domain events (Management -> RabbitMQ -> Notification)
+    rabbitmq_url: str = ""
+    rabbitmq_host: str = ""
+    rabbitmq_port: int = 5672
+    rabbitmq_user: str = ""
+    rabbitmq_password: str = ""
+    rabbitmq_vhost: str = "/"
+    event_exchange: str = "swiftlet.domain.events"
+    events_enabled: bool = True
+    event_dispatch_interval_seconds: float = 2.0
+    event_max_attempts: int = 10
+    auto_apply_additive_migrations: bool = True
+
+    @property
+    def effective_rabbitmq_url(self) -> str:
+        """RABBITMQ_URL if given, else assembled from parts with URL-quoted credentials."""
+        if self.rabbitmq_url:
+            return self.rabbitmq_url
+        if not self.rabbitmq_host:
+            return ""
+        from urllib.parse import quote
+
+        return (
+            f"amqp://{quote(self.rabbitmq_user, safe='')}:{quote(self.rabbitmq_password, safe='')}"
+            f"@{self.rabbitmq_host}:{self.rabbitmq_port}/{quote(self.rabbitmq_vhost, safe='')}"
+        )
+
     def _get_raw_service_tokens(self) -> list[str]:
         raw: list[str] = []
         if self.internal_service_token and self.internal_service_token.strip():

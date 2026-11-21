@@ -5,6 +5,7 @@ import ProtectedRoute from './components/common/ProtectedRoute'
 import LoginPage from './pages/auth/Login/LoginPage'
 import RegisterPage from './pages/auth/Register/RegisterPage'
 import SettingsPage from './pages/account/Settings/SettingsPage'
+import NotificationsPage from './pages/account/Notifications/NotificationsPage'
 
 import FarmOwnerDashboardPage from './pages/farm-owner/Dashboard/DashboardPage'
 import FarmsPage from './pages/farm-owner/Farms/FarmsPage'
@@ -47,6 +48,15 @@ function App() {
             ]}
           >
             <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute allowedRoles={['FARM_OWNER', 'TECHNICIAN', 'ADMIN']}>
+            <NotificationsPage />
           </ProtectedRoute>
         }
       />

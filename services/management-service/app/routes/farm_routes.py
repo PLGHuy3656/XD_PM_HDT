@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app import business_events
 from app.controllers.farm_controller import farm_controller
 from app.core.dependencies import (
     get_current_user,
@@ -55,7 +56,7 @@ def create_farm(
     owner_id = payload.owner_id if is_admin else str(current_user["id"])
     approval_status = "APPROVED" if is_admin else "PENDING"
     approved_by = str(current_user["id"]) if is_admin else None
-    return farm_controller.create_farm(
+    farm = farm_controller.create_farm(
         farm_code=payload.farm_code,
         farm_name=payload.farm_name,
         address=payload.address,
@@ -64,6 +65,9 @@ def create_farm(
         approval_status=approval_status,
         approved_by=approved_by,
     )
+    # INT03-R1: emitted only after the farm row is committed (create_farm returned it).
+    business_events.farm_approval_requested(farm, str(current_user["id"]))
+    return farm
 
 
 @router.put(
@@ -113,10 +117,12 @@ def approve_farm(
     farm_id: str,
     current_user: dict = Depends(require_admin),
 ):
-    return farm_controller.approve_farm(
+    farm = farm_controller.approve_farm(
         farm_id=farm_id,
         admin_user_id=str(current_user["id"]),
     )
+    business_events.farm_decision(farm, "APPROVED", str(current_user["id"]))
+    return farm
 
 
 @router.post(
@@ -129,8 +135,10 @@ def reject_farm(
     payload: FarmRejectRequest,
     current_user: dict = Depends(require_admin),
 ):
-    return farm_controller.reject_farm(
+    farm = farm_controller.reject_farm(
         farm_id=farm_id,
         admin_user_id=str(current_user["id"]),
         rejection_reason=payload.rejection_reason,
     )
+    business_events.farm_decision(farm, "REJECTED", str(current_user["id"]), payload.rejection_reason)
+    return farm

@@ -94,10 +94,11 @@
   border: 1px solid var(--border-default);
   border-radius: 20px;
 
-  background: rgba(255, 253, 248, 0.97);
+  /* INT03-R1: solid background so page content never shows through the dropdown */
+  background: #fffdf8;
 
   box-shadow: 0 24px 60px rgba(10, 34, 52, 0.17);
-  backdrop-filter: blur(22px);
+  /* INT03-R1: no backdrop-filter — with it Chromium composited the page text through the panel. */
 
   animation: notification-enter 160ms ease-out;
 }

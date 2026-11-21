@@ -2285,3 +2285,105 @@ async def proxy_analytics_trends_global(
         timeout=settings.analytics_timeout_seconds,
         canonical_query=canonical_qs,
     )
+
+
+# =============================================================================
+# INT03-R1: Owner Inspection Requests (Management Service owns the data)
+# Explicit routes only (default-deny preserved). Management re-checks farm ownership,
+# technician assignment and state transitions; ids are validated as UUIDs here (fail closed).
+# =============================================================================
+
+_INSPECTION_ACTIONS = {"accept", "start", "complete", "cancel", "assign"}
+
+
+def _inspection_id_or_404(request_id: str) -> str:
+    if not is_valid_uuid(request_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inspection request not found")
+    return str(uuid.UUID(request_id))
+
+
+@router.get(
+    "/api/inspection-requests",
+    tags=["Management - Inspection Requests"],
+    summary="List inspection requests visible to the caller (scoped by Management)",
+)
+async def proxy_inspection_requests_list(
+    request: Request,
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER", "TECHNICIAN")),
+) -> Response:
+    _check_path_security(request, "inspection-requests")
+    allowed = {"status", "farm_id", "unassigned", "limit"}
+    pairs = [(k, v) for k, v in request.query_params.multi_items() if k in allowed]
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path="/api/inspection-requests",
+        timeout=settings.management_timeout_seconds,
+        canonical_query=urllib.parse.urlencode(pairs),
+    )
+
+
+@router.post(
+    "/api/inspection-requests",
+    tags=["Management - Inspection Requests"],
+    summary="Farm Owner creates an inspection request for an owned, approved farm",
+)
+async def proxy_inspection_requests_create(
+    request: Request,
+    current_user: Dict[str, Any] = Depends(require_roles("FARM_OWNER")),
+) -> Response:
+    _check_path_security(request, "inspection-requests")
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path="/api/inspection-requests",
+        timeout=settings.management_timeout_seconds,
+    )
+
+
+@router.get(
+    "/api/inspection-requests/{request_id}",
+    tags=["Management - Inspection Requests"],
+    summary="Inspection request detail with history (scoped by Management, 404 out of scope)",
+)
+async def proxy_inspection_request_detail(
+    request: Request,
+    request_id: str,
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER", "TECHNICIAN")),
+) -> Response:
+    rid = _inspection_id_or_404(request_id)
+    _check_path_security(request, f"inspection-requests/{rid}")
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path=f"/api/inspection-requests/{rid}",
+        timeout=settings.management_timeout_seconds,
+    )
+
+
+@router.post(
+    "/api/inspection-requests/{request_id}/{action}",
+    tags=["Management - Inspection Requests"],
+    summary="Inspection request transition: accept|start|complete (Technician), cancel (Owner), assign (Admin)",
+)
+async def proxy_inspection_request_action(
+    request: Request,
+    request_id: str,
+    action: str,
+    current_user: Dict[str, Any] = Depends(require_roles("ADMIN", "FARM_OWNER", "TECHNICIAN")),
+) -> Response:
+    if action not in _INSPECTION_ACTIONS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+    roles = set(current_user.get("roles") or [])
+    required = {"accept": "TECHNICIAN", "start": "TECHNICIAN", "complete": "TECHNICIAN",
+                "cancel": "FARM_OWNER", "assign": "ADMIN"}[action]
+    if required not in roles:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role permissions")
+    rid = _inspection_id_or_404(request_id)
+    _check_path_security(request, f"inspection-requests/{rid}/{action}")
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.management_service_url,
+        upstream_path=f"/api/inspection-requests/{rid}/{action}",
+        timeout=settings.management_timeout_seconds,
+    )

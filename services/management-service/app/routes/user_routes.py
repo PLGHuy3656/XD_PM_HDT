@@ -1,7 +1,8 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.core.dependencies import require_roles
+from app import business_events
+from app.core.dependencies import get_current_user, require_roles
 from app.schemas.user import (
     UserCreateRequest,
     UserResponse,
@@ -31,12 +32,16 @@ def list_users(
 def create_user(
     req: UserCreateRequest,
     service: UserService = Depends(lambda: user_service),
+    current_user: dict = Depends(get_current_user),
 ):
     """Creates a new user account with role assignment (Admin only)."""
     try:
-        return service.create_user(req)
+        user = service.create_user(req)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    # INT03-R1: only after the account row is committed; never includes password/hash.
+    business_events.user_created(user, str(current_user["id"]))
+    return user
 
 
 @router.get("/{user_id}", response_model=UserResponse)

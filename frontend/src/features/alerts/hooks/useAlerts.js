@@ -9,7 +9,7 @@ import {
 import { getMockAlerts } from '../adapters/alertAdapter.js'
 import { useAuth } from '../../../context/AuthContext'
 import { useNotifications } from '../../notifications/useNotifications.js'
-import { notificationFarmId, toAlertRow } from '../../notifications/notificationAdapter.js'
+import { isOperationalAlert, notificationFarmId, toAlertRow } from '../../notifications/notificationAdapter.js'
 
 /**
  * INT03: in real mode alerts ARE the caller's notifications (Notification Service, server-scoped
@@ -121,7 +121,7 @@ export function useAlerts(farmId = null, filterSeverity = 'ALL') {
   const realAlerts = USE_MOCK
     ? null
     : farmId
-      ? live.items.filter((n) => notificationFarmId(n) === farmId).map((n) => toAlertRow(n))
+      ? live.items.filter((n) => notificationFarmId(n) === farmId && isOperationalAlert(n)).map((n) => toAlertRow(n))
       : []
   const effectiveAlerts = USE_MOCK ? alerts : realAlerts
   const filteredAlerts =

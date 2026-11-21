@@ -2,7 +2,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app import business_events
 from app.controllers.technician_controller import technician_controller
+from app.repositories.inspection_repository import inspection_repository
 from app.core.dependencies import get_current_user, require_admin, require_roles
 from app.repositories.farm_repository import farm_repository
 from app.repositories.user_repository import user_repository
@@ -173,11 +175,18 @@ def assign_technician(
             status_code=status.HTTP_409_CONFLICT,
             detail="Farm must be approved by Admin before assigning technicians",
         )
-    return technician_controller.assign_technician(
+    was_active = user_repository.is_farm_assigned_to_technician(str(technician_id), str(farm_id))
+    result = technician_controller.assign_technician(
         str(technician_id),
         str(farm_id),
         is_primary,
     )
+    # INT03-R1: notify only on a real state change (idempotent re-assign does not re-notify).
+    if not was_active:
+        business_events.technician_assignment(
+            str(farm["farm_id"]), str(technician_id), True, str(current_user["id"])
+        )
+    return result
 
 
 @router.delete(
@@ -189,7 +198,16 @@ def unassign_technician(
     farm_id: UUID,
     current_user: dict = Depends(require_admin),
 ):
-    return technician_controller.unassign_technician(
+    result = technician_controller.unassign_technician(
         str(technician_id),
         str(farm_id),
     )
+    # Reached only when an active assignment was really removed (404 otherwise).
+    business_events.technician_assignment(
+        str(farm_id), str(technician_id), False, str(current_user["id"])
+    )
+    # Open inspection requests of that technician on this farm go back to the Admin queue (NEW).
+    inspection_repository.requeue_for_unassigned_technician(
+        str(farm_id), str(technician_id), str(current_user["id"])
+    )
+    return result

@@ -239,9 +239,11 @@ function FarmsPage() {
                 <span>Yêu cầu chờ duyệt</span>
                 <strong>
                   {
-                    requests.filter(
-                      (request) => request.status === 'PENDING',
-                    ).length
+                    // INT03-R1: real mode counts the owner's farms waiting for Admin approval (Management
+                    // approval_status); the local `requests` list only exists in mock mode.
+                    USE_MOCK
+                      ? requests.filter((request) => request.status === 'PENDING').length
+                      : farms.filter((f) => f.approvalStatus === 'PENDING').length
                   }
                 </strong>
                 <small>Chờ Administrator xử lý</small>

@@ -13,7 +13,18 @@ class FarmResponse(BaseModel):
     device_count: int = Field(ge=0, default=0)
 
 
+class FarmTechnicianInfo(BaseModel):
+    technician_id: str
+    full_name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    is_primary: bool = False
+    assignment_status: str = "ACTIVE"
+    assigned_at: str | None = None
+
+
 class FarmDetailResponse(FarmResponse):
+    technicians: list[FarmTechnicianInfo] = Field(default_factory=list)
     owner_name: str | None = None
     owner_phone: str | None = None
     technician_id: str | None = None

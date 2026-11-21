@@ -99,21 +99,9 @@ function getNotificationsByRole(role) {
 }
 
 function getViewAllConfig(role) {
-  if (role === 'FARM_OWNER') {
-    return {
-      label: 'Xem tất cả cảnh báo',
-      path: '/owner/alerts',
-    }
-  }
-
-  if (role === 'TECHNICIAN') {
-    return {
-      label: 'Xem cảnh báo & công việc',
-      path: '/technician/alerts',
-    }
-  }
-
-  return null
+  // INT03-R1: every role (incl. ADMIN) has a real notification center
+  if (!role) return null
+  return { label: 'Xem tất cả thông báo', path: '/notifications' }
 }
 
 function BellIcon() {
@@ -182,7 +170,7 @@ function NotificationPopover() {
 
   const notifications = USE_MOCK
     ? mockNotifications
-    : live.items.map((n) => toPopoverItem(n, { farmNames }))
+    : live.items.map((n) => toPopoverItem(n, { farmNames, role: user?.role }))
 
   const viewAllConfig = getViewAllConfig(user?.role)
 
@@ -235,9 +223,14 @@ function NotificationPopover() {
       return
     }
     const item = notifications.find((n) => n.id === id)
-    if (!item?.unread) return
-    const res = await live.markRead(id)
-    setActionError(res.success ? null : res.message)
+    if (!item) return
+    if (item.unread) {
+      const res = await live.markRead(id)
+      setActionError(res.success ? null : res.message)
+    }
+    // Navigate only to an existing route of the caller's own role; otherwise open the center.
+    setOpen(false)
+    navigate(item.link || `/notifications?id=${encodeURIComponent(id)}`)
   }
 
   const handleMarkAllRead = async () => {
@@ -384,6 +377,7 @@ function NotificationPopover() {
                     <span className="notification-item__time">
                       {notification.source ? `${notification.source} · ` : ''}
                       {notification.farmName ? `${notification.farmName} · ` : ''}
+                      {notification.zoneLabel ? `${notification.zoneLabel} · ` : ''}
                       {notification.time}
                     </span>
                   </span>

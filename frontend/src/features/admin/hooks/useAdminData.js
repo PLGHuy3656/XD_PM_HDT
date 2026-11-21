@@ -5,7 +5,6 @@ import { devicesApi } from '../../../api/modules/devicesApi'
 import { techniciansApi } from '../../../api/modules/techniciansApi'
 import { usersApi } from '../../../api/modules/usersApi'
 import { systemApi } from '../../../api/modules/systemApi'
-import { alertsApi } from '../../../api/modules/alertsApi'
 import {
   normalizeAdminDevice,
   normalizeAdminFarm,
@@ -69,7 +68,9 @@ export function useAdminData() {
         devicesApi.getDevices(),
         techniciansApi.getTechnicians(),
         systemApi.getStatus().catch(() => null),
-        alertsApi.getAlerts().catch(() => []),
+        // INT03-R1: /api/v1/alerts does not exist behind the Gateway (default-deny 404). Admin
+        // notifications come from the Notification Service (bell / Trung tâm thông báo) instead.
+        Promise.resolve([]),
         usersApi.getUsers().catch(() => null),
       ])
 

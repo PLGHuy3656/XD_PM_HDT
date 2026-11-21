@@ -1,4 +1,58 @@
+import { useEffect, useState } from 'react'
+
+import apiClient from '../../../../api/client.js'
+import { USE_MOCK } from '../../../../api/config.js'
+import { useAuth } from '../../../../context/AuthContext'
+import InspectionRequestPanel from '../../inspections/InspectionRequestPanel'
+
+/**
+ * INT03-R1 (R1-06): technicians come from GET /api/farms/{id} (all ACTIVE assignments, primary first).
+ * The farm LIST response carries no technician data, which is why the panel used to show
+ * "Chưa phân công" for every farm. Nothing is invented when the API returns none.
+ */
+function useFarmAssignmentDetail(farmId) {
+  const [entry, setEntry] = useState({ farmId: null, state: 'IDLE', technicians: [], devices: [], error: null })
+  useEffect(() => {
+    if (USE_MOCK || !farmId) return undefined
+    const controller = new AbortController()
+    Promise.all([
+      apiClient.get(`/api/farms/${encodeURIComponent(farmId)}`, { signal: controller.signal, retries: 0 }),
+      apiClient
+        .get('/api/devices', { signal: controller.signal, retries: 0, params: { farm_id: farmId } })
+        .catch(() => []),
+    ])
+      .then(([detail, devices]) => {
+        const devs = (Array.isArray(devices) ? devices : devices?.items || []).map((d) => ({
+          id: d.device_id || d.id,
+          name: d.name,
+          nodeId: d.node_id,
+          zoneId: d.zone_id || null,
+        }))
+        setEntry({ farmId, state: 'OK', technicians: Array.isArray(detail?.technicians) ? detail.technicians : [], devices: devs, error: null })
+      })
+      .catch((err) => {
+        if (controller.signal.aborted) return
+        setEntry({ farmId, state: 'ERROR', technicians: [], devices: [], error: err?.message || 'Không tải được thông tin phân công.' })
+      })
+    return () => controller.abort()
+  }, [farmId])
+  return entry.farmId === farmId ? entry : { state: farmId ? 'LOADING' : 'IDLE', technicians: [], devices: [], error: null }
+}
+
+function initials(name = '') {
+  return String(name || '?')
+    .split(' ')
+    .filter(Boolean)
+    .slice(-2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+}
+
 function FarmDetailPanel({ farm }) {
+  const { user } = useAuth()
+  const assignment = useFarmAssignmentDetail(farm?.id || null)
+
   if (!farm) {
     return (
       <section className="farm-detail farm-detail--empty">
@@ -85,7 +139,7 @@ function FarmDetailPanel({ farm }) {
         </article>
       </div>
 
-      <div className="farm-technician">
+      <div className="farm-technician" data-testid="farm-technicians" data-state={USE_MOCK ? 'MOCK' : assignment.state}>
         <div className="farm-technician__heading">
           <div>
             <span className="farm-technician__eyebrow">
@@ -93,51 +147,70 @@ function FarmDetailPanel({ farm }) {
             </span>
             <h3>Kỹ thuật viên phụ trách</h3>
             <p>
-              Thông tin kỹ thuật viên đang được phân công hỗ trợ nhà yến này.
+              Kỹ thuật viên đang được Admin phân công hỗ trợ nhà yến này.
             </p>
           </div>
 
-          {technician && (
+          {!USE_MOCK && assignment.technicians.length > 0 && (
             <span className="farm-technician__status">
               <i />
-              {technician.status}
+              {assignment.technicians.length} người đang phụ trách
             </span>
           )}
         </div>
 
-        {technician ? (
+        {USE_MOCK && technician ? (
           <div className="farm-technician__profile">
             <div className="farm-technician__identity">
-              <div className="farm-technician__avatar">
-                {technician.name
-                  .split(' ')
-                  .slice(-2)
-                  .map((word) => word[0])
-                  .join('')}
-              </div>
-
+              <div className="farm-technician__avatar">{initials(technician.name)}</div>
               <div>
                 <strong>{technician.name}</strong>
-                <span>{technician.role}</span>
+                <span>{technician.status}</span>
               </div>
             </div>
-
-            <div className="farm-technician__contact">
-              <span>Số điện thoại</span>
-              <strong>{technician.phone}</strong>
-            </div>
-
-            <div className="farm-technician__contact">
-              <span>Email</span>
-              <strong>{technician.email}</strong>
-            </div>
           </div>
+        ) : assignment.state === 'LOADING' ? (
+          <div className="farm-technician__empty">Đang tải thông tin phân công…</div>
+        ) : assignment.state === 'ERROR' ? (
+          <div className="farm-technician__empty" style={{ color: '#b42318' }}>{assignment.error}</div>
+        ) : assignment.technicians.length > 0 ? (
+          assignment.technicians.map((t) => (
+            <div className="farm-technician__profile" key={t.technician_id}>
+              <div className="farm-technician__identity">
+                <div className="farm-technician__avatar">{initials(t.full_name)}</div>
+                <div>
+                  <strong>{t.full_name || 'Kỹ thuật viên'}</strong>
+                  <span>{t.is_primary ? 'Kỹ thuật viên chính' : 'Kỹ thuật viên hỗ trợ'} · {t.assignment_status === 'ACTIVE' ? 'Đang phụ trách' : t.assignment_status}</span>
+                </div>
+              </div>
+              <div className="farm-technician__contact">
+                <span>Số điện thoại</span>
+                <strong>{t.phone || 'Chưa cập nhật'}</strong>
+              </div>
+              <div className="farm-technician__contact">
+                <span>Email</span>
+                <strong>{t.email || 'Chưa cập nhật'}</strong>
+              </div>
+            </div>
+          ))
         ) : (
           <div className="farm-technician__empty">
-            Nhà yến hiện chưa được phân công kỹ thuật viên phụ trách.
+            Chưa phân công. Nhà yến hiện chưa có kỹ thuật viên phụ trách — Admin sẽ phân công kỹ thuật viên.
+            {approvalStatus === 'APPROVED' && ' Bạn vẫn có thể gửi "Yêu cầu kiểm tra"; yêu cầu sẽ chờ Admin phân công người xử lý.'}
           </div>
         )}
       </div>
+
+      {!USE_MOCK && (
+        <InspectionRequestPanel
+          mode="owner"
+          user={user}
+          farm={farm}
+          zones={farm.zones || []}
+          devices={assignment.devices}
+          title="Yêu cầu kiểm tra của nhà yến"
+        />
+      )}
 
       <div className="farm-detail__section-heading">
         <div>
