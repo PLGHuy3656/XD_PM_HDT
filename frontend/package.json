@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node scripts/test_frontend_architecture.js && node scripts/test_api_client_regression.js && node scripts/test_inspection_completion_regression.js && node scripts/test_notification_center_regression.js",
+    "test": "node scripts/test_frontend_architecture.js && node scripts/test_api_client_regression.js && node scripts/test_inspection_completion_regression.js && node scripts/test_notification_center_regression.js && node scripts/test_fcm_web_push_regression.js",
     "test:live-auth": "node scripts/test_cp12a_live_auth.js",
     "test:farm-owner": "node scripts/test_cp12b_farm_owner.js",
     "test:technician": "node scripts/test_cp12c_technician.js",
@@ -17,6 +17,7 @@
     "test:all": "npm test && npm run test:live-auth && npm run test:farm-owner && npm run test:technician && npm run test:admin && npm run test:e2e"
   },
   "dependencies": {
+    "firebase": "^13.4.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.4"

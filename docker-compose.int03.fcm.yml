@@ -1,0 +1,21 @@
+# ==============================================================================
+# SwiftletCare — INT03-R2 Optional FCM Web Push Runtime Credentials Overlay
+#
+# Use ONLY after placing the Firebase Service Account JSON OUTSIDE the repo
+# (e.g. D:/Development/Secrets/swiftletcare-fcm.json) and setting FIREBASE_* +
+# VITE_FIREBASE_* in .env.int03 (gitignored). Never copy private keys into images.
+#
+#   docker compose -p swiftletcare-int03 \
+#     -f docker-compose.int03.yml \
+#     -f docker-compose.int03.fcm.yml \
+#     --env-file .env.int03 \
+#     up -d --build --no-deps gateway notification-service frontend
+# ==============================================================================
+
+services:
+  notification-service:
+    environment:
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:?FIREBASE_PROJECT_ID is required}
+      FIREBASE_SERVICE_ACCOUNT_PATH: /run/secrets/firebase-service-account.json
+    volumes:
+      - ${FIREBASE_SERVICE_ACCOUNT_HOST_PATH:?FIREBASE_SERVICE_ACCOUNT_HOST_PATH is required}:/run/secrets/firebase-service-account.json:ro

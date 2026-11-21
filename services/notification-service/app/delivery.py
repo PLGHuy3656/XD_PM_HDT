@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import smtplib
 from email.message import EmailMessage
 
@@ -95,13 +96,37 @@ def send_web_push(notification: dict, user_id: str) -> bool:
     return delivered_count > 0
 
 
+def _safe_relative_link(notification: dict) -> str:
+    """Return a validated relative app path for click routing; never trust external URLs."""
+    nid = str(notification.get("id") or "")
+    fallback = f"/notifications?id={nid}" if nid else "/notifications"
+    data = notification.get("data")
+    if not isinstance(data, dict):
+        return fallback
+    candidate = data.get("link")
+    if (
+        isinstance(candidate, str)
+        and candidate.startswith("/")
+        and not candidate.startswith("//")
+        and "://" not in candidate
+    ):
+        return candidate
+    return fallback
+
+
 def send_fcm(notification: dict, user_id: str) -> bool:
     if not settings.firebase_service_account_path:
         logger.warning("FCM delivery skipped: Firebase credentials are not configured")
         return False
 
+    if not os.path.isfile(settings.firebase_service_account_path):
+        logger.warning(
+            "FCM delivery skipped: Firebase service account file is not accessible"
+        )
+        return False
+
     import firebase_admin
-    from firebase_admin import credentials, messaging
+    from firebase_admin import credentials, exceptions as firebase_exceptions, messaging
 
     tokens = repositories.get_fcm_tokens(user_id)
     if not tokens:
@@ -122,36 +147,57 @@ def send_fcm(notification: dict, user_id: str) -> bool:
             name="notification-service",
         )
 
-    delivery_errors = []
+    event_id = str(notification.get("event_id") or "")
+    notification_id = str(notification["id"])
+    payload_data = {
+        "title": str(notification.get("title") or "SwiftletCare"),
+        "body": str(notification.get("message") or ""),
+        "notification_id": notification_id,
+        "event_id": event_id,
+        "event_type": str(notification.get("event_type") or ""),
+        "category": str(notification.get("category") or "info"),
+        "link": _safe_relative_link(notification),
+    }
+
+    stale_errors = tuple(
+        err
+        for err in (
+            getattr(messaging, "UnregisteredError", None),
+            getattr(messaging, "SenderIdMismatchError", None),
+            getattr(firebase_exceptions, "InvalidArgumentError", None),
+        )
+        if err is not None
+    )
+
+    delivery_errors = 0
     delivered_count = 0
     for token in tokens:
         try:
+            # INT03-R2: send data-only payload so the Service Worker controls single display,
+            # tag-based deduplication, foreground sync, and localhost click routing cleanly.
             messaging.send(
                 messaging.Message(
-                    notification=messaging.Notification(
-                        title=notification["title"],
-                        body=notification["message"],
-                    ),
-                    data={
-                        "notification_id": str(notification["id"]),
-                        "event_type": str(notification["event_type"]),
-                    },
+                    data=payload_data,
                     token=token,
                 ),
                 app=firebase_app,
             )
             delivered_count += 1
-        except messaging.UnregisteredError:
-            logger.info("Removing expired FCM token")
+        except stale_errors:
+            logger.info(
+                "Removing invalid/expired FCM token for notification %s",
+                notification_id,
+            )
             repositories.delete_fcm_token(user_id, token)
         except Exception:
             logger.exception(
                 "FCM delivery failed for notification %s",
-                notification["id"],
+                notification_id,
             )
-            delivery_errors.append(token)
+            delivery_errors += 1
+
     if delivery_errors:
         raise RuntimeError(
-            f"FCM failed for {len(delivery_errors)} registration token(s)"
+            f"FCM failed for {delivery_errors} registration token(s)"
         )
     return delivered_count > 0

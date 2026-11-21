@@ -1,64 +1,74 @@
-# INT03-R1 — FCM Web Push: kiểm thử local trên Chrome (chờ TV4 cấu hình)
+# INT03-R2 — FCM Web Push: Hướng dẫn cấu hình Firebase & nghiệm thu Chrome local
 
-**Trạng thái: NOT VERIFIED.** Repo chưa có cấu hình Firebase, nên chưa thể kiểm thử FCM thật.
-Không có kết quả PASS giả lập nào cho FCM.
+**Trạng thái hiện tại:** `CODE READY — CONFIGURATION REQUIRED` (`REAL CHROME PUSH: NOT VERIFIED` cho đến khi TV4 cấu hình Firebase project thật và chạy Chặng 2).
 
-## Hiện trạng code (kiểm tra read-only ngày 21/11/2026)
+FCM Web Push chỉ là **kênh gửi bổ sung**. Notification persistence trong PostgreSQL (`notification_db`) vẫn là nguồn dữ liệu chính; khi Firebase chưa cấu hình hoặc tạm gián đoạn, in-app notifications vẫn hoạt động bình thường.
 
-| Thành phần | Hiện trạng |
+---
+
+## 1. Kiến trúc INT03-R2 đã sẵn sàng trong code
+
+| Thành phần | Trạng thái code |
 |---|---|
-| Notification Service: gửi FCM (`app/delivery.py`, `send_fcm`) | Có code. Cần `FIREBASE_SERVICE_ACCOUNT_PATH` và `FIREBASE_PROJECT_ID`, hiện chưa được truyền vào `docker-compose.int03.yml` |
-| Đăng ký token: `POST /api/v1/devices` / `DELETE /api/v1/devices/{id}` (qua Gateway, kiểm tra danh tính người gọi) | Có code (CP13/INT03) |
-| Vòng đời token: bảng `notification_fcm_tokens`, `token UNIQUE`, gắn với `user_id` của JWT | Có code |
-| Frontend: Firebase JS SDK, `firebase-messaging-sw.js`, VAPID key, lấy token | **Chưa có** |
-| `.env.int03`: biến Firebase | **Chưa có** |
+| **API Gateway** (`gateway/app/routes.py`) | Đã mở `POST /api/v1/notifications/fcm-tokens` và `DELETE /api/v1/notifications/fcm-tokens` (bắt buộc JWT, chặn `userId`/`user_id` của người khác). |
+| **Notification Service** (`app/routes.py`, `app/delivery.py`, `app/repositories.py`) | Gắn token theo user từ JWT (`notification_fcm_tokens.token UNIQUE`, upsert theo user mới nhất). Gửi **data-only FCM message** (`title`, `body`, `notification_id`, `event_id`, `event_type`, `link` nội bộ an toàn); tự xóa token hết hạn/không hợp lệ (`UnregisteredError`, `SenderIdMismatchError`, `InvalidArgumentError`); không log raw token/credentials. |
+| **Frontend Firebase SDK & SW** (`fcmClient.js`, `fcmConfig.js`, `useWebPush.js`, `public/firebase-messaging-sw.js`) | Chỉ xin quyền khi người dùng bấm **"Bật thông báo trên trình duyệt"** (trong `Cài đặt tài khoản → Thông báo` hoặc `Trung tâm thông báo`). Hiển thị 6 trạng thái (`Chưa bật`, `Đang đăng ký`, `Đã bật`, `Bị trình duyệt chặn`, `Chưa cấu hình Firebase`, `Không khả dụng`). Foreground tự đồng bộ Bell/Center từ API (không trùng OS notification). Background hiển thị 1 OS notification với `tag = event_id || notification_id`. Click kiểm tra đường dẫn tương đối cùng origin, focus/mở tab trên `http://localhost:33000`. Logout tự hủy đăng ký token trước khi thu hồi JWT. |
+| **Docker Compose Overlay** (`docker-compose.int03.fcm.yml`) | Bind-mount read-only (`:ro`) file Service Account JSON từ máy host vào `/run/secrets/firebase-service-account.json` trong `notification-service` — không copy vào Docker image, không commit vào Git. |
 
-## Việc TV4 cần làm trên Firebase Console
+---
 
-1. Tạo Firebase project (hoặc dùng project có sẵn) → Project settings → General → Add app → Web.
-   Ghi lại `apiKey`, `authDomain`, `projectId`, `messagingSenderId`, `appId`. Đây là cấu hình public, không phải bí mật.
-2. Project settings → Cloud Messaging → Web Push certificates → Generate key pair.
-   Lấy **public VAPID key**.
-3. Project settings → Service accounts → Generate new private key (file JSON).
-   **Đây là bí mật**:
-   - Lưu ngoài repo, ví dụ `D:\Development\Secrets\swiftletcare-fcm.json`.
-   - Tuyệt đối không commit file này.
-4. Chrome: cho phép Notifications với `http://127.0.0.1:33000`.
-   Chrome coi `127.0.0.1`/`localhost` là secure context nên service worker chạy được mà không cần HTTPS hay domain public.
+## 2. Việc TV4 cần làm trên Firebase Console (chỉ 1 lần)
 
-## Template cấu hình (không chứa giá trị thật)
+1. Mở [Firebase Console](https://console.firebase.google.com/) → chọn hoặc tạo project (ví dụ `swiftletcare-local`).
+2. **Tạo Web App (cấu hình client public):**
+   - **Project settings → General → Your apps → Add app → Web (`</>`)**.
+   - Ghi lại 5 giá trị:
+     - `apiKey` → `VITE_FIREBASE_API_KEY`
+     - `authDomain` → `VITE_FIREBASE_AUTH_DOMAIN`
+     - `projectId` → `VITE_FIREBASE_PROJECT_ID` (và `FIREBASE_PROJECT_ID`)
+     - `messagingSenderId` → `VITE_FIREBASE_MESSAGING_SENDER_ID`
+     - `appId` → `VITE_FIREBASE_APP_ID`
+3. **Tạo Web Push Certificate (VAPID public key):**
+   - **Project settings → Cloud Messaging → Web configuration → Web Push certificates → Generate key pair**.
+   - Copy **Key pair (public key)** → `VITE_FIREBASE_VAPID_KEY`.
+4. **Tạo Service Account Private Key (BÍ MẬT — chỉ dùng ở backend):**
+   - **Project settings → Service accounts → Firebase Admin SDK → Generate new private key**.
+   - Lưu file JSON **bên ngoài repo Git**, ví dụ:
+     `D:\Development\Secrets\swiftletcare-fcm.json`
+   - **Tuyệt đối không** copy file này vào thư mục repo, không gửi nội dung key lên chat, không commit lên Git.
 
-Thêm vào `.env.int03` (file này đã được gitignore):
+---
 
-```
+## 3. Cấu hình vào `.env.int03` (file local đã được gitignore)
+
+Mở `D:\Development\Projects\XD_PM_HDT_int03\.env.int03` và **bổ sung** (không xóa các biến sẵn có):
+
+```env
+# --- INT03-R2: Firebase Cloud Messaging (Local Chrome Web Push) ---
 FIREBASE_PROJECT_ID=<project-id>
 FIREBASE_SERVICE_ACCOUNT_HOST_PATH=D:/Development/Secrets/swiftletcare-fcm.json
+
 VITE_FIREBASE_API_KEY=<apiKey>
 VITE_FIREBASE_AUTH_DOMAIN=<project-id>.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=<project-id>
-VITE_FIREBASE_MESSAGING_SENDER_ID=<senderId>
+VITE_FIREBASE_MESSAGING_SENDER_ID=<messagingSenderId>
 VITE_FIREBASE_APP_ID=<appId>
-VITE_FIREBASE_VAPID_KEY=<public VAPID key>
+VITE_FIREBASE_VAPID_KEY=<public-vapid-key>
 ```
 
-## Phần code còn phải làm sau khi có cấu hình (chưa làm ở R1)
+---
 
-- Compose:
-  - Mount file service account read-only vào `notification-service`.
-  - Truyền `FIREBASE_SERVICE_ACCOUNT_PATH` và `FIREBASE_PROJECT_ID`.
-  - Truyền các biến `VITE_FIREBASE_*` làm build args cho frontend.
-- Frontend:
-  - Thêm `firebase` SDK.
-  - Thêm `public/firebase-messaging-sw.js` để nhận thông báo khi tab ở background.
-  - Sau đăng nhập: xin quyền, gọi `getToken({ vapidKey })`, rồi `POST /api/v1/devices {token, platform:"web"}`.
-  - Khi đăng xuất: `DELETE` token.
-  - Khi tab đang mở (foreground): dùng `onMessage`.
+## 4. Lệnh triển khai Chặng 2 (chỉ rebuild 3 service liên quan, giữ nguyên DB/volumes/port 33000)
 
-## Kịch bản nghiệm thu FCM (khi có cấu hình)
+Sau khi TV4 hoàn tất bước 2 & 3 và cho phép chạy Chặng 2:
 
-1. Đăng nhập Owner A trên Chrome → cho phép Notifications → token được lưu (`notification_fcm_tokens`).
-2. Foreground: phát sự kiện IoT của Farm A → thông báo hiện ngay trong tab.
-3. Background: thu nhỏ tab → thông báo hệ điều hành hiển thị qua service worker.
-4. Đăng xuất → token bị xoá → không nhận thông báo nữa.
-5. Owner B (Farm B) đăng nhập trên profile Chrome khác → không nhận thông báo của Farm A.
-6. Token hết hạn/thu hồi → FCM trả `UNREGISTERED` → delivery chuyển `failed`. In-app notification vẫn hoạt động.
+```powershell
+Set-Location 'D:\Development\Projects\XD_PM_HDT_int03'
+docker compose -p swiftletcare-int03 `
+  -f docker-compose.int03.yml `
+  -f docker-compose.int03.fcm.yml `
+  --env-file .env.int03 `
+  up -d --build --no-deps gateway notification-service frontend
+```
+
+Sau đó kiểm thử trực tiếp trên Chrome tại `http://localhost:33000` (hoặc `http://127.0.0.1:33000` — lưu ý Chrome phân tách quyền Notification và Service Worker giữa `localhost` và `127.0.0.1`, nên chọn thống nhất `http://localhost:33000` trong toàn bộ phiên test!).

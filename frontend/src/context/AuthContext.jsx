@@ -10,6 +10,10 @@ import { authApi, setAuthToken, setUnauthorizedHandler } from '../api'
 import { USE_MOCK } from '../api/config'
 import { clearActiveFarm } from '../features/farms/activeFarmStore.js'
 import {
+  clearForeignBrowserPushOnLogin,
+  unregisterBrowserPushOnLogout,
+} from '../features/notifications/fcmClient.js'
+import {
   MOCK_USERS,
   STORAGE_KEY_LEGACY_USER,
   STORAGE_KEY_TOKEN,
@@ -57,6 +61,9 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     try {
       if (!USE_MOCK) {
+        // INT03-R2: Unregister FCM token BEFORE revoking JWT so the previous user
+        // immediately stops receiving browser push on a shared Chrome profile.
+        await unregisterBrowserPushOnLogout()
         await authApi.logout()
       }
     } catch (_) {
@@ -139,6 +146,7 @@ export function AuthProvider({ children }) {
         name: normalizedEmail.split('@')[0],
       }
       const authenticatedUser = normalizeUser(rawUser)
+      await clearForeignBrowserPushOnLogin(authenticatedUser.id)
 
       setUser(authenticatedUser)
       setTokenState(accessToken)

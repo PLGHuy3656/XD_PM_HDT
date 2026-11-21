@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import AppLayout from '../../../components/layout/AppLayout'
+import BrowserPushControl from '../../../components/features/notifications/BrowserPushControl.jsx'
 import { useAuth } from '../../../context/AuthContext'
 import apiClient from '../../../api/client.js'
 import { useNotifications } from '../../../features/notifications/useNotifications.js'
@@ -218,6 +219,8 @@ function NotificationsPage() {
             </button>
           </div>
         </header>
+
+        <BrowserPushControl compact />
 
         <div className="nc-toolbar" role="region" aria-label="Bộ lọc thông báo">
           <div className="nc-toolbar__filters">

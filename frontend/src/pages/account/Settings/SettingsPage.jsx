@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppLayout from '../../../components/layout/AppLayout'
+import BrowserPushControl from '../../../components/features/notifications/BrowserPushControl.jsx'
 import { useAuth } from '../../../context/AuthContext'
 import './SettingsPage.css'
 
@@ -198,12 +199,7 @@ function SettingsPage() {
             </div>
 
             <div className="notification-settings">
-              <NotificationRow
-                title="Push Notification"
-                description="Thông báo trên trình duyệt hoặc ứng dụng."
-                enabled={notifications.push}
-                onToggle={() => toggleNotification('push')}
-              />
+              <BrowserPushControl />
 
               <NotificationRow
                 title="Cảnh báo môi trường"

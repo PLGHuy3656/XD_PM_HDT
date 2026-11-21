@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { alertsApi } from '../../api/modules/alertsApi.js'
 import { USE_MOCK } from '../../api/config.js'
+import { NOTIFICATIONS_SYNC_EVENT } from './fcmClient.js'
 
 const POLL_MS = 15000
 
@@ -36,9 +37,12 @@ export function useNotifications(userId, { limit = 50 } = {}) {
     const controller = new AbortController()
     const first = setTimeout(() => load(userId, controller.signal), 0)
     const t = setInterval(() => load(userId, controller.signal), POLL_MS)
+    const onPushSync = () => load(userId, controller.signal)
+    window.addEventListener(NOTIFICATIONS_SYNC_EVENT, onPushSync)
     return () => {
       clearTimeout(first)
       clearInterval(t)
+      window.removeEventListener(NOTIFICATIONS_SYNC_EVENT, onPushSync)
       controller.abort()
     }
   }, [userId, load])

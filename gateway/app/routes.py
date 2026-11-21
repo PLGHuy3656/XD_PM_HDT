@@ -2086,6 +2086,50 @@ async def proxy_notifications_item_read(
 
 
 @router.post(
+    "/api/v1/notifications/fcm-tokens",
+    tags=["Notification - User Devices"],
+    summary="Register caller's FCM web/mobile push token (user derived from JWT)",
+)
+async def proxy_notifications_fcm_tokens_post(
+    request: Request,
+    current_user: Dict[str, Any] = Depends(require_any_authenticated),
+) -> Response:
+    """INT03-R2: Register FCM token for the authenticated caller only."""
+    _check_path_security(request, "")
+    await verify_fcm_device_registration(request, current_user)
+
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.notification_service_url,
+        upstream_path="/api/notifications/fcm-tokens",
+        timeout=settings.notification_timeout_seconds,
+        canonical_query="",
+    )
+
+
+@router.delete(
+    "/api/v1/notifications/fcm-tokens",
+    tags=["Notification - User Devices"],
+    summary="Unregister caller's FCM push token (logout / opt-out)",
+)
+async def proxy_notifications_fcm_tokens_delete(
+    request: Request,
+    current_user: Dict[str, Any] = Depends(require_any_authenticated),
+) -> Response:
+    """INT03-R2: Unregister FCM token for the authenticated caller only."""
+    _check_path_security(request, "")
+    await verify_fcm_device_registration(request, current_user)
+
+    return await proxy_handler.forward(
+        request=request,
+        upstream_base_url=settings.notification_service_url,
+        upstream_path="/api/notifications/fcm-tokens",
+        timeout=settings.notification_timeout_seconds,
+        canonical_query="",
+    )
+
+
+@router.post(
     "/api/v1/devices",
     tags=["Notification - User Devices"],
     summary="Register user FCM device with identity validation",

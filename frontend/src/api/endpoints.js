@@ -71,6 +71,7 @@ export const ENDPOINTS = {
     LIST: '/api/v1/notifications',
     MARK_READ: (notificationId) => `/api/v1/notifications/${notificationId}/read`,
     READ_ALL: '/api/v1/notifications/read-all',
+    FCM_TOKENS: '/api/v1/notifications/fcm-tokens',
   },
 
   ANALYTICS: {

@@ -67,6 +67,25 @@ export const alertsApi = {
   async markAllNotificationsRead(options = {}) {
     return apiClient.post(ENDPOINTS.NOTIFICATIONS.READ_ALL, {}, options)
   },
+
+  /**
+   * Register authenticated caller's FCM web push token
+   * @param {string} token
+   * @param {'web'|'android'|'ios'} [platform]
+   * @param {Object} [options]
+   */
+  async registerFcmToken(token, platform = 'web', options = {}) {
+    return apiClient.post(ENDPOINTS.NOTIFICATIONS.FCM_TOKENS, { token, platform }, options)
+  },
+
+  /**
+   * Unregister authenticated caller's FCM push token (logout / opt-out)
+   * @param {string} token
+   * @param {Object} [options]
+   */
+  async unregisterFcmToken(token, options = {}) {
+    return apiClient.delete(ENDPOINTS.NOTIFICATIONS.FCM_TOKENS, { ...options, body: { token } })
+  },
 }
 
 export default alertsApi
